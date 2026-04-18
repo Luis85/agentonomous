@@ -1,6 +1,9 @@
 import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
 import type { Embodiment } from '../body/Embodiment.js';
+import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
+import type { Learner } from '../cognition/learning/Learner.js';
+import type { Reasoner } from '../cognition/reasoning/Reasoner.js';
 import { AgeModel } from '../lifecycle/AgeModel.js';
 import type { LifecycleDescriptor } from '../lifecycle/defineLifecycle.js';
 import type { LifeStage } from '../lifecycle/LifeStage.js';
@@ -12,6 +15,9 @@ import type { MoodModel } from '../mood/MoodModel.js';
 import { DefaultMoodModel } from '../mood/DefaultMoodModel.js';
 import type { Need } from '../needs/Need.js';
 import { Needs } from '../needs/Needs.js';
+import type { NeedsPolicy } from '../needs/NeedsPolicy.js';
+import type { Skill } from '../skills/Skill.js';
+import { SkillRegistry } from '../skills/SkillRegistry.js';
 import type { AutoSavePolicy } from '../persistence/AutoSavePolicy.js';
 import { pickDefaultSnapshotStore } from '../persistence/pickDefaultSnapshotStore.js';
 import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
@@ -100,6 +106,19 @@ export interface CreateAgentConfig {
   remote?: RemoteController;
   /** Scripted controller (for `controlMode: 'scripted'`). */
   scripted?: ScriptedController;
+  /** Override the reasoner. Defaults to `UrgencyReasoner`. */
+  reasoner?: Reasoner;
+  /** Override the behavior runner. Defaults to `DirectBehaviorRunner`. */
+  behavior?: BehaviorRunner;
+  /** Override the learner. Defaults to `NoopLearner`. */
+  learner?: Learner;
+  /**
+   * Needs policy. When set together with `needs`, feeds needs-driven
+   * intention candidates into the reasoner every tick.
+   */
+  needsPolicy?: NeedsPolicy;
+  /** SkillRegistry instance OR a list of `Skill`s to register. */
+  skills?: SkillRegistry | readonly Skill[];
   /**
    * Persistence config. Pass `false` to disable auto-save entirely.
    * When omitted, `pickDefaultSnapshotStore()` auto-selects
@@ -155,6 +174,15 @@ export function createAgent(config: CreateAgentConfig): Agent {
   const randomEvents = resolveRandomEvents(config.randomEvents);
   const memory = config.memory ?? new InMemoryMemoryAdapter();
   const { snapshotStore, autoSave, autoSaveKey } = resolvePersistence(config.persistence);
+  const skills = resolveSkills(config.skills);
+
+  // Auto-install any skills contributed by config-time modules so the
+  // SkillRegistry is fully populated by the time the agent starts ticking.
+  for (const mod of config.modules ?? []) {
+    for (const skill of (mod.skills ?? []) as readonly Skill[]) {
+      skills.register(skill);
+    }
+  }
 
   return new Agent({
     identity,
@@ -179,7 +207,20 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(snapshotStore !== undefined ? { snapshotStore } : {}),
     ...(autoSave !== undefined ? { autoSave } : {}),
     ...(autoSaveKey !== undefined ? { autoSaveKey } : {}),
+    ...(config.reasoner !== undefined ? { reasoner: config.reasoner } : {}),
+    ...(config.behavior !== undefined ? { behavior: config.behavior } : {}),
+    ...(config.learner !== undefined ? { learner: config.learner } : {}),
+    ...(config.needsPolicy !== undefined ? { needsPolicy: config.needsPolicy } : {}),
+    skills,
   });
+}
+
+function resolveSkills(input: SkillRegistry | readonly Skill[] | undefined): SkillRegistry {
+  if (input === undefined) return new SkillRegistry();
+  if (input instanceof SkillRegistry) return input;
+  const reg = new SkillRegistry();
+  reg.registerAll(input);
+  return reg;
 }
 
 function resolveRandomEvents(

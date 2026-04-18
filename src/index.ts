@@ -56,9 +56,29 @@ export {
 export { ActiveNeedsPolicy, type ActiveNeedsPolicyOptions } from './needs/ActiveNeedsPolicy.js';
 export { ComposedNeedsPolicy } from './needs/ComposedNeedsPolicy.js';
 
-// Cognition types (full reasoner/behavior lands in M7).
+// Cognition (M3 types + M7 defaults + ports).
 export type { Intention, IntentionKind } from './cognition/Intention.js';
 export type { IntentionCandidate } from './cognition/IntentionCandidate.js';
+export { defaultPersonaBias, type PersonaBiasFn } from './cognition/personaBias.js';
+export type { Reasoner, ReasonerContext } from './cognition/reasoning/Reasoner.js';
+export { NoopReasoner } from './cognition/reasoning/NoopReasoner.js';
+export {
+  UrgencyReasoner,
+  type UrgencyReasonerOptions,
+} from './cognition/reasoning/UrgencyReasoner.js';
+export type { BehaviorRunner } from './cognition/behavior/BehaviorRunner.js';
+export {
+  DirectBehaviorRunner,
+  type DirectBehaviorRunnerOptions,
+} from './cognition/behavior/DirectBehaviorRunner.js';
+export { NoopBehavior } from './cognition/behavior/NoopBehavior.js';
+export type { Learner, LearningOutcome } from './cognition/learning/Learner.js';
+export { NoopLearner } from './cognition/learning/NoopLearner.js';
+
+// Skills (M7).
+export type { Skill, SkillOutcome, SkillError } from './skills/Skill.js';
+export type { SkillContext } from './skills/SkillContext.js';
+export { SkillRegistry } from './skills/SkillRegistry.js';
 
 // Lifecycle (M5).
 export type { LifeStage } from './lifecycle/LifeStage.js';
@@ -175,6 +195,8 @@ export {
   LIFE_STAGE_CHANGED,
   AGENT_DIED,
   MOOD_CHANGED,
+  SKILL_COMPLETED,
+  SKILL_FAILED,
   type NeedCriticalEvent,
   type NeedSafeEvent,
   type NeedSatisfiedEvent,
@@ -184,6 +206,8 @@ export {
   type LifeStageChangedEvent,
   type AgentDiedEvent,
   type MoodChangedEvent,
+  type SkillCompletedEvent,
+  type SkillFailedEvent,
 } from './events/standardEvents.js';
 
 // Ports — the determinism seams.

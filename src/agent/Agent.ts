@@ -19,9 +19,18 @@ import {
   type NeedSafeEvent,
 } from '../events/standardEvents.js';
 import type { Embodiment } from '../body/Embodiment.js';
+import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
+import { DirectBehaviorRunner } from '../cognition/behavior/DirectBehaviorRunner.js';
+import type { IntentionCandidate } from '../cognition/IntentionCandidate.js';
+import type { Learner } from '../cognition/learning/Learner.js';
+import { NoopLearner } from '../cognition/learning/NoopLearner.js';
+import type { Reasoner } from '../cognition/reasoning/Reasoner.js';
+import { UrgencyReasoner } from '../cognition/reasoning/UrgencyReasoner.js';
+import type { NeedsPolicy } from '../needs/NeedsPolicy.js';
 import type { AgeModel, LifeStageTransition } from '../lifecycle/AgeModel.js';
 import { DECEASED_STAGE, type LifeStage } from '../lifecycle/LifeStage.js';
 import type { StageCapabilityMap } from '../lifecycle/StageCapabilities.js';
+import { stageAllowsSkill } from '../lifecycle/StageCapabilities.js';
 import type { MemoryRepository } from '../memory/MemoryRepository.js';
 import type { Modifier } from '../modifiers/Modifier.js';
 import type { ModifierRemoval } from '../modifiers/Modifiers.js';
@@ -41,6 +50,17 @@ import { runCatchUp } from '../persistence/offlineCatchUp.js';
 import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
 import type { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
 import { InMemoryMemoryAdapter } from '../memory/InMemoryMemoryAdapter.js';
+import type { SkillError, SkillOutcome } from '../skills/Skill.js';
+import type { SkillContext } from '../skills/SkillContext.js';
+import { SkillRegistry } from '../skills/SkillRegistry.js';
+import {
+  SKILL_COMPLETED,
+  SKILL_FAILED,
+  type SkillCompletedEvent,
+  type SkillFailedEvent,
+} from '../events/standardEvents.js';
+import type { Result } from './result.js';
+import { isInvokeSkillAction } from './AgentAction.js';
 import type { RemoteController } from './RemoteController.js';
 import type { ScriptedController } from './ScriptedController.js';
 import type { Rng } from '../ports/Rng.js';
@@ -111,6 +131,20 @@ export interface AgentDependencies {
   autoSave?: AutoSavePolicy;
   /** Key used when auto-saving snapshots. Defaults to the agent id. */
   autoSaveKey?: string;
+  /** Reasoner. Defaults to `UrgencyReasoner`. M7. */
+  reasoner?: Reasoner;
+  /** Behavior runner. Defaults to `DirectBehaviorRunner`. M7. */
+  behavior?: BehaviorRunner;
+  /** Learner for future-tick scoring. Defaults to `NoopLearner`. M7. */
+  learner?: Learner;
+  /** Skill registry. Defaults to an empty registry. M7. */
+  skills?: SkillRegistry;
+  /**
+   * Needs policy consulted each tick for candidates. When both this and
+   * `needs` are set, the agent feeds needs-driven candidates into the
+   * reasoner. M7.
+   */
+  needsPolicy?: NeedsPolicy;
 }
 
 /**
@@ -142,6 +176,11 @@ export class Agent {
   readonly scripted: ScriptedController | undefined;
   readonly snapshotStore: SnapshotStorePort | undefined;
   readonly autoSaveKey: string;
+  readonly reasoner: Reasoner;
+  readonly behavior: BehaviorRunner;
+  readonly learner: Learner;
+  readonly skills: SkillRegistry;
+  readonly needsPolicy: NeedsPolicy | undefined;
   protected readonly autoSaveTracker: AutoSaveTracker | undefined;
   protected currentMood: Mood | undefined;
   /** Cumulative virtual seconds tracked for random-event cooldown bookkeeping. */
@@ -185,6 +224,11 @@ export class Agent {
       this.snapshotStore !== undefined
         ? new AutoSaveTracker(deps.autoSave ?? DEFAULT_AUTOSAVE_POLICY)
         : undefined;
+    this.reasoner = deps.reasoner ?? new UrgencyReasoner();
+    this.behavior = deps.behavior ?? new DirectBehaviorRunner();
+    this.learner = deps.learner ?? new NoopLearner();
+    this.skills = deps.skills ?? new SkillRegistry();
+    this.needsPolicy = deps.needsPolicy;
     this.virtualNowSeconds = this.ageModel?.ageSeconds ?? 0;
     if (this.ageModel?.stage === DECEASED_STAGE) {
       this.halted = true;
@@ -265,7 +309,10 @@ export class Agent {
     // Stage 2.8: animation reconcile. (M8)
 
     // Stage 3: dispatch by control mode.
-    const actions: AgentAction[] = await this.collectActions(tickStartedAt);
+    const actions: AgentAction[] = await this.collectActions(tickStartedAt, perceived);
+
+    // Stage 7: execute actions (skills + noops + custom).
+    await this.executeActions(actions, tickStartedAt);
 
     // Stage 4-7: cognition (M7 wires UrgencyReasoner + DirectBehaviorRunner).
     // Stage 8:   score (learner) (M7 stub).
@@ -306,23 +353,157 @@ export class Agent {
   }
 
   /** Collect actions for this tick based on `controlMode`. */
-  protected async collectActions(_wallNowMs: number): Promise<AgentAction[]> {
+  protected async collectActions(
+    wallNowMs: number,
+    perceived: readonly DomainEvent[],
+  ): Promise<AgentAction[]> {
     switch (this.controlMode) {
       case 'remote': {
         if (!this.remote) return [];
-        const pulled = await this.remote.pull(this.identity.id, _wallNowMs);
+        const pulled = await this.remote.pull(this.identity.id, wallNowMs);
         return [...pulled];
       }
       case 'scripted': {
         if (!this.scripted) return [];
-        const next = this.scripted.next(this.identity.id, _wallNowMs);
+        const next = this.scripted.next(this.identity.id, wallNowMs);
         return next ? [...next] : [];
       }
       case 'autonomous':
       default:
-        // Cognition pipeline runs in M7; M6 stays silent.
-        return [];
+        return this.runAutonomousCognition(perceived);
     }
+  }
+
+  /** Autonomous cognition pipeline — Stage 4 (candidates) + 5 (select) + 6 (behavior). */
+  protected runAutonomousCognition(perceived: readonly DomainEvent[]): AgentAction[] {
+    const candidates: IntentionCandidate[] = [];
+    if (this.needs && this.needsPolicy) {
+      for (const c of this.needsPolicy.suggest(this.needs, this.identity.persona)) {
+        candidates.push(c);
+      }
+    }
+    const intention = this.reasoner.selectIntention({
+      perceived,
+      needs: this.needs,
+      modifiers: this.modifiers,
+      ...(this.identity.persona !== undefined ? { persona: this.identity.persona } : {}),
+      candidates,
+    });
+    if (!intention) return [];
+    return [...this.behavior.run(intention)];
+  }
+
+  /** Stage 7: dispatch actions — invoke-skill goes through the registry. */
+  protected async executeActions(
+    actions: readonly AgentAction[],
+    wallNowMs: number,
+  ): Promise<void> {
+    if (actions.length === 0) return;
+    const ctx = this.skillContext();
+    for (const action of actions) {
+      if (action.type === 'noop') continue;
+      if (isInvokeSkillAction(action)) {
+        await this.invokeSkillAction(action.skillId, action.params, ctx, wallNowMs);
+        continue;
+      }
+      if (action.type === 'emit-event' && 'event' in action) {
+        const event = (action as { event: DomainEvent }).event;
+        this.publish(event);
+        continue;
+      }
+      // Unknown action kinds are left for consumer modules to interpret;
+      // they can subscribe and react via reactive handlers next tick.
+    }
+  }
+
+  /**
+   * Invoke a skill through the registry, honoring stage capabilities + modifier
+   * effectiveness, and emit the appropriate SkillCompleted / SkillFailed event.
+   */
+  protected async invokeSkillAction(
+    skillId: string,
+    params: Record<string, unknown> | undefined,
+    ctx: SkillContext,
+    wallNowMs: number,
+  ): Promise<void> {
+    // Stage capability gate.
+    if (this.ageModel && this.stageCapabilities) {
+      if (!stageAllowsSkill(this.stageCapabilities, this.ageModel.stage, skillId)) {
+        const event: SkillFailedEvent = {
+          type: SKILL_FAILED,
+          at: wallNowMs,
+          agentId: this.identity.id,
+          skillId,
+          code: 'stage-blocked',
+          message: `Skill '${skillId}' is blocked at stage '${this.ageModel.stage}'.`,
+        };
+        this.publish(event);
+        return;
+      }
+    }
+    if (!this.skills.has(skillId)) {
+      const event: SkillFailedEvent = {
+        type: SKILL_FAILED,
+        at: wallNowMs,
+        agentId: this.identity.id,
+        skillId,
+        code: 'not-registered',
+        message: `No skill registered with id '${skillId}'.`,
+      };
+      this.publish(event);
+      return;
+    }
+    const result: Result<SkillOutcome, SkillError> = await this.skills.invoke(skillId, params, ctx);
+    if (result.ok) {
+      const skill = this.skills.get(skillId);
+      const base = skill?.baseEffectiveness ?? 1;
+      const effectiveness =
+        (result.value.effectiveness ?? base) * this.modifiers.skillEffectiveness(skillId);
+      const event: SkillCompletedEvent = {
+        type: SKILL_COMPLETED,
+        at: wallNowMs,
+        agentId: this.identity.id,
+        skillId,
+        effectiveness,
+        ...(result.value.fxHint !== undefined ? { fxHint: result.value.fxHint } : {}),
+        ...(result.value.details !== undefined ? { details: result.value.details } : {}),
+      };
+      this.publish(event);
+      this.learner.score({
+        intention: { kind: 'satisfy', type: skillId },
+        actions: [{ type: 'invoke-skill', skillId, ...(params !== undefined ? { params } : {}) }],
+        details: { effectiveness },
+      });
+    } else {
+      const event: SkillFailedEvent = {
+        type: SKILL_FAILED,
+        at: wallNowMs,
+        agentId: this.identity.id,
+        skillId,
+        code: result.error.code,
+        message: result.error.message,
+        ...(result.error.details !== undefined ? { details: result.error.details } : {}),
+      };
+      this.publish(event);
+    }
+  }
+
+  /** Build the SkillContext passed to every skill execution. */
+  protected skillContext(): SkillContext {
+    return {
+      identity: this.identity,
+      clock: this.clock,
+      rng: this.rng,
+      satisfyNeed: (needId, amount) => {
+        this.needs?.satisfy(needId, amount);
+      },
+      applyModifier: (mod) => this.applyModifier(mod),
+      removeModifier: (id) => this.removeModifier(id),
+      publishEvent: (event) => {
+        this.publish(event);
+      },
+      ageSeconds: () => this.ageModel?.ageSeconds ?? 0,
+    };
   }
 
   /** Publish random events onto the bus (step 1.5). */
@@ -726,6 +907,9 @@ export class Agent {
       logger: this.logger,
       publishEvent: (event: DomainEvent) => {
         this.eventBus.publish(event);
+      },
+      invokeSkill: async (skillId, params) => {
+        await this.invokeSkillAction(skillId, params, this.skillContext(), this.clock.now());
       },
     };
   }

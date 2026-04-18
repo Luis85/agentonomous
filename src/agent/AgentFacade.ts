@@ -25,4 +25,12 @@ export interface AgentFacade {
 
   /** Publish a `DomainEvent` onto the shared bus. */
   publishEvent(event: DomainEvent): void;
+
+  /**
+   * Invoke a registered skill by id. Used primarily by module reactive
+   * handlers (e.g., routing `InteractionRequested` events to the matching
+   * skill). Fires `SkillCompleted` / `SkillFailed` on the bus like any
+   * in-tick skill execution.
+   */
+  invokeSkill(skillId: string, params?: Record<string, unknown>): Promise<void>;
 }

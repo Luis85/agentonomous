@@ -83,6 +83,27 @@ export interface AgentDiedEvent extends DomainEvent {
   atAgeSeconds: number;
 }
 
+// --- Skills (M7) ---
+export const SKILL_COMPLETED = 'SkillCompleted' as const;
+export const SKILL_FAILED = 'SkillFailed' as const;
+
+export interface SkillCompletedEvent extends DomainEvent {
+  type: typeof SKILL_COMPLETED;
+  agentId: string;
+  skillId: string;
+  effectiveness: number;
+  details?: Record<string, unknown>;
+}
+
+export interface SkillFailedEvent extends DomainEvent {
+  type: typeof SKILL_FAILED;
+  agentId: string;
+  skillId: string;
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 // --- Mood (M5) ---
 export const MOOD_CHANGED = 'MoodChanged' as const;
 
