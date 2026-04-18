@@ -1,5 +1,13 @@
 import type { DomainEvent } from '../events/DomainEvent.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
+import {
+  NEED_CRITICAL,
+  NEED_SAFE,
+  type NeedCriticalEvent,
+  type NeedSafeEvent,
+} from '../events/standardEvents.js';
+import type { NeedsDelta } from '../needs/Need.js';
+import type { Needs } from '../needs/Needs.js';
 import type { Rng } from '../ports/Rng.js';
 import type { WallClock } from '../ports/WallClock.js';
 import type { Logger } from '../ports/Logger.js';
@@ -39,6 +47,8 @@ export interface AgentDependencies {
   modules?: readonly AgentModule[];
   /** Initial control mode. Default: `'autonomous'`. M6 wires scripted/remote. */
   controlMode?: ControlMode;
+  /** Optional homeostatic needs (hunger, energy, …). Wired in M3. */
+  needs?: Needs;
 }
 
 /**
@@ -58,12 +68,15 @@ export class Agent {
   readonly logger: Logger;
   readonly eventBus: EventBusPort;
   readonly validator: Validator | undefined;
+  readonly needs: Needs | undefined;
 
   protected readonly timeScale: number;
   protected controlMode: ControlMode;
   protected halted = false;
   protected readonly reactiveHandlers: ReactiveHandler[] = [];
   protected readonly modules: AgentModule[] = [];
+  /** Events queued for inclusion in the current tick's `emitted` field. */
+  protected emittedThisTick: DomainEvent[] = [];
 
   constructor(deps: AgentDependencies) {
     if (!deps.identity) throw new MissingDependencyError('identity');
@@ -79,6 +92,7 @@ export class Agent {
     this.validator = deps.validator;
     this.timeScale = deps.timeScale ?? DEFAULT_TIME_SCALE;
     this.controlMode = deps.controlMode ?? 'autonomous';
+    this.needs = deps.needs;
 
     // Install config-time modules.
     for (const mod of deps.modules ?? []) {
@@ -117,6 +131,8 @@ export class Agent {
       };
     }
 
+    this.emittedThisTick = [];
+
     // Stage 0: advance time. (Lifecycle stage transitions land in M5.)
 
     // Stage 1: perceive — drain pending events from the bus.
@@ -125,22 +141,24 @@ export class Agent {
 
     // Stage 1.5: random events. (M11)
     // Stage 2:   modifier tick. (M4)
-    // Stage 2.5: needs tick.    (M3)
+
+    // Stage 2.5: needs tick. Decay, critical crossings → events.
+    const needsDeltas = this.runNeedsTick(virtualDtSeconds, tickStartedAt);
+
     // Stage 2.7: mood evaluate. (M5)
     // Stage 2.8: animation reconcile. (M8)
 
-    // Stage 3: dispatch by control mode. In M2 only 'autonomous' is wired
+    // Stage 3: dispatch by control mode. In M3 only 'autonomous' is wired
     // and the cognition pipeline is a no-op; M6 adds scripted/remote.
     const actions: AgentAction[] = [];
 
-    // Stage 4-7: cognition (M3+ / M7).
+    // Stage 4-7: cognition (M7).
     // Stage 8:   score (learner) (M7 stub).
     // Stage 9:   persist + autosave (M10).
 
-    // Stage 10: return trace. Events emitted DURING this tick sit in the bus
-    // queue for next-tick perception; they are also included in `emitted`
-    // for observability.
-    const emittedDuringTick = this.collectEmittedSinceDrain(perceived);
+    // Stage 10: return trace.
+    const deltas: Record<string, unknown> | undefined =
+      needsDeltas.length > 0 ? { needs: needsDeltas } : undefined;
 
     return {
       agentId: this.identity.id,
@@ -151,8 +169,46 @@ export class Agent {
       halted: false,
       perceived,
       actions,
-      emitted: emittedDuringTick,
+      emitted: this.emittedThisTick,
+      ...(deltas ? { deltas } : {}),
     };
+  }
+
+  /** Run the Needs.tick step and emit critical/safe events for threshold crossings. */
+  protected runNeedsTick(virtualDtSeconds: number, at: number): readonly NeedsDelta[] {
+    if (!this.needs || virtualDtSeconds <= 0) return [];
+    const deltas = this.needs.tick(virtualDtSeconds);
+    for (const delta of deltas) {
+      if (delta.crossedCritical) {
+        const event: NeedCriticalEvent = {
+          type: NEED_CRITICAL,
+          at,
+          agentId: this.identity.id,
+          needId: delta.needId,
+          level: delta.after,
+        };
+        this.publish(event);
+      } else if (delta.crossedSafe) {
+        const event: NeedSafeEvent = {
+          type: NEED_SAFE,
+          at,
+          agentId: this.identity.id,
+          needId: delta.needId,
+          level: delta.after,
+        };
+        this.publish(event);
+      }
+    }
+    return deltas;
+  }
+
+  /**
+   * Publish an event onto the bus AND record it in the current tick's
+   * `emitted` list. Internal helper — skills/modules use `AgentFacade`.
+   */
+  protected publish(event: DomainEvent): void {
+    this.emittedThisTick.push(event);
+    this.eventBus.publish(event);
   }
 
   /**
@@ -194,7 +250,7 @@ export class Agent {
       stage: this.halted ? 'deceased' : 'alive',
       halted: this.halted,
       ageSeconds: 0, // M5
-      needs: {}, // M3
+      needs: this.needs?.snapshot() ?? {},
       modifiers: [], // M4
       animation: 'idle', // M8
     };
@@ -248,14 +304,5 @@ export class Agent {
         }
       }
     }
-  }
-
-  /**
-   * In M2 the agent does not emit during the tick itself, so we simply
-   * return an empty list. The signature stays stable so later milestones
-   * (skills, need-critical emitters) can capture outbound events here.
-   */
-  protected collectEmittedSinceDrain(_perceived: readonly DomainEvent[]): DomainEvent[] {
-    return [];
   }
 }

@@ -44,6 +44,32 @@ export {
 // Persistence state slice (full persistence lands in M10).
 export type { AgentState } from './persistence/AgentState.js';
 
+// Needs (M3).
+export type { Need, NeedsDelta } from './needs/Need.js';
+export { DEFAULT_URGENCY_CURVE } from './needs/Need.js';
+export { Needs, type DecayMultiplierFn } from './needs/Needs.js';
+export type { NeedsPolicy } from './needs/NeedsPolicy.js';
+export {
+  ExpressiveNeedsPolicy,
+  type ExpressiveNeedsPolicyOptions,
+} from './needs/ExpressiveNeedsPolicy.js';
+export { ActiveNeedsPolicy, type ActiveNeedsPolicyOptions } from './needs/ActiveNeedsPolicy.js';
+export { ComposedNeedsPolicy } from './needs/ComposedNeedsPolicy.js';
+
+// Cognition types (full reasoner/behavior lands in M7).
+export type { Intention, IntentionKind } from './cognition/Intention.js';
+export type { IntentionCandidate } from './cognition/IntentionCandidate.js';
+
+// Standard event constants/types.
+export {
+  NEED_CRITICAL,
+  NEED_SAFE,
+  NEED_SATISFIED,
+  type NeedCriticalEvent,
+  type NeedSafeEvent,
+  type NeedSatisfiedEvent,
+} from './events/standardEvents.js';
+
 // Ports — the determinism seams.
 export type { WallClock } from './ports/WallClock.js';
 export { SystemClock } from './ports/SystemClock.js';

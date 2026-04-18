@@ -1,5 +1,7 @@
 import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
+import type { Need } from '../needs/Need.js';
+import { Needs } from '../needs/Needs.js';
 import type { WallClock } from '../ports/WallClock.js';
 import { SystemClock } from '../ports/SystemClock.js';
 import type { Rng } from '../ports/Rng.js';
@@ -53,6 +55,8 @@ export interface CreateAgentConfig {
   validator?: Validator;
   /** Plugins to install at construction time. */
   modules?: readonly AgentModule[];
+  /** Homeostatic needs. Pass a `Needs` instance or a list of `Need` definitions. */
+  needs?: Needs | readonly Need[];
 }
 
 /**
@@ -76,6 +80,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
   const eventBus = config.eventBus ?? new InMemoryEventBus();
   const clock = config.clock ?? new SystemClock();
   const rng = resolveRng(config.rng, config.id);
+  const needs = resolveNeeds(config.needs);
 
   return new Agent({
     identity,
@@ -87,7 +92,14 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(config.timeScale !== undefined ? { timeScale: config.timeScale } : {}),
     ...(config.controlMode !== undefined ? { controlMode: config.controlMode } : {}),
     ...(config.modules !== undefined ? { modules: config.modules } : {}),
+    ...(needs ? { needs } : {}),
   });
+}
+
+function resolveNeeds(needs: Needs | readonly Need[] | undefined): Needs | undefined {
+  if (needs === undefined) return undefined;
+  if (needs instanceof Needs) return needs;
+  return new Needs(needs);
 }
 
 function resolveRng(rng: Rng | number | string | undefined, fallbackSeed: string): Rng {
