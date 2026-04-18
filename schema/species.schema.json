@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/luis85/agentonomous/schema/species.schema.json",
+  "title": "SpeciesDescriptor",
+  "description": "Data-driven species definition. Pair with agentonomous' defineSpecies() factory.",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "displayName": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "dialogueCapable": { "type": "boolean" },
+    "allowedSkills": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "locomotion": {
+      "type": "string",
+      "description": "walk | swim | fly | crawl | slither | static | <custom>"
+    },
+    "persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "traits": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "needs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "level", "decayPerSec"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "level": { "type": "number", "minimum": 0, "maximum": 1 },
+          "decayPerSec": { "type": "number", "minimum": 0 },
+          "criticalThreshold": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": ["schedule"],
+      "additionalProperties": false,
+      "properties": {
+        "schedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stage", "atSeconds"],
+            "additionalProperties": false,
+            "properties": {
+              "stage": { "type": "string", "minLength": 1 },
+              "atSeconds": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "allow": { "type": "array", "items": { "type": "string" } },
+              "deny": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "passiveModifiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source", "appliedAt", "stack", "effects"],
+        "properties": {
+          "id": { "type": "string" },
+          "source": { "type": "string" },
+          "appliedAt": { "type": "number" },
+          "expiresAt": { "type": "number" },
+          "stack": {
+            "type": "string",
+            "enum": ["replace", "stack", "refresh", "ignore"]
+          },
+          "effects": { "type": "array" },
+          "visual": { "type": "object" }
+        }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "required": ["shape", "width", "height", "color", "visible"],
+      "additionalProperties": false,
+      "properties": {
+        "shape": { "type": "string" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "color": { "type": "string" },
+        "visible": { "type": "boolean" },
+        "spriteId": { "type": "string" },
+        "layer": { "type": "number" }
+      }
+    }
+  }
+}

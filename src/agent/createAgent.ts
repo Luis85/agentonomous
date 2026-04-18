@@ -35,6 +35,9 @@ import type { Rng } from '../ports/Rng.js';
 import { SeededRng } from '../ports/SeededRng.js';
 import type { Logger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
+import type { SpeciesDescriptor } from '../species/SpeciesDescriptor.js';
+import type { SpeciesRegistry } from '../species/SpeciesRegistry.js';
+import { InvalidSpeciesError } from './errors.js';
 import type { Species } from './Species.js';
 import type { AgentRole } from './AgentRole.js';
 import type { Persona } from './Persona.js';
@@ -51,8 +54,14 @@ import { Agent } from './Agent.js';
 export interface CreateAgentConfig {
   /** Stable unique identifier. */
   id: string;
-  /** Species identifier (free-form string; M12 adds rich descriptors). */
-  species: Species;
+  /**
+   * Species. Accepts a bare id string (resolved via `speciesRegistry` when
+   * one is wired), a full `SpeciesDescriptor` (from `defineSpecies()`), or
+   * both a registry + id.
+   */
+  species: Species | SpeciesDescriptor;
+  /** Optional registry consulted when `species` is passed as a string. */
+  speciesRegistry?: SpeciesRegistry;
 
   /** Human-readable name. Defaults to `id` if omitted. */
   name?: string;
@@ -149,21 +158,29 @@ export interface CreateAgentConfig {
  * ```
  */
 export function createAgent(config: CreateAgentConfig): Agent {
+  const speciesDescriptor = resolveSpecies(config.species, config.speciesRegistry);
+  const speciesId =
+    speciesDescriptor?.id ?? (typeof config.species === 'string' ? config.species : '');
+
   const identity: AgentIdentity = {
     id: config.id,
     name: config.name ?? config.id,
     version: config.version ?? '0.0.0',
     role: config.role ?? 'npc',
-    species: config.species,
-    ...(config.persona !== undefined ? { persona: config.persona } : {}),
+    species: speciesId,
+    ...(config.persona !== undefined
+      ? { persona: config.persona }
+      : speciesDescriptor?.persona !== undefined
+        ? { persona: speciesDescriptor.persona }
+        : {}),
   };
 
   const eventBus = config.eventBus ?? new InMemoryEventBus();
   const clock = config.clock ?? new SystemClock();
   const rng = resolveRng(config.rng, config.id);
-  const needs = resolveNeeds(config.needs);
+  const needs = resolveNeeds(config.needs ?? speciesDescriptor?.needs);
 
-  const lifecycle = resolveLifecycle(config.lifecycle);
+  const lifecycle = resolveLifecycle(config.lifecycle ?? speciesDescriptor?.lifecycle);
   const ageModel =
     lifecycle !== undefined
       ? new AgeModel({
@@ -190,7 +207,32 @@ export function createAgent(config: CreateAgentConfig): Agent {
     }
   }
 
-  return new Agent({
+  // Build an embodiment from species defaults if the consumer didn't
+  // supply one. Locomotion + appearance flow through.
+  let embodiment = config.embodiment;
+  if (embodiment === undefined && speciesDescriptor) {
+    const appearance = speciesDescriptor.appearance;
+    const locomotion = speciesDescriptor.locomotion;
+    if (appearance !== undefined || locomotion !== undefined) {
+      embodiment = {
+        transform: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+        },
+        appearance: appearance ?? {
+          shape: 'rectangle',
+          width: 32,
+          height: 32,
+          color: '#ffffff',
+          visible: true,
+        },
+        locomotion: locomotion ?? 'static',
+      };
+    }
+  }
+
+  const agent = new Agent({
     identity,
     eventBus,
     clock,
@@ -205,7 +247,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(ageModel !== undefined ? { ageModel } : {}),
     ...(lifecycle?.capabilities !== undefined ? { stageCapabilities: lifecycle.capabilities } : {}),
     ...(moodModel !== undefined ? { moodModel } : {}),
-    ...(config.embodiment !== undefined ? { embodiment: config.embodiment } : {}),
+    ...(embodiment !== undefined ? { embodiment } : {}),
     ...(randomEvents !== undefined ? { randomEvents } : {}),
     memory,
     ...(config.remote !== undefined ? { remote: config.remote } : {}),
@@ -220,6 +262,16 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(config.animation !== undefined ? { animation: config.animation } : {}),
     skills,
   });
+
+  // Apply species-declared passive modifiers after construction so the
+  // standard ModifierApplied events fire on the bus.
+  if (speciesDescriptor?.passiveModifiers) {
+    for (const mod of speciesDescriptor.passiveModifiers) {
+      agent.applyModifier(mod);
+    }
+  }
+
+  return agent;
 }
 
 function resolveSkills(input: SkillRegistry | readonly Skill[] | undefined): SkillRegistry {
@@ -228,6 +280,22 @@ function resolveSkills(input: SkillRegistry | readonly Skill[] | undefined): Ski
   const reg = new SkillRegistry();
   reg.registerAll(input);
   return reg;
+}
+
+function resolveSpecies(
+  species: Species | SpeciesDescriptor,
+  registry: SpeciesRegistry | undefined,
+): SpeciesDescriptor | undefined {
+  if (typeof species === 'string') {
+    if (registry?.has(species)) return registry.get(species);
+    return undefined;
+  }
+  if (species && typeof species === 'object' && 'id' in species) {
+    return species;
+  }
+  throw new InvalidSpeciesError(
+    'Invalid `species` config — expected string id or SpeciesDescriptor.',
+  );
 }
 
 function resolveRandomEvents(

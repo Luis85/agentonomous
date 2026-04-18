@@ -135,6 +135,11 @@ export { DefaultMoodModel } from './mood/DefaultMoodModel.js';
 export { InMemoryRemoteController, type RemoteController } from './agent/RemoteController.js';
 export { ArrayScriptedController, type ScriptedController } from './agent/ScriptedController.js';
 
+// Species (M12).
+export type { SpeciesDescriptor } from './species/SpeciesDescriptor.js';
+export { defineSpecies } from './species/defineSpecies.js';
+export { SpeciesRegistry } from './species/SpeciesRegistry.js';
+
 // Body (M9).
 export {
   type Vector3Like,
