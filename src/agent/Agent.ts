@@ -18,6 +18,14 @@ import {
   type NeedCriticalEvent,
   type NeedSafeEvent,
 } from '../events/standardEvents.js';
+import {
+  ANIMATION_TRANSITION,
+  type AnimationTransitionEvent,
+} from '../animation/AnimationTransitionEvent.js';
+import {
+  AnimationStateMachine,
+  type AnimationStateMachineOptions,
+} from '../animation/AnimationStateMachine.js';
 import type { Embodiment } from '../body/Embodiment.js';
 import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
 import { DirectBehaviorRunner } from '../cognition/behavior/DirectBehaviorRunner.js';
@@ -145,6 +153,8 @@ export interface AgentDependencies {
    * reasoner. M7.
    */
   needsPolicy?: NeedsPolicy;
+  /** Animation state machine. Defaults to a new instance with sensible maps. M8. */
+  animation?: AnimationStateMachine | AnimationStateMachineOptions;
 }
 
 /**
@@ -181,6 +191,9 @@ export class Agent {
   readonly learner: Learner;
   readonly skills: SkillRegistry;
   readonly needsPolicy: NeedsPolicy | undefined;
+  readonly animation: AnimationStateMachine;
+  /** Id of the skill whose execution is currently driving the animation (if any). */
+  protected currentActiveSkillId: string | undefined;
   protected readonly autoSaveTracker: AutoSaveTracker | undefined;
   protected currentMood: Mood | undefined;
   /** Cumulative virtual seconds tracked for random-event cooldown bookkeeping. */
@@ -229,6 +242,10 @@ export class Agent {
     this.learner = deps.learner ?? new NoopLearner();
     this.skills = deps.skills ?? new SkillRegistry();
     this.needsPolicy = deps.needsPolicy;
+    this.animation =
+      deps.animation instanceof AnimationStateMachine
+        ? deps.animation
+        : new AnimationStateMachine(deps.animation);
     this.virtualNowSeconds = this.ageModel?.ageSeconds ?? 0;
     if (this.ageModel?.stage === DECEASED_STAGE) {
       this.halted = true;
@@ -306,7 +323,8 @@ export class Agent {
 
     // Stage 2.7: mood evaluate.
     const moodChange = this.runMoodTick(tickStartedAt);
-    // Stage 2.8: animation reconcile. (M8)
+    // Stage 2.8: animation reconcile.
+    const animationTransition = this.runAnimationTick(tickStartedAt);
 
     // Stage 3: dispatch by control mode.
     const actions: AgentAction[] = await this.collectActions(tickStartedAt, perceived);
@@ -332,6 +350,7 @@ export class Agent {
       deltasRecord.stageTransitions = stageTransitions;
     }
     if (moodChange) deltasRecord.mood = moodChange;
+    if (animationTransition) deltasRecord.animation = animationTransition;
     const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
 
     const stage: LifeStage = this.ageModel?.stage ?? 'alive';
@@ -453,7 +472,15 @@ export class Agent {
       this.publish(event);
       return;
     }
-    const result: Result<SkillOutcome, SkillError> = await this.skills.invoke(skillId, params, ctx);
+    // Expose the running skill to the animation reconciler. Scoped to this
+    // invocation so multiple sequential skills don't leak state.
+    const previousActive = this.currentActiveSkillId;
+    this.currentActiveSkillId = skillId;
+    const result: Result<SkillOutcome, SkillError> = await this.skills
+      .invoke(skillId, params, ctx)
+      .finally(() => {
+        this.currentActiveSkillId = previousActive;
+      });
     if (result.ok) {
       const skill = this.skills.get(skillId);
       const base = skill?.baseEffectiveness ?? 1;
@@ -547,6 +574,34 @@ export class Agent {
       this.publish(event);
     }
     return transitions;
+  }
+
+  /** Reconcile the animation state machine and emit AnimationTransition if it rotated. */
+  protected runAnimationTick(at: number): { from: string; to: string; reason?: string } | null {
+    const transition = this.animation.reconcile({
+      modifiers: this.modifiers,
+      wallNowMs: at,
+      ...(this.currentActiveSkillId !== undefined
+        ? { activeSkillId: this.currentActiveSkillId }
+        : {}),
+      ...(this.currentMood?.category !== undefined ? { mood: this.currentMood.category } : {}),
+    });
+    if (!transition) return null;
+    const event: AnimationTransitionEvent = {
+      type: ANIMATION_TRANSITION,
+      at,
+      agentId: this.identity.id,
+      from: transition.from,
+      to: transition.to,
+      ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
+      ...(transition.fxHint !== undefined ? { fxHint: transition.fxHint } : {}),
+    };
+    this.publish(event);
+    return {
+      from: transition.from,
+      to: transition.to,
+      ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
+    };
   }
 
   /** Evaluate the mood model and emit MoodChanged if the category rotated. */
@@ -664,6 +719,22 @@ export class Agent {
       ...(reason !== undefined ? { reason } : {}),
     };
     this.publish(died);
+
+    // Force the animation into its 'dead' state so renderers update
+    // immediately; reconciliation is inert from now on since halted=true
+    // short-circuits future ticks.
+    const animationT = this.animation.transition('dead', 'deceased');
+    if (animationT) {
+      const animEvent: AnimationTransitionEvent = {
+        type: ANIMATION_TRANSITION,
+        at,
+        agentId: this.identity.id,
+        from: animationT.from,
+        to: animationT.to,
+        reason: 'deceased',
+      };
+      this.publish(animEvent);
+    }
     // Suppress unused-var warning if stage wasn't needed.
     void fromStage;
   }
@@ -876,7 +947,7 @@ export class Agent {
       ...(this.currentMood !== undefined
         ? { mood: { category: this.currentMood.category, updatedAt: this.currentMood.updatedAt } }
         : {}),
-      animation: 'idle', // M8
+      animation: this.halted ? 'dead' : this.animation.current(),
     };
   }
 

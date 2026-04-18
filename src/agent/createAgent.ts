@@ -1,5 +1,9 @@
 import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
+import type {
+  AnimationStateMachine,
+  AnimationStateMachineOptions,
+} from '../animation/AnimationStateMachine.js';
 import type { Embodiment } from '../body/Embodiment.js';
 import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
 import type { Learner } from '../cognition/learning/Learner.js';
@@ -119,6 +123,8 @@ export interface CreateAgentConfig {
   needsPolicy?: NeedsPolicy;
   /** SkillRegistry instance OR a list of `Skill`s to register. */
   skills?: SkillRegistry | readonly Skill[];
+  /** Animation state machine instance or its constructor options. */
+  animation?: AnimationStateMachine | AnimationStateMachineOptions;
   /**
    * Persistence config. Pass `false` to disable auto-save entirely.
    * When omitted, `pickDefaultSnapshotStore()` auto-selects
@@ -211,6 +217,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(config.behavior !== undefined ? { behavior: config.behavior } : {}),
     ...(config.learner !== undefined ? { learner: config.learner } : {}),
     ...(config.needsPolicy !== undefined ? { needsPolicy: config.needsPolicy } : {}),
+    ...(config.animation !== undefined ? { animation: config.animation } : {}),
     skills,
   });
 }

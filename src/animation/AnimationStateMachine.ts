@@ -1,0 +1,156 @@
+import type { Modifiers } from '../modifiers/Modifiers.js';
+import type { MoodCategory } from '../mood/Mood.js';
+import type { AnimationState } from './AnimationState.js';
+
+/** A recorded state rotation. Useful for debug overlays + replay tests. */
+export interface AnimationTransition {
+  from: AnimationState;
+  to: AnimationState;
+  at: number;
+  reason?: string;
+  fxHint?: string;
+}
+
+export interface ReconcileContext {
+  activeSkillId?: string;
+  mood?: MoodCategory;
+  modifiers?: Modifiers;
+  wallNowMs: number;
+}
+
+/**
+ * Options for `AnimationStateMachine`. Consumers tune how the reconciler
+ * maps (active skill + mood + modifiers) onto concrete animation states.
+ *
+ * - `skillMap` maps a running skill id to its "during execution" state
+ *   (e.g., `feed → 'eating'`).
+ * - `modifierOverrides` maps a modifier id to a forcing state (e.g.,
+ *   `sick → 'sick'`). The first matching present modifier wins.
+ * - `moodMap` maps a mood category onto an animation state when no skill
+ *   or modifier is driving.
+ * - `idleState` is the fallback. Default `'idle'`.
+ */
+export interface AnimationStateMachineOptions {
+  skillMap?: Readonly<Record<string, AnimationState>>;
+  modifierOverrides?: Readonly<Record<string, AnimationState>>;
+  moodMap?: Readonly<Record<string, AnimationState>>;
+  idleState?: AnimationState;
+}
+
+/**
+ * State machine routing (active skill + mood + modifiers) to a single
+ * `AnimationState`. Pure apart from the history buffer; every transition
+ * call yields an event the agent publishes onto the bus.
+ */
+export class AnimationStateMachine {
+  private currentState: AnimationState = 'idle';
+  private readonly historyLog: AnimationTransition[] = [];
+  private readonly skillMap: Readonly<Record<string, AnimationState>>;
+  private readonly modifierOverrides: Readonly<Record<string, AnimationState>>;
+  private readonly moodMap: Readonly<Record<string, AnimationState>>;
+  private readonly idleState: AnimationState;
+
+  constructor(opts: AnimationStateMachineOptions = {}) {
+    this.skillMap = opts.skillMap ?? {};
+    this.modifierOverrides = opts.modifierOverrides ?? { sick: 'sick' };
+    this.moodMap = opts.moodMap ?? {
+      sad: 'sad',
+      happy: 'happy',
+      playful: 'playing',
+      sleepy: 'sleeping',
+      bored: 'idle',
+      sick: 'sick',
+    };
+    this.idleState = opts.idleState ?? 'idle';
+    this.currentState = this.idleState;
+  }
+
+  current(): AnimationState {
+    return this.currentState;
+  }
+
+  history(): readonly AnimationTransition[] {
+    return this.historyLog;
+  }
+
+  /**
+   * Force an explicit transition. Skips reconciliation. Returns the
+   * transition (or null if we're already in `next`).
+   */
+  transition(next: AnimationState, reason?: string, fxHint?: string): AnimationTransition | null {
+    if (next === this.currentState) return null;
+    const t: AnimationTransition = {
+      from: this.currentState,
+      to: next,
+      at: 0, // caller patches in wall ms — the Agent fills it in.
+      ...(reason !== undefined ? { reason } : {}),
+      ...(fxHint !== undefined ? { fxHint } : {}),
+    };
+    this.currentState = next;
+    this.historyLog.push(t);
+    return t;
+  }
+
+  /**
+   * Derive the right state from context priority:
+   *   1. Deceased: forced 'dead' (caller sets reason = 'deceased').
+   *   2. Modifier override wins (sick / stunned / etc).
+   *   3. Running skill.
+   *   4. Mood mapping.
+   *   5. Fallback to idle.
+   */
+  reconcile(ctx: ReconcileContext): AnimationTransition | null {
+    const next = this.pickNext(ctx);
+    if (next === this.currentState) return null;
+    const t: AnimationTransition = {
+      from: this.currentState,
+      to: next,
+      at: ctx.wallNowMs,
+      reason: this.reasonFor(ctx, next),
+    };
+    this.currentState = next;
+    this.historyLog.push(t);
+    return t;
+  }
+
+  snapshot(): { state: AnimationState } {
+    return { state: this.currentState };
+  }
+
+  restore(snap: { state: AnimationState }): void {
+    this.currentState = snap.state;
+  }
+
+  private pickNext(ctx: ReconcileContext): AnimationState {
+    if (ctx.modifiers) {
+      for (const mod of ctx.modifiers.list()) {
+        const mapped = this.modifierOverrides[mod.id];
+        if (mapped !== undefined) return mapped;
+      }
+    }
+    if (ctx.activeSkillId !== undefined) {
+      const mapped = this.skillMap[ctx.activeSkillId];
+      if (mapped !== undefined) return mapped;
+    }
+    if (ctx.mood !== undefined) {
+      const mapped = this.moodMap[ctx.mood];
+      if (mapped !== undefined) return mapped;
+    }
+    return this.idleState;
+  }
+
+  private reasonFor(ctx: ReconcileContext, next: AnimationState): string {
+    if (ctx.modifiers) {
+      for (const mod of ctx.modifiers.list()) {
+        if (this.modifierOverrides[mod.id] === next) return `modifier:${mod.id}`;
+      }
+    }
+    if (ctx.activeSkillId !== undefined && this.skillMap[ctx.activeSkillId] === next) {
+      return `skill:${ctx.activeSkillId}`;
+    }
+    if (ctx.mood !== undefined && this.moodMap[ctx.mood] === next) {
+      return `mood:${ctx.mood}`;
+    }
+    return 'idle';
+  }
+}

@@ -80,6 +80,36 @@ export type { Skill, SkillOutcome, SkillError } from './skills/Skill.js';
 export type { SkillContext } from './skills/SkillContext.js';
 export { SkillRegistry } from './skills/SkillRegistry.js';
 
+// Default skill library (M7).
+export {
+  defaultPetInteractionModule,
+  defaultActiveSkills,
+  defaultExpressionSkills,
+  FeedSkill,
+  CleanSkill,
+  PlaySkill,
+  RestSkill,
+  ScoldSkill,
+  PetSkill,
+  MedicateSkill,
+  ExpressMeowSkill,
+  ExpressSadSkill,
+  ExpressSleepySkill,
+} from './skills/defaults/index.js';
+
+// Animation (M8).
+export type { AnimationState } from './animation/AnimationState.js';
+export {
+  type AnimationTransitionEvent,
+  ANIMATION_TRANSITION,
+} from './animation/AnimationTransitionEvent.js';
+export {
+  AnimationStateMachine,
+  type AnimationStateMachineOptions,
+  type AnimationTransition,
+  type ReconcileContext,
+} from './animation/AnimationStateMachine.js';
+
 // Lifecycle (M5).
 export type { LifeStage } from './lifecycle/LifeStage.js';
 export { DECEASED_STAGE } from './lifecycle/LifeStage.js';
