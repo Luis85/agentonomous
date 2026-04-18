@@ -18,9 +18,11 @@ import {
   type NeedCriticalEvent,
   type NeedSafeEvent,
 } from '../events/standardEvents.js';
+import type { Embodiment } from '../body/Embodiment.js';
 import type { AgeModel, LifeStageTransition } from '../lifecycle/AgeModel.js';
 import { DECEASED_STAGE, type LifeStage } from '../lifecycle/LifeStage.js';
 import type { StageCapabilityMap } from '../lifecycle/StageCapabilities.js';
+import type { MemoryRepository } from '../memory/MemoryRepository.js';
 import type { Modifier } from '../modifiers/Modifier.js';
 import type { ModifierRemoval } from '../modifiers/Modifiers.js';
 import { Modifiers } from '../modifiers/Modifiers.js';
@@ -28,6 +30,19 @@ import type { Mood } from '../mood/Mood.js';
 import type { MoodModel } from '../mood/MoodModel.js';
 import type { NeedsDelta } from '../needs/Need.js';
 import type { Needs } from '../needs/Needs.js';
+import type { AgentSnapshot, SnapshotPart } from '../persistence/AgentSnapshot.js';
+import { CURRENT_SNAPSHOT_VERSION } from '../persistence/AgentSnapshot.js';
+import {
+  AutoSaveTracker,
+  DEFAULT_AUTOSAVE_POLICY,
+  type AutoSavePolicy,
+} from '../persistence/AutoSavePolicy.js';
+import { runCatchUp } from '../persistence/offlineCatchUp.js';
+import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
+import type { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
+import { InMemoryMemoryAdapter } from '../memory/InMemoryMemoryAdapter.js';
+import type { RemoteController } from './RemoteController.js';
+import type { ScriptedController } from './ScriptedController.js';
 import type { Rng } from '../ports/Rng.js';
 import type { WallClock } from '../ports/WallClock.js';
 import type { Logger } from '../ports/Logger.js';
@@ -80,6 +95,22 @@ export interface AgentDependencies {
   stageCapabilities?: StageCapabilityMap;
   /** Optional mood model. `DefaultMoodModel` in createAgent when needs are present. */
   moodModel?: MoodModel;
+  /** Optional embodiment (transform + appearance + locomotion). M9. */
+  embodiment?: Embodiment;
+  /** Optional random event ticker. M11. */
+  randomEvents?: RandomEventTicker;
+  /** Optional memory store. M10. */
+  memory?: MemoryRepository;
+  /** Remote controller for `controlMode: 'remote'`. M6. */
+  remote?: RemoteController;
+  /** Scripted controller for `controlMode: 'scripted'`. M6. */
+  scripted?: ScriptedController;
+  /** Snapshot store used by auto-save. M10. */
+  snapshotStore?: SnapshotStorePort;
+  /** Auto-save policy. Defaults to `DEFAULT_AUTOSAVE_POLICY` when a store is wired. */
+  autoSave?: AutoSavePolicy;
+  /** Key used when auto-saving snapshots. Defaults to the agent id. */
+  autoSaveKey?: string;
 }
 
 /**
@@ -104,7 +135,17 @@ export class Agent {
   readonly ageModel: AgeModel | undefined;
   readonly stageCapabilities: StageCapabilityMap | undefined;
   readonly moodModel: MoodModel | undefined;
+  readonly embodiment: Embodiment | undefined;
+  readonly randomEvents: RandomEventTicker | undefined;
+  readonly memory: MemoryRepository | undefined;
+  readonly remote: RemoteController | undefined;
+  readonly scripted: ScriptedController | undefined;
+  readonly snapshotStore: SnapshotStorePort | undefined;
+  readonly autoSaveKey: string;
+  protected readonly autoSaveTracker: AutoSaveTracker | undefined;
   protected currentMood: Mood | undefined;
+  /** Cumulative virtual seconds tracked for random-event cooldown bookkeeping. */
+  protected virtualNowSeconds = 0;
 
   protected readonly timeScale: number;
   protected controlMode: ControlMode;
@@ -133,6 +174,18 @@ export class Agent {
     this.ageModel = deps.ageModel;
     this.stageCapabilities = deps.stageCapabilities;
     this.moodModel = deps.moodModel;
+    this.embodiment = deps.embodiment;
+    this.randomEvents = deps.randomEvents;
+    this.memory = deps.memory;
+    this.remote = deps.remote;
+    this.scripted = deps.scripted;
+    this.snapshotStore = deps.snapshotStore;
+    this.autoSaveKey = deps.autoSaveKey ?? this.identity.id;
+    this.autoSaveTracker =
+      this.snapshotStore !== undefined
+        ? new AutoSaveTracker(deps.autoSave ?? DEFAULT_AUTOSAVE_POLICY)
+        : undefined;
+    this.virtualNowSeconds = this.ageModel?.ageSeconds ?? 0;
     if (this.ageModel?.stage === DECEASED_STAGE) {
       this.halted = true;
     }
@@ -183,7 +236,9 @@ export class Agent {
     const perceived = this.eventBus.drain();
     await this.dispatchReactiveHandlers(perceived);
 
-    // Stage 1.5: random events. (M11)
+    // Stage 1.5: random events — publish seeded random events onto the bus.
+    this.virtualNowSeconds += virtualDtSeconds;
+    this.runRandomEventsTick(virtualDtSeconds, tickStartedAt);
 
     // Stage 2: modifier tick — expire time-bound modifiers.
     const expired = this.runModifiersTick(tickStartedAt);
@@ -209,13 +264,16 @@ export class Agent {
     const moodChange = this.runMoodTick(tickStartedAt);
     // Stage 2.8: animation reconcile. (M8)
 
-    // Stage 3: dispatch by control mode. In M3 only 'autonomous' is wired
-    // and the cognition pipeline is a no-op; M6 adds scripted/remote.
-    const actions: AgentAction[] = [];
+    // Stage 3: dispatch by control mode.
+    const actions: AgentAction[] = await this.collectActions(tickStartedAt);
 
-    // Stage 4-7: cognition (M7).
+    // Stage 4-7: cognition (M7 wires UrgencyReasoner + DirectBehaviorRunner).
     // Stage 8:   score (learner) (M7 stub).
-    // Stage 9:   persist + autosave (M10).
+
+    // Stage 9: persist + autosave (M10).
+    if (this.autoSaveTracker) {
+      this.autoSaveTracker.advance(virtualDtSeconds);
+    }
 
     // Stage 10: return trace.
     const deltasRecord: Record<string, unknown> = {};
@@ -230,7 +288,7 @@ export class Agent {
     const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
 
     const stage: LifeStage = this.ageModel?.stage ?? 'alive';
-    return {
+    const trace: DecisionTrace = {
       agentId: this.identity.id,
       tickStartedAt,
       virtualDtSeconds,
@@ -242,6 +300,54 @@ export class Agent {
       emitted: this.emittedThisTick,
       ...(deltas ? { deltas } : {}),
     };
+
+    await this.maybeAutoSave();
+    return trace;
+  }
+
+  /** Collect actions for this tick based on `controlMode`. */
+  protected async collectActions(_wallNowMs: number): Promise<AgentAction[]> {
+    switch (this.controlMode) {
+      case 'remote': {
+        if (!this.remote) return [];
+        const pulled = await this.remote.pull(this.identity.id, _wallNowMs);
+        return [...pulled];
+      }
+      case 'scripted': {
+        if (!this.scripted) return [];
+        const next = this.scripted.next(this.identity.id, _wallNowMs);
+        return next ? [...next] : [];
+      }
+      case 'autonomous':
+      default:
+        // Cognition pipeline runs in M7; M6 stays silent.
+        return [];
+    }
+  }
+
+  /** Publish random events onto the bus (step 1.5). */
+  protected runRandomEventsTick(virtualDtSeconds: number, at: number): void {
+    if (!this.randomEvents || virtualDtSeconds <= 0) return;
+    const events = this.randomEvents.tick({
+      virtualDtSeconds,
+      virtualNowSeconds: this.virtualNowSeconds,
+      rng: this.rng,
+      needs: this.needs,
+      modifiers: this.modifiers,
+      stage: this.ageModel?.stage,
+    });
+    for (const event of events) {
+      // Ensure `at` is populated even if the emitter forgot.
+      this.publish({ ...event, at: event.at ?? at });
+    }
+  }
+
+  /** Persist the current snapshot to the configured store if the policy fires. */
+  protected async maybeAutoSave(): Promise<void> {
+    if (!this.autoSaveTracker || !this.snapshotStore) return;
+    if (!this.autoSaveTracker.shouldSave()) return;
+    await this.snapshotStore.save(this.autoSaveKey, this.snapshot());
+    this.autoSaveTracker.markSaved();
   }
 
   /** Advance age + life stages; emit LifeStageChanged for each crossed threshold. */
@@ -386,12 +492,113 @@ export class Agent {
     this.die('explicit', reason, this.clock.now());
   }
 
+  // =========================================================================
+  // Persistence (M10)
+  // =========================================================================
+
+  /**
+   * Project the agent's mutable state into a serializable `AgentSnapshot`.
+   *
+   * `include` lets consumers trim heavy subsystems (e.g., memory) out of the
+   * saved payload.
+   */
+  snapshot(opts: { include?: readonly SnapshotPart[] } = {}): AgentSnapshot {
+    const wanted = (part: SnapshotPart): boolean =>
+      opts.include === undefined || opts.include.includes(part);
+
+    const snap: AgentSnapshot = {
+      schemaVersion: CURRENT_SNAPSHOT_VERSION,
+      snapshotAt: this.clock.now(),
+      identity: this.identity,
+    };
+    if (this.ageModel && wanted('lifecycle')) {
+      snap.lifecycle = this.ageModel.snapshot();
+    }
+    if (this.needs && wanted('needs')) {
+      snap.needs = this.needs.snapshot();
+    }
+    if (wanted('modifiers')) {
+      const list = this.modifiers.list();
+      if (list.length > 0) snap.modifiers = [...list];
+    }
+    if (this.currentMood && wanted('mood')) {
+      snap.mood = { ...this.currentMood };
+    }
+    if (this.memory && wanted('memory') && isInMemoryMemoryAdapter(this.memory)) {
+      const records = this.memory.snapshot();
+      if (records.length > 0) snap.memory = [...records];
+    }
+    return snap;
+  }
+
+  /**
+   * Restore a snapshot into an already-constructed agent. Replaces the
+   * relevant state slices; does NOT replace ports (clock, rng, bus) — those
+   * are the consumer's responsibility and are typically re-supplied via
+   * `new Agent(deps)` before calling `restore`.
+   *
+   * If `opts.catchUp` is set, the agent sub-steps forward from
+   * `snapshot.snapshotAt` to `clock.now()` using `runCatchUp`.
+   */
+  async restore(
+    snapshot: AgentSnapshot,
+    opts: { catchUp?: boolean | { chunkVirtualSeconds?: number } } = {},
+  ): Promise<void> {
+    if (snapshot.lifecycle && this.ageModel) {
+      this.ageModel.restore({
+        ageSeconds: snapshot.lifecycle.ageSeconds,
+        stage: snapshot.lifecycle.stage,
+      });
+      this.virtualNowSeconds = snapshot.lifecycle.ageSeconds;
+      if (snapshot.lifecycle.stage === DECEASED_STAGE) {
+        this.halted = true;
+      }
+    }
+    if (snapshot.needs && this.needs) {
+      this.needs.restore(snapshot.needs);
+    }
+    if (snapshot.modifiers) {
+      for (const mod of snapshot.modifiers) {
+        // Drop already-expired modifiers up front.
+        if (mod.expiresAt !== undefined && mod.expiresAt <= this.clock.now()) continue;
+        this.modifiers.apply(mod);
+      }
+    }
+    if (snapshot.mood) {
+      this.currentMood = { ...snapshot.mood };
+    }
+    if (snapshot.memory && this.memory && isInMemoryMemoryAdapter(this.memory)) {
+      this.memory.restore(snapshot.memory);
+    }
+
+    if (opts.catchUp !== undefined && opts.catchUp !== false) {
+      const nowMs = this.clock.now();
+      const elapsedMs = Math.max(0, nowMs - snapshot.snapshotAt);
+      const elapsedSec = (elapsedMs / 1000) * this.timeScale;
+      const chunkOpts =
+        typeof opts.catchUp === 'object' && opts.catchUp.chunkVirtualSeconds !== undefined
+          ? { chunkVirtualSeconds: opts.catchUp.chunkVirtualSeconds }
+          : {};
+      await runCatchUp(
+        elapsedSec,
+        async (chunk) => {
+          // Feed virtual dt back through tick(). dt is in real seconds before
+          // timeScale; invert it here so total virtual advance matches.
+          const realDt = chunk / this.timeScale;
+          await this.tick(realDt);
+        },
+        chunkOpts,
+      );
+    }
+  }
+
   /**
    * Publish an event onto the bus AND record it in the current tick's
    * `emitted` list. Internal helper — skills/modules use `AgentFacade`.
    */
   protected publish(event: DomainEvent): void {
     this.emittedThisTick.push(event);
+    this.autoSaveTracker?.observeEvent(event.type);
     this.eventBus.publish(event);
   }
 
@@ -541,4 +748,8 @@ export class Agent {
       }
     }
   }
+}
+
+function isInMemoryMemoryAdapter(m: MemoryRepository): m is InMemoryMemoryAdapter {
+  return m instanceof InMemoryMemoryAdapter;
 }

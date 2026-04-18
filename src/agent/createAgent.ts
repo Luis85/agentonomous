@@ -1,14 +1,24 @@
 import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
+import type { Embodiment } from '../body/Embodiment.js';
 import { AgeModel } from '../lifecycle/AgeModel.js';
 import type { LifecycleDescriptor } from '../lifecycle/defineLifecycle.js';
 import type { LifeStage } from '../lifecycle/LifeStage.js';
 import type { LifeStageSchedule } from '../lifecycle/LifeStageSchedule.js';
+import { InMemoryMemoryAdapter } from '../memory/InMemoryMemoryAdapter.js';
+import type { MemoryRepository } from '../memory/MemoryRepository.js';
 import type { Modifiers } from '../modifiers/Modifiers.js';
 import type { MoodModel } from '../mood/MoodModel.js';
 import { DefaultMoodModel } from '../mood/DefaultMoodModel.js';
 import type { Need } from '../needs/Need.js';
 import { Needs } from '../needs/Needs.js';
+import type { AutoSavePolicy } from '../persistence/AutoSavePolicy.js';
+import { pickDefaultSnapshotStore } from '../persistence/pickDefaultSnapshotStore.js';
+import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
+import { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
+import type { RandomEventDef } from '../randomEvents/defineRandomEvent.js';
+import type { RemoteController } from './RemoteController.js';
+import type { ScriptedController } from './ScriptedController.js';
 import type { WallClock } from '../ports/WallClock.js';
 import { SystemClock } from '../ports/SystemClock.js';
 import type { Rng } from '../ports/Rng.js';
@@ -80,6 +90,29 @@ export interface CreateAgentConfig {
   bornAt?: number;
   /** Override the mood model. Omit to get `DefaultMoodModel` (auto-enabled when lifecycle or needs exist). */
   moodModel?: MoodModel | false;
+  /** Optional embodiment (transform + appearance + locomotion). */
+  embodiment?: Embodiment;
+  /** Random event ticker or a list of definitions to register. */
+  randomEvents?: RandomEventTicker | readonly RandomEventDef[];
+  /** Memory store. Defaults to an `InMemoryMemoryAdapter` when omitted. */
+  memory?: MemoryRepository;
+  /** Remote controller (for `controlMode: 'remote'`). */
+  remote?: RemoteController;
+  /** Scripted controller (for `controlMode: 'scripted'`). */
+  scripted?: ScriptedController;
+  /**
+   * Persistence config. Pass `false` to disable auto-save entirely.
+   * When omitted, `pickDefaultSnapshotStore()` auto-selects
+   * `LocalStorageSnapshotStore` in the browser and `InMemorySnapshotStore`
+   * in Node — the MVP nurture-pet demo's "zero-config persistence" story.
+   */
+  persistence?:
+    | false
+    | {
+        store?: SnapshotStorePort;
+        autoSave?: AutoSavePolicy;
+        autoSaveKey?: string;
+      };
 }
 
 /**
@@ -119,6 +152,9 @@ export function createAgent(config: CreateAgentConfig): Agent {
       : undefined;
 
   const moodModel = resolveMoodModel(config.moodModel, Boolean(needs ?? ageModel));
+  const randomEvents = resolveRandomEvents(config.randomEvents);
+  const memory = config.memory ?? new InMemoryMemoryAdapter();
+  const { snapshotStore, autoSave, autoSaveKey } = resolvePersistence(config.persistence);
 
   return new Agent({
     identity,
@@ -135,7 +171,39 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(ageModel !== undefined ? { ageModel } : {}),
     ...(lifecycle?.capabilities !== undefined ? { stageCapabilities: lifecycle.capabilities } : {}),
     ...(moodModel !== undefined ? { moodModel } : {}),
+    ...(config.embodiment !== undefined ? { embodiment: config.embodiment } : {}),
+    ...(randomEvents !== undefined ? { randomEvents } : {}),
+    memory,
+    ...(config.remote !== undefined ? { remote: config.remote } : {}),
+    ...(config.scripted !== undefined ? { scripted: config.scripted } : {}),
+    ...(snapshotStore !== undefined ? { snapshotStore } : {}),
+    ...(autoSave !== undefined ? { autoSave } : {}),
+    ...(autoSaveKey !== undefined ? { autoSaveKey } : {}),
   });
+}
+
+function resolveRandomEvents(
+  input: RandomEventTicker | readonly RandomEventDef[] | undefined,
+): RandomEventTicker | undefined {
+  if (input === undefined) return undefined;
+  if (input instanceof RandomEventTicker) return input;
+  return new RandomEventTicker(input);
+}
+
+function resolvePersistence(input: CreateAgentConfig['persistence']): {
+  snapshotStore: SnapshotStorePort | undefined;
+  autoSave: AutoSavePolicy | undefined;
+  autoSaveKey: string | undefined;
+} {
+  if (input === false) {
+    return { snapshotStore: undefined, autoSave: undefined, autoSaveKey: undefined };
+  }
+  const store = input?.store ?? pickDefaultSnapshotStore();
+  return {
+    snapshotStore: store,
+    autoSave: input?.autoSave,
+    autoSaveKey: input?.autoSaveKey,
+  };
 }
 
 function resolveLifecycle(

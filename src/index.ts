@@ -81,6 +81,78 @@ export type { Mood, MoodCategory } from './mood/Mood.js';
 export type { MoodModel, MoodEvaluationContext } from './mood/MoodModel.js';
 export { DefaultMoodModel } from './mood/DefaultMoodModel.js';
 
+// Control modes (M6).
+export { InMemoryRemoteController, type RemoteController } from './agent/RemoteController.js';
+export { ArrayScriptedController, type ScriptedController } from './agent/ScriptedController.js';
+
+// Body (M9).
+export {
+  type Vector3Like,
+  type Transform,
+  identityTransform,
+  translate,
+} from './body/Transform.js';
+export type { LocomotionMode } from './body/LocomotionMode.js';
+export { type Appearance, type AgentShape, defaultAppearance } from './body/Appearance.js';
+export { type Embodiment, defaultEmbodiment } from './body/Embodiment.js';
+
+// Memory (M10 — Markdown adapter is Phase B).
+export type { MemoryKind, MemoryRecord } from './memory/MemoryRecord.js';
+export type { MemoryFilter, MemoryRepository } from './memory/MemoryRepository.js';
+export { InMemoryMemoryAdapter } from './memory/InMemoryMemoryAdapter.js';
+
+// Persistence (M10).
+export {
+  type AgentSnapshot,
+  type SnapshotPart,
+  CURRENT_SNAPSHOT_VERSION,
+} from './persistence/AgentSnapshot.js';
+export type { SnapshotStorePort } from './persistence/SnapshotStorePort.js';
+export { InMemorySnapshotStore } from './persistence/InMemorySnapshotStore.js';
+export {
+  LocalStorageSnapshotStore,
+  type LocalStorageSnapshotStoreOptions,
+  type StorageLike,
+} from './persistence/LocalStorageSnapshotStore.js';
+export {
+  FsSnapshotStore,
+  type FsSnapshotStoreOptions,
+  type FsAdapter,
+} from './persistence/FsSnapshotStore.js';
+export { pickDefaultSnapshotStore } from './persistence/pickDefaultSnapshotStore.js';
+export {
+  AutoSaveTracker,
+  DEFAULT_AUTOSAVE_POLICY,
+  type AutoSavePolicy,
+} from './persistence/AutoSavePolicy.js';
+export {
+  runCatchUp,
+  type CatchUpOptions,
+  type CatchUpResult,
+} from './persistence/offlineCatchUp.js';
+export {
+  migrateSnapshot,
+  type SnapshotMigration,
+  SNAPSHOT_MIGRATIONS,
+} from './persistence/migrateSnapshot.js';
+export {
+  bindAgentToStore,
+  type AgentStateListener,
+  type BindOptions,
+} from './persistence/StoreBinding.js';
+
+// Random events (M11).
+export {
+  defineRandomEvent,
+  type RandomEventContext,
+  type RandomEventDef,
+} from './randomEvents/defineRandomEvent.js';
+export {
+  RandomEventTicker,
+  type RandomEventTickOptions,
+} from './randomEvents/RandomEventTicker.js';
+export { withFxHint, getFxHint } from './randomEvents/fxHint.js';
+
 // Modifiers (M4).
 export type { Modifier, ModifierStackPolicy } from './modifiers/Modifier.js';
 export type { ModifierEffect } from './modifiers/ModifierEffect.js';
