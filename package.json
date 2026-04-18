@@ -1,0 +1,123 @@
+{
+  "name": "agentonomous",
+  "version": "0.0.0",
+  "description": "Autonomous agent library for TypeScript simulations — nurture-pet demo ready, engine-agnostic.",
+  "type": "module",
+  "license": "MIT",
+  "author": "luis85",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luis85/agentonomous.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luis85/agentonomous/issues"
+  },
+  "homepage": "https://github.com/luis85/agentonomous#readme",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.18"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./integrations/excalibur": {
+      "import": "./dist/integrations/excalibur/index.js",
+      "types": "./dist/integrations/excalibur/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "docs": "typedoc",
+    "changeset": "changeset",
+    "release": "changeset publish",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "agent",
+    "autonomous",
+    "simulation",
+    "nurture",
+    "virtual-pet",
+    "ecs",
+    "excalibur",
+    "sim-ecs",
+    "typescript"
+  ],
+  "devDependencies": {
+    "@changesets/cli": "^2.27.10",
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.11",
+    "prettier": "^3.4.2",
+    "typedoc": "^0.28.19",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.18.0",
+    "vite": "^6.0.0",
+    "vite-plugin-dts": "^4.4.0",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": "*",
+    "brain.js": "^2.0.0",
+    "excalibur": "*",
+    "js-son-agent": "*",
+    "mistreevous": "^4.0.0",
+    "openai": "*",
+    "sim-ecs": "*"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "brain.js": {
+      "optional": true
+    },
+    "excalibur": {
+      "optional": true
+    },
+    "js-son-agent": {
+      "optional": true
+    },
+    "mistreevous": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "sim-ecs": {
+      "optional": true
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

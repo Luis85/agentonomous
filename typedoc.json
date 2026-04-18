@@ -1,0 +1,16 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts", "src/integrations/excalibur/index.ts"],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "tsconfig": "./tsconfig.build.json",
+  "readme": "README.md",
+  "name": "agentonomous",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "categorizeByGroup": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/luis85/agentonomous"
+  }
+}
