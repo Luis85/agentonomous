@@ -60,6 +60,27 @@ export { ComposedNeedsPolicy } from './needs/ComposedNeedsPolicy.js';
 export type { Intention, IntentionKind } from './cognition/Intention.js';
 export type { IntentionCandidate } from './cognition/IntentionCandidate.js';
 
+// Lifecycle (M5).
+export type { LifeStage } from './lifecycle/LifeStage.js';
+export { DECEASED_STAGE } from './lifecycle/LifeStage.js';
+export type { LifeStageSchedule, LifeStageScheduleEntry } from './lifecycle/LifeStageSchedule.js';
+export { AgeModel, type AgeModelOptions, type LifeStageTransition } from './lifecycle/AgeModel.js';
+export {
+  defineLifecycle,
+  type LifecycleTemplate,
+  type LifecycleDescriptor,
+} from './lifecycle/defineLifecycle.js';
+export {
+  stageAllowsSkill,
+  type StageCapabilityRule,
+  type StageCapabilityMap,
+} from './lifecycle/StageCapabilities.js';
+
+// Mood (M5).
+export type { Mood, MoodCategory } from './mood/Mood.js';
+export type { MoodModel, MoodEvaluationContext } from './mood/MoodModel.js';
+export { DefaultMoodModel } from './mood/DefaultMoodModel.js';
+
 // Modifiers (M4).
 export type { Modifier, ModifierStackPolicy } from './modifiers/Modifier.js';
 export type { ModifierEffect } from './modifiers/ModifierEffect.js';
@@ -79,12 +100,18 @@ export {
   MODIFIER_APPLIED,
   MODIFIER_EXPIRED,
   MODIFIER_REMOVED,
+  LIFE_STAGE_CHANGED,
+  AGENT_DIED,
+  MOOD_CHANGED,
   type NeedCriticalEvent,
   type NeedSafeEvent,
   type NeedSatisfiedEvent,
   type ModifierAppliedEvent,
   type ModifierExpiredEvent,
   type ModifierRemovedEvent,
+  type LifeStageChangedEvent,
+  type AgentDiedEvent,
+  type MoodChangedEvent,
 } from './events/standardEvents.js';
 
 // Ports — the determinism seams.

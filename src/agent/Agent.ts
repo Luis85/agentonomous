@@ -1,20 +1,31 @@
 import type { DomainEvent } from '../events/DomainEvent.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
 import {
+  AGENT_DIED,
+  LIFE_STAGE_CHANGED,
   MODIFIER_APPLIED,
   MODIFIER_EXPIRED,
   MODIFIER_REMOVED,
+  MOOD_CHANGED,
   NEED_CRITICAL,
   NEED_SAFE,
+  type AgentDiedEvent,
+  type LifeStageChangedEvent,
   type ModifierAppliedEvent,
   type ModifierExpiredEvent,
   type ModifierRemovedEvent,
+  type MoodChangedEvent,
   type NeedCriticalEvent,
   type NeedSafeEvent,
 } from '../events/standardEvents.js';
+import type { AgeModel, LifeStageTransition } from '../lifecycle/AgeModel.js';
+import { DECEASED_STAGE, type LifeStage } from '../lifecycle/LifeStage.js';
+import type { StageCapabilityMap } from '../lifecycle/StageCapabilities.js';
 import type { Modifier } from '../modifiers/Modifier.js';
 import type { ModifierRemoval } from '../modifiers/Modifiers.js';
 import { Modifiers } from '../modifiers/Modifiers.js';
+import type { Mood } from '../mood/Mood.js';
+import type { MoodModel } from '../mood/MoodModel.js';
 import type { NeedsDelta } from '../needs/Need.js';
 import type { Needs } from '../needs/Needs.js';
 import type { Rng } from '../ports/Rng.js';
@@ -63,6 +74,12 @@ export interface AgentDependencies {
    * agent constructs an empty `Modifiers` instance internally.
    */
   modifiers?: Modifiers;
+  /** Lifecycle / aging model. Without it, agents never age or transition stages. */
+  ageModel?: AgeModel;
+  /** Optional per-stage skill capability gates. Consulted by the behavior runner (M7). */
+  stageCapabilities?: StageCapabilityMap;
+  /** Optional mood model. `DefaultMoodModel` in createAgent when needs are present. */
+  moodModel?: MoodModel;
 }
 
 /**
@@ -84,6 +101,10 @@ export class Agent {
   readonly validator: Validator | undefined;
   readonly needs: Needs | undefined;
   readonly modifiers: Modifiers;
+  readonly ageModel: AgeModel | undefined;
+  readonly stageCapabilities: StageCapabilityMap | undefined;
+  readonly moodModel: MoodModel | undefined;
+  protected currentMood: Mood | undefined;
 
   protected readonly timeScale: number;
   protected controlMode: ControlMode;
@@ -109,6 +130,12 @@ export class Agent {
     this.controlMode = deps.controlMode ?? 'autonomous';
     this.needs = deps.needs;
     this.modifiers = deps.modifiers ?? new Modifiers();
+    this.ageModel = deps.ageModel;
+    this.stageCapabilities = deps.stageCapabilities;
+    this.moodModel = deps.moodModel;
+    if (this.ageModel?.stage === DECEASED_STAGE) {
+      this.halted = true;
+    }
 
     // Install config-time modules.
     for (const mod of deps.modules ?? []) {
@@ -149,7 +176,8 @@ export class Agent {
 
     this.emittedThisTick = [];
 
-    // Stage 0: advance time. (Lifecycle stage transitions land in M5.)
+    // Stage 0: advance age + life stages (catch-up-aware).
+    const stageTransitions = this.runLifecycleTick(virtualDtSeconds, tickStartedAt);
 
     // Stage 1: perceive — drain pending events from the bus.
     const perceived = this.eventBus.drain();
@@ -161,9 +189,24 @@ export class Agent {
     const expired = this.runModifiersTick(tickStartedAt);
 
     // Stage 2.5: needs tick. Decay (scaled by modifier multipliers), critical crossings → events.
+    // If health just hit 0 during decay we die here and short-circuit.
     const needsDeltas = this.runNeedsTick(virtualDtSeconds, tickStartedAt);
+    if (this.halted) {
+      return {
+        agentId: this.identity.id,
+        tickStartedAt,
+        virtualDtSeconds,
+        controlMode: this.controlMode,
+        stage: DECEASED_STAGE,
+        halted: true,
+        perceived,
+        actions: [],
+        emitted: this.emittedThisTick,
+      };
+    }
 
-    // Stage 2.7: mood evaluate. (M5)
+    // Stage 2.7: mood evaluate.
+    const moodChange = this.runMoodTick(tickStartedAt);
     // Stage 2.8: animation reconcile. (M8)
 
     // Stage 3: dispatch by control mode. In M3 only 'autonomous' is wired
@@ -180,20 +223,70 @@ export class Agent {
     if (expired.length > 0) deltasRecord.modifiersExpired = expired.map((r) => r.modifier.id);
     const activeModifierIds = this.modifiers.list().map((m) => m.id);
     if (activeModifierIds.length > 0) deltasRecord.activeModifiers = activeModifierIds;
+    if (stageTransitions.length > 0) {
+      deltasRecord.stageTransitions = stageTransitions;
+    }
+    if (moodChange) deltasRecord.mood = moodChange;
     const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
 
+    const stage: LifeStage = this.ageModel?.stage ?? 'alive';
     return {
       agentId: this.identity.id,
       tickStartedAt,
       virtualDtSeconds,
       controlMode: this.controlMode,
-      stage: 'alive',
+      stage,
       halted: false,
       perceived,
       actions,
       emitted: this.emittedThisTick,
       ...(deltas ? { deltas } : {}),
     };
+  }
+
+  /** Advance age + life stages; emit LifeStageChanged for each crossed threshold. */
+  protected runLifecycleTick(virtualDtSeconds: number, at: number): readonly LifeStageTransition[] {
+    if (!this.ageModel) return [];
+    const transitions = this.ageModel.advance(virtualDtSeconds);
+    for (const t of transitions) {
+      const event: LifeStageChangedEvent = {
+        type: LIFE_STAGE_CHANGED,
+        at,
+        agentId: this.identity.id,
+        from: t.from,
+        to: t.to,
+        atAgeSeconds: t.atAgeSeconds,
+      };
+      this.publish(event);
+    }
+    return transitions;
+  }
+
+  /** Evaluate the mood model and emit MoodChanged if the category rotated. */
+  protected runMoodTick(
+    at: number,
+  ): { from: string | undefined; to: string; valence: number | undefined } | null {
+    if (!this.moodModel) return null;
+    const previous = this.currentMood;
+    const next = this.moodModel.evaluate({
+      needs: this.needs,
+      modifiers: this.modifiers,
+      persona: this.identity.persona,
+      wallNowMs: at,
+      previous,
+    });
+    this.currentMood = next;
+    if (previous && previous.category === next.category) return null;
+    const event: MoodChangedEvent = {
+      type: MOOD_CHANGED,
+      at,
+      agentId: this.identity.id,
+      from: previous?.category,
+      to: next.category,
+      valence: next.valence,
+    };
+    this.publish(event);
+    return { from: previous?.category, to: next.category, valence: next.valence };
   }
 
   /** Expire time-bound modifiers and publish `ModifierExpired` events. */
@@ -219,6 +312,7 @@ export class Agent {
   protected runNeedsTick(virtualDtSeconds: number, at: number): readonly NeedsDelta[] {
     if (!this.needs || virtualDtSeconds <= 0) return [];
     const deltas = this.needs.tick(virtualDtSeconds, (id) => this.modifiers.decayMultiplier(id));
+    let healthDepleted = false;
     for (const delta of deltas) {
       if (delta.crossedCritical) {
         const event: NeedCriticalEvent = {
@@ -239,8 +333,57 @@ export class Agent {
         };
         this.publish(event);
       }
+      if (delta.needId === 'health' && delta.after <= 0) {
+        healthDepleted = true;
+      }
+    }
+    if (healthDepleted && !this.halted) {
+      this.die('health-depleted', undefined, at);
     }
     return deltas;
+  }
+
+  /**
+   * Internal death path. Marks the agent deceased, flips `halted`, and emits
+   * `AgentDied`. Used by both explicit `agent.kill(reason)` and automatic
+   * health-depletion.
+   */
+  protected die(
+    cause: 'health-depleted' | 'stage-transition' | 'explicit' | (string & {}),
+    reason: string | undefined,
+    at: number,
+  ): void {
+    if (this.halted) return;
+    this.halted = true;
+    const fromStage = this.ageModel?.stage ?? 'alive';
+    const transition = this.ageModel?.markDeceased() ?? null;
+    if (transition) {
+      const stageEvent: LifeStageChangedEvent = {
+        type: LIFE_STAGE_CHANGED,
+        at,
+        agentId: this.identity.id,
+        from: transition.from,
+        to: transition.to,
+        atAgeSeconds: transition.atAgeSeconds,
+      };
+      this.publish(stageEvent);
+    }
+    const died: AgentDiedEvent = {
+      type: AGENT_DIED,
+      at,
+      agentId: this.identity.id,
+      cause,
+      atAgeSeconds: this.ageModel?.ageSeconds ?? 0,
+      ...(reason !== undefined ? { reason } : {}),
+    };
+    this.publish(died);
+    // Suppress unused-var warning if stage wasn't needed.
+    void fromStage;
+  }
+
+  /** Public death trigger for narrative / event-driven deaths. */
+  kill(reason: string): void {
+    this.die('explicit', reason, this.clock.now());
   }
 
   /**
@@ -334,14 +477,17 @@ export class Agent {
   getState(): AgentState {
     return {
       id: this.identity.id,
-      stage: this.halted ? 'deceased' : 'alive',
+      stage: this.ageModel?.stage ?? (this.halted ? DECEASED_STAGE : 'alive'),
       halted: this.halted,
-      ageSeconds: 0, // M5
+      ageSeconds: this.ageModel?.ageSeconds ?? 0,
       needs: this.needs?.snapshot() ?? {},
       modifiers: this.modifiers.list().map((m) => ({
         id: m.id,
         ...(m.expiresAt !== undefined ? { expiresAt: m.expiresAt } : {}),
       })),
+      ...(this.currentMood !== undefined
+        ? { mood: { category: this.currentMood.category, updatedAt: this.currentMood.updatedAt } }
+        : {}),
       animation: 'idle', // M8
     };
   }

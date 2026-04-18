@@ -1,4 +1,6 @@
+import type { LifeStage } from '../lifecycle/LifeStage.js';
 import type { Modifier } from '../modifiers/Modifier.js';
+import type { MoodCategory } from '../mood/Mood.js';
 import type { DomainEvent } from './DomainEvent.js';
 
 /**
@@ -59,4 +61,35 @@ export interface ModifierRemovedEvent extends DomainEvent {
   modifierId: string;
   source: string;
   reason: 'removed' | 'replaced';
+}
+
+// --- Lifecycle (M5) ---
+export const LIFE_STAGE_CHANGED = 'LifeStageChanged' as const;
+export const AGENT_DIED = 'AgentDied' as const;
+
+export interface LifeStageChangedEvent extends DomainEvent {
+  type: typeof LIFE_STAGE_CHANGED;
+  agentId: string;
+  from: LifeStage;
+  to: LifeStage;
+  atAgeSeconds: number;
+}
+
+export interface AgentDiedEvent extends DomainEvent {
+  type: typeof AGENT_DIED;
+  agentId: string;
+  cause: 'health-depleted' | 'stage-transition' | 'explicit' | (string & {});
+  reason?: string;
+  atAgeSeconds: number;
+}
+
+// --- Mood (M5) ---
+export const MOOD_CHANGED = 'MoodChanged' as const;
+
+export interface MoodChangedEvent extends DomainEvent {
+  type: typeof MOOD_CHANGED;
+  agentId: string;
+  from: MoodCategory | undefined;
+  to: MoodCategory;
+  valence: number | undefined;
 }

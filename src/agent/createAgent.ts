@@ -1,6 +1,12 @@
 import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
+import { AgeModel } from '../lifecycle/AgeModel.js';
+import type { LifecycleDescriptor } from '../lifecycle/defineLifecycle.js';
+import type { LifeStage } from '../lifecycle/LifeStage.js';
+import type { LifeStageSchedule } from '../lifecycle/LifeStageSchedule.js';
 import type { Modifiers } from '../modifiers/Modifiers.js';
+import type { MoodModel } from '../mood/MoodModel.js';
+import { DefaultMoodModel } from '../mood/DefaultMoodModel.js';
 import type { Need } from '../needs/Need.js';
 import { Needs } from '../needs/Needs.js';
 import type { WallClock } from '../ports/WallClock.js';
@@ -60,6 +66,20 @@ export interface CreateAgentConfig {
   needs?: Needs | readonly Need[];
   /** Pre-populated `Modifiers` collection. Usually left to default (empty). */
   modifiers?: Modifiers;
+  /**
+   * Lifecycle descriptor — either a `LifecycleDescriptor` from
+   * `defineLifecycle()` or a bare schedule. Without this the agent never
+   * ages or transitions life stages.
+   */
+  lifecycle?: LifecycleDescriptor | LifeStageSchedule;
+  /** Initial virtual age in seconds. Defaults to 0. */
+  initialAgeSeconds?: number;
+  /** Initial life stage. Defaults to the first schedule entry. */
+  initialStage?: LifeStage;
+  /** Wall-clock ms when the agent was born. Defaults to `clock.now()`. */
+  bornAt?: number;
+  /** Override the mood model. Omit to get `DefaultMoodModel` (auto-enabled when lifecycle or needs exist). */
+  moodModel?: MoodModel | false;
 }
 
 /**
@@ -85,6 +105,21 @@ export function createAgent(config: CreateAgentConfig): Agent {
   const rng = resolveRng(config.rng, config.id);
   const needs = resolveNeeds(config.needs);
 
+  const lifecycle = resolveLifecycle(config.lifecycle);
+  const ageModel =
+    lifecycle !== undefined
+      ? new AgeModel({
+          bornAt: config.bornAt ?? clock.now(),
+          schedule: lifecycle.schedule,
+          ...(config.initialAgeSeconds !== undefined
+            ? { initialAgeSeconds: config.initialAgeSeconds }
+            : {}),
+          ...(config.initialStage !== undefined ? { initialStage: config.initialStage } : {}),
+        })
+      : undefined;
+
+  const moodModel = resolveMoodModel(config.moodModel, Boolean(needs ?? ageModel));
+
   return new Agent({
     identity,
     eventBus,
@@ -97,7 +132,29 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(config.modules !== undefined ? { modules: config.modules } : {}),
     ...(needs ? { needs } : {}),
     ...(config.modifiers !== undefined ? { modifiers: config.modifiers } : {}),
+    ...(ageModel !== undefined ? { ageModel } : {}),
+    ...(lifecycle?.capabilities !== undefined ? { stageCapabilities: lifecycle.capabilities } : {}),
+    ...(moodModel !== undefined ? { moodModel } : {}),
   });
+}
+
+function resolveLifecycle(
+  lifecycle: LifecycleDescriptor | LifeStageSchedule | undefined,
+): LifecycleDescriptor | undefined {
+  if (lifecycle === undefined) return undefined;
+  if (Array.isArray(lifecycle)) {
+    return { schedule: lifecycle };
+  }
+  return lifecycle as LifecycleDescriptor;
+}
+
+function resolveMoodModel(
+  override: MoodModel | false | undefined,
+  autoEnable: boolean,
+): MoodModel | undefined {
+  if (override === false) return undefined;
+  if (override !== undefined) return override;
+  return autoEnable ? new DefaultMoodModel() : undefined;
 }
 
 function resolveNeeds(needs: Needs | readonly Need[] | undefined): Needs | undefined {
