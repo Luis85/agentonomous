@@ -1,11 +1,20 @@
 import type { DomainEvent } from '../events/DomainEvent.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
 import {
+  MODIFIER_APPLIED,
+  MODIFIER_EXPIRED,
+  MODIFIER_REMOVED,
   NEED_CRITICAL,
   NEED_SAFE,
+  type ModifierAppliedEvent,
+  type ModifierExpiredEvent,
+  type ModifierRemovedEvent,
   type NeedCriticalEvent,
   type NeedSafeEvent,
 } from '../events/standardEvents.js';
+import type { Modifier } from '../modifiers/Modifier.js';
+import type { ModifierRemoval } from '../modifiers/Modifiers.js';
+import { Modifiers } from '../modifiers/Modifiers.js';
 import type { NeedsDelta } from '../needs/Need.js';
 import type { Needs } from '../needs/Needs.js';
 import type { Rng } from '../ports/Rng.js';
@@ -49,6 +58,11 @@ export interface AgentDependencies {
   controlMode?: ControlMode;
   /** Optional homeostatic needs (hunger, energy, …). Wired in M3. */
   needs?: Needs;
+  /**
+   * Optional modifier (buff/debuff) collection. If omitted but needed, the
+   * agent constructs an empty `Modifiers` instance internally.
+   */
+  modifiers?: Modifiers;
 }
 
 /**
@@ -69,6 +83,7 @@ export class Agent {
   readonly eventBus: EventBusPort;
   readonly validator: Validator | undefined;
   readonly needs: Needs | undefined;
+  readonly modifiers: Modifiers;
 
   protected readonly timeScale: number;
   protected controlMode: ControlMode;
@@ -93,6 +108,7 @@ export class Agent {
     this.timeScale = deps.timeScale ?? DEFAULT_TIME_SCALE;
     this.controlMode = deps.controlMode ?? 'autonomous';
     this.needs = deps.needs;
+    this.modifiers = deps.modifiers ?? new Modifiers();
 
     // Install config-time modules.
     for (const mod of deps.modules ?? []) {
@@ -140,9 +156,11 @@ export class Agent {
     await this.dispatchReactiveHandlers(perceived);
 
     // Stage 1.5: random events. (M11)
-    // Stage 2:   modifier tick. (M4)
 
-    // Stage 2.5: needs tick. Decay, critical crossings → events.
+    // Stage 2: modifier tick — expire time-bound modifiers.
+    const expired = this.runModifiersTick(tickStartedAt);
+
+    // Stage 2.5: needs tick. Decay (scaled by modifier multipliers), critical crossings → events.
     const needsDeltas = this.runNeedsTick(virtualDtSeconds, tickStartedAt);
 
     // Stage 2.7: mood evaluate. (M5)
@@ -157,8 +175,12 @@ export class Agent {
     // Stage 9:   persist + autosave (M10).
 
     // Stage 10: return trace.
-    const deltas: Record<string, unknown> | undefined =
-      needsDeltas.length > 0 ? { needs: needsDeltas } : undefined;
+    const deltasRecord: Record<string, unknown> = {};
+    if (needsDeltas.length > 0) deltasRecord.needs = needsDeltas;
+    if (expired.length > 0) deltasRecord.modifiersExpired = expired.map((r) => r.modifier.id);
+    const activeModifierIds = this.modifiers.list().map((m) => m.id);
+    if (activeModifierIds.length > 0) deltasRecord.activeModifiers = activeModifierIds;
+    const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
 
     return {
       agentId: this.identity.id,
@@ -174,10 +196,29 @@ export class Agent {
     };
   }
 
+  /** Expire time-bound modifiers and publish `ModifierExpired` events. */
+  protected runModifiersTick(at: number): readonly ModifierRemoval[] {
+    const expired = this.modifiers.tick(at);
+    for (const removal of expired) {
+      const event: ModifierExpiredEvent = {
+        type: MODIFIER_EXPIRED,
+        at,
+        agentId: this.identity.id,
+        modifierId: removal.modifier.id,
+        source: removal.modifier.source,
+        ...(removal.modifier.visual?.fxHint !== undefined
+          ? { fxHint: removal.modifier.visual.fxHint }
+          : {}),
+      };
+      this.publish(event);
+    }
+    return expired;
+  }
+
   /** Run the Needs.tick step and emit critical/safe events for threshold crossings. */
   protected runNeedsTick(virtualDtSeconds: number, at: number): readonly NeedsDelta[] {
     if (!this.needs || virtualDtSeconds <= 0) return [];
-    const deltas = this.needs.tick(virtualDtSeconds);
+    const deltas = this.needs.tick(virtualDtSeconds, (id) => this.modifiers.decayMultiplier(id));
     for (const delta of deltas) {
       if (delta.crossedCritical) {
         const event: NeedCriticalEvent = {
@@ -216,6 +257,52 @@ export class Agent {
    * params. Reactive handlers (typically registered via a consumer module)
    * route it to concrete skills. Keeps UI code free of manual event wiring.
    */
+  /**
+   * Apply a modifier (buff/debuff). Emits `ModifierApplied`; if stack
+   * semantics evicted an existing instance, also emits `ModifierRemoved`
+   * with reason `'replaced'`.
+   */
+  applyModifier(mod: Modifier): Modifier {
+    const { applied, removed } = this.modifiers.apply(mod);
+    const at = this.clock.now();
+    if (removed) {
+      const removedEvent: ModifierRemovedEvent = {
+        type: MODIFIER_REMOVED,
+        at,
+        agentId: this.identity.id,
+        modifierId: removed.modifier.id,
+        source: removed.modifier.source,
+        reason: removed.reason === 'replaced' ? 'replaced' : 'removed',
+      };
+      this.publish(removedEvent);
+    }
+    const appliedEvent: ModifierAppliedEvent = {
+      type: MODIFIER_APPLIED,
+      at,
+      agentId: this.identity.id,
+      modifier: applied,
+      ...(applied.visual?.fxHint !== undefined ? { fxHint: applied.visual.fxHint } : {}),
+    };
+    this.publish(appliedEvent);
+    return applied;
+  }
+
+  /** Remove a modifier by id. Emits `ModifierRemoved` with reason `'removed'`. */
+  removeModifier(id: string): Modifier | null {
+    const removed = this.modifiers.remove(id);
+    if (!removed) return null;
+    const event: ModifierRemovedEvent = {
+      type: MODIFIER_REMOVED,
+      at: this.clock.now(),
+      agentId: this.identity.id,
+      modifierId: removed.id,
+      source: removed.source,
+      reason: 'removed',
+    };
+    this.publish(event);
+    return removed;
+  }
+
   interact(verb: string, params?: Record<string, unknown>): void {
     this.eventBus.publish({
       type: INTERACTION_REQUESTED,
@@ -251,7 +338,10 @@ export class Agent {
       halted: this.halted,
       ageSeconds: 0, // M5
       needs: this.needs?.snapshot() ?? {},
-      modifiers: [], // M4
+      modifiers: this.modifiers.list().map((m) => ({
+        id: m.id,
+        ...(m.expiresAt !== undefined ? { expiresAt: m.expiresAt } : {}),
+      })),
       animation: 'idle', // M8
     };
   }

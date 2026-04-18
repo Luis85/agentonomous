@@ -1,5 +1,6 @@
 import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
+import type { Modifiers } from '../modifiers/Modifiers.js';
 import type { Need } from '../needs/Need.js';
 import { Needs } from '../needs/Needs.js';
 import type { WallClock } from '../ports/WallClock.js';
@@ -57,6 +58,8 @@ export interface CreateAgentConfig {
   modules?: readonly AgentModule[];
   /** Homeostatic needs. Pass a `Needs` instance or a list of `Need` definitions. */
   needs?: Needs | readonly Need[];
+  /** Pre-populated `Modifiers` collection. Usually left to default (empty). */
+  modifiers?: Modifiers;
 }
 
 /**
@@ -93,6 +96,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(config.controlMode !== undefined ? { controlMode: config.controlMode } : {}),
     ...(config.modules !== undefined ? { modules: config.modules } : {}),
     ...(needs ? { needs } : {}),
+    ...(config.modifiers !== undefined ? { modifiers: config.modifiers } : {}),
   });
 }
 

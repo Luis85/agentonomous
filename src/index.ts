@@ -60,14 +60,31 @@ export { ComposedNeedsPolicy } from './needs/ComposedNeedsPolicy.js';
 export type { Intention, IntentionKind } from './cognition/Intention.js';
 export type { IntentionCandidate } from './cognition/IntentionCandidate.js';
 
+// Modifiers (M4).
+export type { Modifier, ModifierStackPolicy } from './modifiers/Modifier.js';
+export type { ModifierEffect } from './modifiers/ModifierEffect.js';
+export type { ModifierTarget } from './modifiers/ModifierTarget.js';
+export { Modifiers, type ModifierRemoval } from './modifiers/Modifiers.js';
+export {
+  defineModifier,
+  type ModifierTemplate,
+  type ModifierBlueprint,
+} from './modifiers/defineModifier.js';
+
 // Standard event constants/types.
 export {
   NEED_CRITICAL,
   NEED_SAFE,
   NEED_SATISFIED,
+  MODIFIER_APPLIED,
+  MODIFIER_EXPIRED,
+  MODIFIER_REMOVED,
   type NeedCriticalEvent,
   type NeedSafeEvent,
   type NeedSatisfiedEvent,
+  type ModifierAppliedEvent,
+  type ModifierExpiredEvent,
+  type ModifierRemovedEvent,
 } from './events/standardEvents.js';
 
 // Ports — the determinism seams.

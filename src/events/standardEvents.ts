@@ -1,3 +1,4 @@
+import type { Modifier } from '../modifiers/Modifier.js';
 import type { DomainEvent } from './DomainEvent.js';
 
 /**
@@ -32,4 +33,30 @@ export interface NeedSatisfiedEvent extends DomainEvent {
   needId: string;
   before: number;
   after: number;
+}
+
+// --- Modifiers (M4) ---
+export const MODIFIER_APPLIED = 'ModifierApplied' as const;
+export const MODIFIER_EXPIRED = 'ModifierExpired' as const;
+export const MODIFIER_REMOVED = 'ModifierRemoved' as const;
+
+export interface ModifierAppliedEvent extends DomainEvent {
+  type: typeof MODIFIER_APPLIED;
+  agentId: string;
+  modifier: Modifier;
+}
+
+export interface ModifierExpiredEvent extends DomainEvent {
+  type: typeof MODIFIER_EXPIRED;
+  agentId: string;
+  modifierId: string;
+  source: string;
+}
+
+export interface ModifierRemovedEvent extends DomainEvent {
+  type: typeof MODIFIER_REMOVED;
+  agentId: string;
+  modifierId: string;
+  source: string;
+  reason: 'removed' | 'replaced';
 }
