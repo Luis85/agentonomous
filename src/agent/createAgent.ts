@@ -1,0 +1,97 @@
+import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
+import type { EventBusPort } from '../events/EventBusPort.js';
+import type { WallClock } from '../ports/WallClock.js';
+import { SystemClock } from '../ports/SystemClock.js';
+import type { Rng } from '../ports/Rng.js';
+import { SeededRng } from '../ports/SeededRng.js';
+import type { Logger } from '../ports/Logger.js';
+import type { Validator } from '../ports/Validator.js';
+import type { Species } from './Species.js';
+import type { AgentRole } from './AgentRole.js';
+import type { Persona } from './Persona.js';
+import type { AgentIdentity } from './AgentIdentity.js';
+import type { AgentModule } from './AgentModule.js';
+import type { ControlMode } from './ControlMode.js';
+import { Agent } from './Agent.js';
+
+/**
+ * Ergonomic builder config for `createAgent`. Only `id` + `species` are
+ * required; every other slot has a sensible Phase A default so a consumer
+ * can get a running agent in a one-liner.
+ */
+export interface CreateAgentConfig {
+  /** Stable unique identifier. */
+  id: string;
+  /** Species identifier (free-form string; M12 adds rich descriptors). */
+  species: Species;
+
+  /** Human-readable name. Defaults to `id` if omitted. */
+  name?: string;
+  /** Version tag stored on the identity. Defaults to `'0.0.0'`. */
+  version?: string;
+  /** Role in the simulation. Defaults to `'npc'`. */
+  role?: AgentRole;
+  /** Optional persona traits. */
+  persona?: Persona;
+  /** Time scale multiplier. Defaults to 1. */
+  timeScale?: number;
+  /** Initial control mode. Defaults to `'autonomous'`. */
+  controlMode?: ControlMode;
+
+  /** Override the event bus. Defaults to a fresh `InMemoryEventBus`. */
+  eventBus?: EventBusPort;
+  /** Override the wall clock. Defaults to `SystemClock`. */
+  clock?: WallClock;
+  /**
+   * RNG override, or a seed. Passing a number/string constructs a
+   * `SeededRng` with that seed. Omitting it seeds with `id` for stability.
+   */
+  rng?: Rng | number | string;
+  /** Logger. Omitted → `NullLogger` (silent). */
+  logger?: Logger;
+  /** Optional validator for skill/tool inputs (opt-in). */
+  validator?: Validator;
+  /** Plugins to install at construction time. */
+  modules?: readonly AgentModule[];
+}
+
+/**
+ * Default ingress. Returns a running `Agent` with Phase A defaults wired in.
+ *
+ * ```ts
+ * const pet = createAgent({ id: 'whiskers', species: 'cat' });
+ * await pet.tick(0.016);
+ * ```
+ */
+export function createAgent(config: CreateAgentConfig): Agent {
+  const identity: AgentIdentity = {
+    id: config.id,
+    name: config.name ?? config.id,
+    version: config.version ?? '0.0.0',
+    role: config.role ?? 'npc',
+    species: config.species,
+    ...(config.persona !== undefined ? { persona: config.persona } : {}),
+  };
+
+  const eventBus = config.eventBus ?? new InMemoryEventBus();
+  const clock = config.clock ?? new SystemClock();
+  const rng = resolveRng(config.rng, config.id);
+
+  return new Agent({
+    identity,
+    eventBus,
+    clock,
+    rng,
+    ...(config.logger !== undefined ? { logger: config.logger } : {}),
+    ...(config.validator !== undefined ? { validator: config.validator } : {}),
+    ...(config.timeScale !== undefined ? { timeScale: config.timeScale } : {}),
+    ...(config.controlMode !== undefined ? { controlMode: config.controlMode } : {}),
+    ...(config.modules !== undefined ? { modules: config.modules } : {}),
+  });
+}
+
+function resolveRng(rng: Rng | number | string | undefined, fallbackSeed: string): Rng {
+  if (rng === undefined) return new SeededRng(fallbackSeed);
+  if (typeof rng === 'number' || typeof rng === 'string') return new SeededRng(rng);
+  return rng;
+}

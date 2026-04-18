@@ -1,0 +1,186 @@
+import { describe, expect, it, vi } from 'vitest';
+import { Agent, type AgentDependencies } from '../../../src/agent/Agent.js';
+import type { AgentIdentity } from '../../../src/agent/AgentIdentity.js';
+import type { AgentModule } from '../../../src/agent/AgentModule.js';
+import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
+import { ManualClock } from '../../../src/ports/ManualClock.js';
+import { SeededRng } from '../../../src/ports/SeededRng.js';
+import { MissingDependencyError } from '../../../src/agent/errors.js';
+
+function baseDeps(overrides: Partial<AgentDependencies> = {}): AgentDependencies {
+  const identity: AgentIdentity = {
+    id: 'whiskers',
+    name: 'Whiskers',
+    version: '0.0.0',
+    role: 'npc',
+    species: 'cat',
+  };
+  return {
+    identity,
+    eventBus: new InMemoryEventBus(),
+    clock: new ManualClock(1_000),
+    rng: new SeededRng('whiskers-seed'),
+    ...overrides,
+  };
+}
+
+describe('Agent (M2 shell)', () => {
+  it('requires core dependencies', () => {
+    expect(
+      () => new Agent({ ...baseDeps(), identity: undefined as unknown as AgentIdentity }),
+    ).toThrow(MissingDependencyError);
+  });
+
+  it('tick() returns a DecisionTrace with stable fields', async () => {
+    const clock = new ManualClock(1_000);
+    const agent = new Agent(baseDeps({ clock, timeScale: 2 }));
+
+    const trace = await agent.tick(0.5);
+    expect(trace.agentId).toBe('whiskers');
+    expect(trace.tickStartedAt).toBe(1_000);
+    expect(trace.virtualDtSeconds).toBeCloseTo(1.0); // 0.5 * timeScale 2
+    expect(trace.controlMode).toBe('autonomous');
+    expect(trace.stage).toBe('alive');
+    expect(trace.halted).toBe(false);
+    expect(trace.perceived).toEqual([]);
+    expect(trace.actions).toEqual([]);
+  });
+
+  it('drains bus events into perceived on the next tick (not current)', async () => {
+    const bus = new InMemoryEventBus();
+    const agent = new Agent(baseDeps({ eventBus: bus }));
+
+    bus.publish({ type: 'pokeA', at: 0 });
+    bus.publish({ type: 'pokeB', at: 0 });
+
+    const trace = await agent.tick(0.016);
+    expect(trace.perceived.map((e) => e.type)).toEqual(['pokeA', 'pokeB']);
+
+    // Next tick — queue is empty.
+    const next = await agent.tick(0.016);
+    expect(next.perceived).toEqual([]);
+  });
+
+  it('interact(verb) publishes an InteractionRequested event', () => {
+    const bus = new InMemoryEventBus();
+    const listener = vi.fn();
+    bus.subscribe(listener);
+    const agent = new Agent(baseDeps({ eventBus: bus }));
+
+    agent.interact('feed', { item: 'kibble' });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener.mock.calls[0]?.[0]).toMatchObject({
+      type: 'InteractionRequested',
+      agentId: 'whiskers',
+      verb: 'feed',
+      params: { item: 'kibble' },
+    });
+  });
+
+  it('subscribe() forwards to the event bus and returns an unsubscribe', () => {
+    const bus = new InMemoryEventBus();
+    const agent = new Agent(baseDeps({ eventBus: bus }));
+    const seen: string[] = [];
+    const unsub = agent.subscribe((e) => seen.push(e.type));
+
+    bus.publish({ type: 'hi', at: 1 });
+    unsub();
+    bus.publish({ type: 'bye', at: 2 });
+
+    expect(seen).toEqual(['hi']);
+  });
+
+  it('getState() returns the M2 state shell', () => {
+    const agent = new Agent(baseDeps());
+    const state = agent.getState();
+    expect(state).toEqual({
+      id: 'whiskers',
+      stage: 'alive',
+      halted: false,
+      ageSeconds: 0,
+      needs: {},
+      modifiers: [],
+      animation: 'idle',
+    });
+  });
+
+  it('dispatches reactive handlers during tick perception', async () => {
+    const handler = vi.fn();
+    const mod: AgentModule = {
+      id: 'test-module',
+      reactiveHandlers: [{ on: 'InteractionRequested', handle: handler }],
+    };
+    const bus = new InMemoryEventBus();
+    const agent = new Agent(baseDeps({ eventBus: bus, modules: [mod] }));
+
+    agent.interact('feed');
+    await agent.tick(0.016);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0]?.[0]).toMatchObject({
+      type: 'InteractionRequested',
+      verb: 'feed',
+    });
+  });
+
+  it('dispatches wildcard handlers to every event', async () => {
+    const handler = vi.fn();
+    const mod: AgentModule = {
+      id: 'wildcard',
+      reactiveHandlers: [{ on: '*', handle: handler }],
+    };
+    const bus = new InMemoryEventBus();
+    const agent = new Agent(baseDeps({ eventBus: bus, modules: [mod] }));
+
+    bus.publish({ type: 'a', at: 0 });
+    bus.publish({ type: 'b', at: 0 });
+    await agent.tick(0.016);
+
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it('swallows reactive handler errors and logs them', async () => {
+    const warn = vi.fn();
+    const mod: AgentModule = {
+      id: 'broken',
+      reactiveHandlers: [
+        {
+          on: '*',
+          handle: () => {
+            throw new Error('oh no');
+          },
+        },
+      ],
+    };
+    const bus = new InMemoryEventBus();
+    const agent = new Agent(
+      baseDeps({
+        eventBus: bus,
+        modules: [mod],
+        logger: {
+          debug: vi.fn(),
+          info: vi.fn(),
+          warn,
+          error: vi.fn(),
+        },
+      }),
+    );
+
+    bus.publish({ type: 'ping', at: 0 });
+    const trace = await agent.tick(0.016);
+    expect(trace.halted).toBe(false);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('runs onInstall() for modules at construction', () => {
+    const onInstall = vi.fn();
+    const mod: AgentModule = { id: 'hook', onInstall };
+    const agent = new Agent(baseDeps({ modules: [mod] }));
+    // Confirm the facade passed to onInstall has the right identity wired up.
+    expect(onInstall).toHaveBeenCalledTimes(1);
+    const facade = onInstall.mock.calls[0]?.[0] as { identity: { id: string } } | undefined;
+    expect(facade?.identity.id).toBe('whiskers');
+    expect(agent).toBeInstanceOf(Agent);
+  });
+});

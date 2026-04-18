@@ -11,9 +11,38 @@ export type { AgentRole } from './agent/AgentRole.js';
 export type { Species } from './agent/Species.js';
 export type { Persona } from './agent/Persona.js';
 export type { AgentInput, AgentOutput } from './agent/types.js';
+export type { ControlMode } from './agent/ControlMode.js';
+
+// Agent core.
+export { Agent, type AgentDependencies } from './agent/Agent.js';
+export { createAgent, type CreateAgentConfig } from './agent/createAgent.js';
+export type { AgentFacade } from './agent/AgentFacade.js';
+export type { AgentModule, ReactiveHandler } from './agent/AgentModule.js';
+export type { DecisionTrace } from './agent/DecisionTrace.js';
+export { type AgentAction, isInvokeSkillAction, isEmitEventAction } from './agent/AgentAction.js';
+
+// Errors + Result.
+export {
+  AgentError,
+  MissingDependencyError,
+  SnapshotRestoreError,
+  InvalidSpeciesError,
+  SkillInvocationError,
+  BudgetExceededError,
+} from './agent/errors.js';
+export { type Result, ok, err, isOk, isErr, map, mapErr, andThen, unwrap } from './agent/result.js';
 
 // Events.
 export type { DomainEvent } from './events/DomainEvent.js';
+export type { EventBusPort } from './events/EventBusPort.js';
+export { InMemoryEventBus } from './events/InMemoryEventBus.js';
+export {
+  type InteractionRequestedEvent,
+  INTERACTION_REQUESTED,
+} from './interaction/InteractionRequestedEvent.js';
+
+// Persistence state slice (full persistence lands in M10).
+export type { AgentState } from './persistence/AgentState.js';
 
 // Ports — the determinism seams.
 export type { WallClock } from './ports/WallClock.js';
