@@ -1,4 +1,5 @@
 import type { DomainEvent } from '../events/DomainEvent.js';
+import type { Skill } from '../skills/Skill.js';
 import type { AgentFacade } from './AgentFacade.js';
 
 /**
@@ -26,9 +27,9 @@ export interface ReactiveHandler {
  */
 export interface AgentModule {
   id: string;
-  /** Skills contributed by this module. Phase A: M7. */
-  skills?: readonly unknown[];
-  /** Tools contributed by this module. Phase A: M7. */
+  /** Skills contributed by this module. */
+  skills?: readonly Skill[];
+  /** Tools contributed by this module. Kept `unknown[]` until the Tool interface ships. */
   tools?: readonly unknown[];
   /** Reactive handlers invoked when matching events arrive. */
   reactiveHandlers?: readonly ReactiveHandler[];

@@ -202,7 +202,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
   // Auto-install any skills contributed by config-time modules so the
   // SkillRegistry is fully populated by the time the agent starts ticking.
   for (const mod of config.modules ?? []) {
-    for (const skill of (mod.skills ?? []) as readonly Skill[]) {
+    for (const skill of mod.skills ?? []) {
       skills.register(skill);
     }
   }
