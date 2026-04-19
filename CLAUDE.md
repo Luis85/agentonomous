@@ -16,10 +16,13 @@ MVP is a virtual-pet nurture demo (`examples/nurture-pet`).
   `Math.random()`, or `setTimeout` anywhere in `src/` — everything flows
   through `WallClock`, `Rng`, and port interfaces. ESLint enforces this.
 - **Branch flow.** `main` tracks published releases. `develop` is the
-  integration branch. All work lives on short-lived topic branches cut from
-  `develop` (`feat/…`, `fix/…`, `refactor/…`, `docs/…`, `chore/…`).
-  **Never push directly to `main` or `develop`.** PRs target `develop`
-  (except hotfixes, which target `main`).
+  integration branch. `demo` is the long-lived branch the GitHub Pages
+  demo deploys from (promoted from `develop` on demand — see
+  `PUBLISHING.md#demo-deployment`). All work lives on short-lived topic
+  branches cut from `develop` (`feat/…`, `fix/…`, `refactor/…`,
+  `docs/…`, `chore/…`). **Never push directly to `main`, `develop`, or
+  `demo`.** PRs target `develop` (hotfixes target `main`; demo
+  promotions target `demo`).
 - **One PR, one branch, from the start.** If a session covers multiple
   independent tasks, cut a fresh topic branch from `develop` for each
   one — never stack them on a shared branch and split later. Splitting
