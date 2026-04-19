@@ -6,6 +6,7 @@ import { ANIMATION_TRANSITION } from '../../../src/animation/AnimationTransition
 import type { DomainEvent } from '../../../src/events/DomainEvent.js';
 import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
 import { MOOD_CHANGED } from '../../../src/events/standardEvents.js';
+import { AgeModel } from '../../../src/lifecycle/AgeModel.js';
 import { DefaultMoodModel } from '../../../src/mood/DefaultMoodModel.js';
 import { Needs } from '../../../src/needs/Needs.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
@@ -178,5 +179,101 @@ describe('Agent snapshot/restore — R-01 animation + mood + active skill', () =
           (e as { modifierId?: string }).modifierId === 'just-expired',
       ),
     ).toHaveLength(0);
+  });
+});
+
+describe('Agent snapshot/restore — timeScale round-trip', () => {
+  it('snapshot captures the agent’s current timeScale', () => {
+    const agent = new Agent(baseDeps({ timeScale: 4 }));
+    expect(agent.snapshot().timeScale).toBe(4);
+
+    agent.setTimeScale(8);
+    expect(agent.snapshot().timeScale).toBe(8);
+  });
+
+  it('restore applies the snapshotted timeScale onto the fresh agent', async () => {
+    const a = new Agent(baseDeps({ timeScale: 4 }));
+    const snap = a.snapshot();
+
+    const b = new Agent(baseDeps({ timeScale: 1 }));
+    expect(b.getTimeScale()).toBe(1);
+    await b.restore(snap);
+    expect(b.getTimeScale()).toBe(4);
+  });
+
+  it('catchUp uses the snapshotted timeScale, not the fresh agent’s constructor value', async () => {
+    // Schedule with no transitions in range, so ageSeconds advances freely.
+    const schedule = [{ atSeconds: 0, stage: 'adult' as const }];
+
+    // Agent A: scale 4, snapshots at wall-clock t=1000.
+    const clockA = new ManualClock(1_000);
+    const a = new Agent(
+      baseDeps({
+        clock: clockA,
+        timeScale: 4,
+        ageModel: new AgeModel({ bornAt: 0, schedule, initialAgeSeconds: 0 }),
+      }),
+    );
+    const snap = a.snapshot();
+
+    // Agent B: scale 1 constructor value. Fresh clock 2 wall seconds later.
+    // Pre-fix: catch-up scaled 2000 ms by 1 → 2 virtual seconds of aging.
+    // Post-fix: scales by the snapshotted 4 → 8 virtual seconds.
+    const clockB = new ManualClock(3_000);
+    const b = new Agent(
+      baseDeps({
+        clock: clockB,
+        timeScale: 1,
+        ageModel: new AgeModel({ bornAt: 0, schedule, initialAgeSeconds: 0 }),
+      }),
+    );
+
+    await b.restore(snap, { catchUp: { chunkVirtualSeconds: 1_000 } });
+
+    expect(b.getTimeScale()).toBe(4);
+    expect(b.getState().ageSeconds).toBeCloseTo(8, 9);
+  });
+
+  it('setTimeScale(0) with catchUp: true completes cleanly (no NaN, no throw)', async () => {
+    // Snapshot at scale 0, then restore into a fresh agent with catchUp.
+    // elapsedSec = elapsedMs * 0 = 0, so runCatchUp is a no-op. Contract:
+    // no division-by-zero leaks out and the fresh agent adopts scale 0.
+    const schedule = [{ atSeconds: 0, stage: 'adult' as const }];
+    const clockA = new ManualClock(1_000);
+    const a = new Agent(
+      baseDeps({
+        clock: clockA,
+        timeScale: 60,
+        ageModel: new AgeModel({ bornAt: 0, schedule, initialAgeSeconds: 0 }),
+      }),
+    );
+    a.setTimeScale(0);
+    const snap = a.snapshot();
+    expect(snap.timeScale).toBe(0);
+
+    const clockB = new ManualClock(5_000);
+    const b = new Agent(
+      baseDeps({
+        clock: clockB,
+        timeScale: 1,
+        ageModel: new AgeModel({ bornAt: 0, schedule, initialAgeSeconds: 0 }),
+      }),
+    );
+    await b.restore(snap, { catchUp: true });
+
+    expect(b.getTimeScale()).toBe(0);
+    expect(Number.isNaN(b.getState().ageSeconds)).toBe(false);
+    expect(b.getState().ageSeconds).toBe(0);
+  });
+
+  it('pre-v2 snapshots without timeScale keep the restoring agent’s constructor value', async () => {
+    // Simulate a legacy snapshot: no timeScale field.
+    const a = new Agent(baseDeps({ timeScale: 4 }));
+    const snap = a.snapshot();
+    const legacy = { ...snap, timeScale: undefined };
+
+    const b = new Agent(baseDeps({ timeScale: 2 }));
+    await b.restore(legacy);
+    expect(b.getTimeScale()).toBe(2);
   });
 });

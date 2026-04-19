@@ -533,6 +533,7 @@ export class Agent {
       schemaVersion: CURRENT_SNAPSHOT_VERSION,
       snapshotAt: this.clock.now(),
       identity: this.identity,
+      timeScale: this.timeScale,
     };
     if (this.ageModel && wanted('lifecycle')) {
       snap.lifecycle = this.ageModel.snapshot();
@@ -573,6 +574,13 @@ export class Agent {
     snapshot: AgentSnapshot,
     opts: { catchUp?: boolean | { chunkVirtualSeconds?: number } } = {},
   ): Promise<void> {
+    // Apply the snapshotted timeScale first so catch-up (below) and any
+    // subsequent ticks run at the cadence the snapshot was taken at, not
+    // the fresh agent's constructor value. Pre-v2 snapshots omit this
+    // field and keep the constructor value.
+    if (snapshot.timeScale !== undefined) {
+      this.timeScale = snapshot.timeScale;
+    }
     if (snapshot.lifecycle && this.ageModel) {
       this.ageModel.restore({
         ageSeconds: snapshot.lifecycle.ageSeconds,
