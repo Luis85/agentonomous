@@ -129,11 +129,30 @@ export class CognitionPipeline {
     // invocation so multiple sequential skills don't leak state.
     const previousActive = agent.currentActiveSkillId;
     agent.currentActiveSkillId = skillId;
-    const result: Result<SkillOutcome, SkillError> = await agent.skills
-      .invoke(skillId, params, ctx)
-      .finally(() => {
-        agent.currentActiveSkillId = previousActive;
-      });
+    let result: Result<SkillOutcome, SkillError>;
+    try {
+      result = await agent.skills.invoke(skillId, params, ctx);
+    } catch (cause) {
+      // Throws from inside a skill are treated as infrastructure failures:
+      // emit SkillFailed with `code: 'execution-threw'` and continue. Skills
+      // should return `err(...)` for expected failure modes — this path
+      // guards determinism: no RNG draws happen between the throw and the
+      // next tick, so replay stays byte-identical.
+      agent.currentActiveSkillId = previousActive;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      const event: SkillFailedEvent = {
+        type: SKILL_FAILED,
+        at: wallNowMs,
+        agentId: agent.identity.id,
+        skillId,
+        code: 'execution-threw',
+        message,
+        details: { cause: message },
+      };
+      agent._internalPublish(event);
+      return;
+    }
+    agent.currentActiveSkillId = previousActive;
     if (result.ok) {
       const skill = agent.skills.get(skillId);
       const base = skill?.baseEffectiveness ?? 1;
