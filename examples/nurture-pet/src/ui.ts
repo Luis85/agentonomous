@@ -245,6 +245,83 @@ export function resetSimulation(agentId: string): void {
 }
 
 /**
+ * Mount Export / Import buttons that let the player save the current pet
+ * to a JSON file and restore it later. Export serializes
+ * `agent.snapshot()` to JSON and triggers a browser download; Import
+ * reads a JSON file, parses it, and hands the payload to
+ * `agent.restore(snapshot, { catchUp: false })`. `catchUp: false` keeps
+ * the imported snapshot's virtual-time cursor stable — the player sees
+ * the pet exactly as it was at save time, not fast-forwarded by the wall
+ * clock that elapsed between export and import.
+ *
+ * Errors are surfaced via `alert()` — intentional Phase A ergonomics;
+ * the demo never blocks on a Promise rejection during the import flow.
+ */
+export function mountExportImport(agent: Agent): void {
+  const exportBtn = document.getElementById('export-button');
+  const importBtn = document.getElementById('import-button');
+  const fileInput = document.getElementById('import-file') as HTMLInputElement | null;
+  if (!exportBtn || !importBtn || !fileInput) return;
+
+  exportBtn.setAttribute('aria-label', `Export ${agent.identity.name ?? agent.identity.id}`);
+  importBtn.setAttribute(
+    'aria-label',
+    `Import a saved ${agent.identity.name ?? agent.identity.id}`,
+  );
+
+  exportBtn.addEventListener('click', () => {
+    try {
+      const snap = agent.snapshot();
+      const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${agent.identity.id}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      globalThis.alert?.(`Export failed: ${(err as Error).message}`);
+    }
+  });
+
+  importBtn.addEventListener('click', () => {
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      fileInput.value = ''; // allow re-importing the same file name
+      try {
+        const parsed = JSON.parse(text) as Parameters<Agent['restore']>[0];
+        // `snapshot()` omits the `modifiers` field when the list is empty,
+        // and `restore()` only touches modifiers when the field is present.
+        // That means importing a clean save over a sick/dirty pet would
+        // leave stale modifiers active. Clear them explicitly before
+        // restore so the imported state wins cleanly.
+        for (const mod of agent.modifiers.list()) {
+          agent.removeModifier(mod.id);
+        }
+        void agent.restore(parsed, { catchUp: false }).catch((err: Error) => {
+          globalThis.alert?.(`Import failed: ${err.message}`);
+        });
+      } catch (err) {
+        globalThis.alert?.(`Import failed: ${(err as Error).message}`);
+      }
+    };
+    reader.onerror = () => {
+      globalThis.alert?.('Import failed: could not read file.');
+    };
+    reader.readAsText(file);
+  });
+}
+
+/**
  * Mount the persistent "Reset" button. Clicking it confirms the action,
  * then calls `resetSimulation(agentId)`. The confirm dialog guards against
  * accidental clicks since reset is destructive (lifetime stats lost).

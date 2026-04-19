@@ -167,6 +167,14 @@
       .reset-button:hover {
         background: #64748b;
       }
+      .io-button {
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #64748b;
+      }
+      .io-button:hover {
+        background: #475569;
+      }
       .modifiers li {
         display: inline-flex;
         align-items: center;
@@ -217,6 +225,9 @@
       <div class="speed">
         <span class="speed-label">Speed</span>
         <div class="speed-buttons" id="speed-picker"></div>
+        <button id="export-button" class="io-button" type="button">💾 Export</button>
+        <button id="import-button" class="io-button" type="button">📂 Import</button>
+        <input id="import-file" type="file" accept="application/json,.json" hidden />
         <button id="reset-button" class="reset-button" type="button">🔄 Reset</button>
       </div>
       <div class="bars" id="bars"></div>
