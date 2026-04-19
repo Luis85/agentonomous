@@ -141,7 +141,7 @@ ageSeconds).
 ```bash
 nvm use               # node 22
 npm install
-npm test              # vitest (245 tests, 45 files)
+npm test              # vitest
 npm run typecheck     # tsc --noEmit
 npm run lint          # eslint 9 flat config
 npm run build         # vite library mode → dist/
@@ -151,6 +151,12 @@ npm run docs          # typedoc → docs/
 Phase A milestones (M0–M15) are all green. Phase B (sim-ecs adapter, LLM
 tool, Markdown memory, social/dialogue, possession/jobs, Mistreevous BTs,
 JS-son BDI, brain.js learning) lands post-V1.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for branch model, commit style, PR
+conventions, and the release flow. TL;DR: work on a topic branch cut from
+`develop`, PR against `develop`, keep commits small and reversible.
 
 ## License
 
