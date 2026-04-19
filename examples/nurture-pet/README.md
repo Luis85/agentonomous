@@ -17,7 +17,9 @@ and watch it react and act autonomously between your inputs.
   (`pet.interact('feed')` etc.) to the default skill library.
 - Zero-config persistence via `LocalStorageSnapshotStore` — close the tab
   and the pet remembers.
-- Event-driven UI refresh via `agent.subscribe(AGENT_TICKED)` — a single listener reads the full `DecisionTrace` off `event.trace` and drives HUD + trace panel each tick. The rAF loop is a pure tick driver.
+- Event-driven UI refresh via `agent.subscribe(AGENT_TICKED)` — a single
+  listener reads the full `DecisionTrace` off `event.trace` and drives HUD +
+  trace panel each tick. The rAF loop is a pure tick driver.
 - **Runtime speed control** via `agent.setTimeScale(scale)` — HUD exposes
   Pause / 0.5× / 1× / 2× / 4× / 8× buttons. The chosen speed persists to
   `localStorage` across reloads (separate from the agent snapshot).
