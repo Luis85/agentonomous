@@ -16,18 +16,28 @@ import { mountHud } from './ui.js';
 const STORAGE_KEY = 'whiskers';
 
 // --- Random events ------------------------------------------------------------
+// R-11: cadence tuned so a player sees 2–3 events per virtual minute.
+// R-10: messyPlay applies a `dirty` modifier so the Clean button has a real
+// reason to exist, and simultaneously applies `disobedient` so the Scold
+// button (gated by default ScoldSkill) is corrective rather than abusive.
 const randomEvents = new RandomEventTicker([
   defineRandomEvent({
     id: 'mildIllness',
-    probabilityPerSecond: 0.002,
-    cooldownSeconds: 60,
+    probabilityPerSecond: 0.01,
+    cooldownSeconds: 30,
     emit: () => ({ type: 'RandomEvent', subtype: 'mildIllness', at: 0 }),
   }),
   defineRandomEvent({
     id: 'surpriseTreat',
-    probabilityPerSecond: 0.001,
-    cooldownSeconds: 90,
+    probabilityPerSecond: 0.01,
+    cooldownSeconds: 30,
     emit: () => ({ type: 'RandomEvent', subtype: 'surpriseTreat', at: 0 }),
+  }),
+  defineRandomEvent({
+    id: 'messyPlay',
+    probabilityPerSecond: 0.008,
+    cooldownSeconds: 30,
+    emit: () => ({ type: 'RandomEvent', subtype: 'messyPlay', at: 0 }),
   }),
 ]);
 
@@ -82,6 +92,26 @@ pet.subscribe((event) => {
       stack: 'refresh',
       effects: [{ target: { type: 'mood-bias', category: 'playful' }, kind: 'add', value: 0.5 }],
       visual: { hudIcon: '🎁', fxHint: 'sparkle-gold' },
+    });
+  } else if (re.subtype === 'messyPlay') {
+    // R-10: a mess to clean up + R-12: a reason to scold.
+    pet.applyModifier({
+      id: 'dirty',
+      source: 'event:messyPlay',
+      appliedAt: pet.clock.now(),
+      expiresAt: pet.clock.now() + 120_000,
+      stack: 'refresh',
+      effects: [{ target: { type: 'mood-bias', category: 'sad' }, kind: 'add', value: 0.2 }],
+      visual: { hudIcon: '🧹', fxHint: 'dust-cloud' },
+    });
+    pet.applyModifier({
+      id: 'disobedient',
+      source: 'event:messyPlay',
+      appliedAt: pet.clock.now(),
+      expiresAt: pet.clock.now() + 60_000,
+      stack: 'replace',
+      effects: [],
+      visual: { hudIcon: '😼', fxHint: 'mischief' },
     });
   }
 });
