@@ -47,6 +47,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "docs": "typedoc",
+    "analyze": "npm run build && du -sh dist && find dist -name '*.js' -not -path '*.d.*' -exec wc -c {} + | sort -rn | head -20",
     "changeset": "changeset",
     "release": "changeset publish",
     "prepare": "husky",

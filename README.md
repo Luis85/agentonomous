@@ -86,6 +86,106 @@ requestAnimationFrame(frame);
 That's the whole MVP surface. See `examples/nurture-pet` for a full browser
 demo with HUD, buffs, random events, and localStorage persistence.
 
+### Interaction flow
+
+`agent.interact(verb, params?)` is the recommended entrypoint for UI- or
+host-triggered actions. It publishes an `InteractionRequested` event on the
+agent's bus. Reactive handlers — the `defaultPetInteractionModule` ships
+with one — translate verbs into `invokeSkill(...)` calls:
+
+```
+click → agent.interact('feed')
+  └─► InteractionRequested (on bus)
+      └─► defaultPetInteractionModule handler
+          └─► agent.invokeSkill('feed', …)
+              └─► FeedSkill.execute(ctx)
+                  └─► SkillCompleted + effects (needs, modifiers)
+```
+
+If you route your own verbs, register a module with a `reactiveHandlers`
+entry keyed on `'InteractionRequested'`. The `AgentFacade` passed to the
+handler gives you `facade.invokeSkill(id, params)` without reaching for the
+`Agent` directly.
+
+### Advanced: random events + custom skills
+
+```ts
+import {
+  createAgent,
+  defineRandomEvent,
+  defineSpecies,
+  err,
+  ok,
+  RandomEventTicker,
+  SkillRegistry,
+  type Skill,
+} from 'agentonomous';
+
+const rainstorm: Skill = {
+  id: 'rainstorm',
+  label: 'Rainstorm',
+  baseEffectiveness: 1,
+  execute(_params, ctx) {
+    if (!ctx.hasModifier('outside')) {
+      return Promise.resolve(err({ code: 'indoors', message: 'Pet is inside.' }));
+    }
+    ctx.applyModifier({
+      id: 'wet',
+      source: 'skill:rainstorm',
+      appliedAt: ctx.clock.now(),
+      expiresAt: ctx.clock.now() + 30_000,
+      stack: 'refresh',
+      effects: [{ target: { type: 'mood-bias', category: 'sad' }, kind: 'add', value: 0.2 }],
+    });
+    return Promise.resolve(ok({ fxHint: 'rain-drops' }));
+  },
+};
+
+const skills = new SkillRegistry();
+skills.register(rainstorm);
+
+const randomEvents = new RandomEventTicker([
+  defineRandomEvent({
+    id: 'weather:rain',
+    probabilityPerSecond: 0.005,
+    cooldownSeconds: 120,
+    emit: () => ({ type: 'RandomEvent', subtype: 'rain', at: 0 }),
+  }),
+]);
+
+const pet = createAgent({
+  id: 'whiskers',
+  species: defineSpecies({ id: 'cat' }),
+  skills,
+  randomEvents,
+});
+```
+
+Skills return `ok(...)` for success or `err(...)` for expected failure. A
+thrown exception is caught by the tick pipeline and surfaced as
+`SkillFailed` with `code: 'execution-threw'` — no RNG draws happen between
+the throw and the next tick, so replay stays deterministic.
+
+### Running the example
+
+The `examples/nurture-pet` demo consumes the library via a workspace-local
+build. You must build the library before the example resolves it:
+
+```bash
+# From the repo root.
+npm install
+npm run build                       # → dist/ populated so the example can import
+
+# Install the example's own deps + start Vite dev server.
+cd examples/nurture-pet
+npm install
+npm run dev
+```
+
+Open the printed `http://localhost:5173/` URL. Feed, pet, clean, and watch
+the pet grow up, get hungry, and eventually die (with a life-summary
+modal). LocalStorage persists the pet across reloads.
+
 ## Determinism
 
 Under a fixed `SeededRng` + `ManualClock`, every tick produces a
@@ -101,7 +201,7 @@ expect(runA.finalState).toEqual(runB.finalState);
 
 The library forbids raw `Date.now()` / `Math.random()` / `setTimeout` inside
 its own code via ESLint rules — all non-determinism flows through the
-`WallClock`, `Rng`, `RemoteController`, and `LlmProviderPort` ports.
+`WallClock`, `Rng`, and `RemoteController` ports.
 
 ## Adding your own species
 
@@ -124,8 +224,31 @@ defaults.
 
 ## Reactive store (Pinia, Zustand, …)
 
+`bindAgentToStore` takes any listener; wire it into whichever reactive
+store you use. A Pinia example end-to-end:
+
 ```ts
-import { bindAgentToStore } from 'agentonomous';
+// stores/pet.ts
+import { defineStore } from 'pinia';
+import type { AgentState } from 'agentonomous';
+
+export const usePetStore = defineStore('pet', {
+  state: (): { snapshot: AgentState | null } => ({ snapshot: null }),
+  actions: {
+    syncFromAgent(state: AgentState): void {
+      this.snapshot = state;
+    },
+  },
+});
+```
+
+```ts
+// main.ts
+import { bindAgentToStore, createAgent, defineSpecies } from 'agentonomous';
+import { usePetStore } from './stores/pet';
+
+const pet = createAgent({ id: 'whiskers', species: defineSpecies({ id: 'cat' }) });
+const store = usePetStore();
 
 const unsubscribe = bindAgentToStore(pet, (state) => {
   store.syncFromAgent(state);
@@ -133,8 +256,8 @@ const unsubscribe = bindAgentToStore(pet, (state) => {
 ```
 
 The listener fires synchronously on every event and receives the current
-`getState()` slice (id, stage, needs, modifiers, mood, animation, halted,
-ageSeconds).
+`getState()` slice (`id`, `stage`, `needs`, `modifiers`, `mood`,
+`animation`, `halted`, `ageSeconds`). Call `unsubscribe()` to detach.
 
 ## Development
 
@@ -146,7 +269,17 @@ npm run typecheck     # tsc --noEmit
 npm run lint          # eslint 9 flat config
 npm run build         # vite library mode → dist/
 npm run docs          # typedoc → docs/
+npm run analyze       # build + list the 20 largest dist/*.js files by bytes
 ```
+
+### Bundle-size budget
+
+The library's core bundle (everything re-exported from
+`agentonomous`) targets ~80 KB unminified ESM. The
+`agentonomous/integrations/excalibur` subpath is a separate entry so
+consumers who don't use Excalibur don't pay for it. Run
+`npm run analyze` after meaningful changes; a significant regression is a
+signal to check for accidentally-bundled adapters or heavy deps.
 
 Phase A milestones (M0–M15) are all green. Phase B (sim-ecs adapter, LLM
 tool, Markdown memory, social/dialogue, possession/jobs, Mistreevous BTs,
