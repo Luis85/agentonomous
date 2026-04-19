@@ -37,6 +37,10 @@
       "import": "./dist/cognition/adapters/js-son/index.js",
       "types": "./dist/cognition/adapters/js-son/index.d.ts"
     },
+    "./cognition/adapters/brainjs": {
+      "import": "./dist/cognition/adapters/brainjs/index.js",
+      "types": "./dist/cognition/adapters/brainjs/index.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -107,7 +111,7 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": "*",
-    "brain.js": "^2.0.0",
+    "brain.js": "^2.0.0-beta.0",
     "excalibur": "*",
     "js-son-agent": "*",
     "mistreevous": "^4.0.0",
@@ -159,6 +163,12 @@
     {
       "name": "dist/cognition/adapters/js-son/index.js (gzip)",
       "path": "dist/cognition/adapters/js-son/index.js",
+      "gzip": true,
+      "limit": "2 KB"
+    },
+    {
+      "name": "dist/cognition/adapters/brainjs/index.js (gzip)",
+      "path": "dist/cognition/adapters/brainjs/index.js",
       "gzip": true,
       "limit": "2 KB"
     }

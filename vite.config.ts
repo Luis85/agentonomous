@@ -10,6 +10,8 @@ import dts from 'vite-plugin-dts';
 //                                                    → dist/cognition/adapters/mistreevous/index.js
 // - js-son:      src/cognition/adapters/js-son/index.ts
 //                                                    → dist/cognition/adapters/js-son/index.js
+// - brain.js:    src/cognition/adapters/brainjs/index.ts
+//                                                    → dist/cognition/adapters/brainjs/index.js
 //
 // All peer dependencies are marked external so consumers provide them.
 
@@ -38,6 +40,14 @@ const ambientDtsEntries: AmbientDtsEntry[] = [
     referencedBy: [
       'dist/cognition/adapters/js-son/index.d.ts',
       'dist/cognition/adapters/js-son/JsSonReasoner.d.ts',
+    ],
+  },
+  {
+    from: 'src/cognition/adapters/brainjs/brain.d.ts',
+    to: 'dist/cognition/adapters/brainjs/brain.d.ts',
+    referencedBy: [
+      'dist/cognition/adapters/brainjs/index.d.ts',
+      'dist/cognition/adapters/brainjs/BrainJsReasoner.d.ts',
     ],
   },
 ];
@@ -94,6 +104,10 @@ export default defineConfig({
         'cognition/adapters/js-son/index': resolve(
           __dirname,
           'src/cognition/adapters/js-son/index.ts',
+        ),
+        'cognition/adapters/brainjs/index': resolve(
+          __dirname,
+          'src/cognition/adapters/brainjs/index.ts',
         ),
       },
       formats: ['es'],
