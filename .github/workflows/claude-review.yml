@@ -1,0 +1,70 @@
+# Automated PR review by Claude.
+#
+# Triggers a fresh Claude agent whenever a PR targeting `develop` is
+# marked ready for review (or reopened / synchronized while non-draft).
+# Claude reads the diff and reviews from product perspectives: UX,
+# correctness, determinism (per CLAUDE.md), API shape, test coverage,
+# and docs. If everything looks good it reacts with a thumbs-up;
+# otherwise it posts a review with actionable comments.
+
+name: Claude PR review
+
+on:
+  pull_request:
+    types: [ready_for_review, reopened, synchronize]
+    branches: [develop]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip drafts — only run once the PR is actually ready for review.
+    if: github.event.pull_request.draft == false
+    name: Claude reviews the PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude review
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-opus-4-7
+          direct_prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            ("${{ github.event.pull_request.title }}") against `develop`.
+
+            Review from every product perspective that applies:
+            - Correctness and edge cases
+            - Determinism rules in CLAUDE.md (no raw Date.now / Math.random /
+              setTimeout in src/; everything flows through WallClock, Rng, ports)
+            - Public API shape, naming, JSDoc, and barrel exposure
+            - Test coverage (unit mirrors src/ 1:1; seeded SeededRng + ManualClock)
+            - Style conventions in STYLE_GUIDE.md
+            - Changeset presence when library behavior changes
+            - Docs / README impact
+
+            Decision rule:
+            - If the PR is in good shape with no blocking concerns, react to
+              the PR with a thumbs-up (+1) and do not post a review.
+            - If anything needs to be revisited, submit a REQUEST_CHANGES or
+              COMMENT review with inline comments on the specific lines.
+              Be concrete, reference file_path:line_number, and prefer
+              suggestions over vague feedback.
+
+            Do not modify code. Do not push commits. Review only.
+          allowed_tools: |
+            mcp__github__pull_request_read
+            mcp__github__get_file_contents
+            mcp__github__pull_request_review_write
+            mcp__github__add_comment_to_pending_review
+            mcp__github__add_issue_comment
