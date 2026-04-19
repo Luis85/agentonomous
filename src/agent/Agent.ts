@@ -4,6 +4,7 @@ import {
   AGENT_DIED,
   LIFE_STAGE_CHANGED,
   MODIFIER_APPLIED,
+  MODIFIER_EXPIRED,
   MODIFIER_REMOVED,
   type AgentDiedEvent,
   type LifeStageChangedEvent,
@@ -559,9 +560,24 @@ export class Agent {
       this.needs.restore(snapshot.needs);
     }
     if (snapshot.modifiers) {
+      const nowMs = this.clock.now();
       for (const mod of snapshot.modifiers) {
-        // Drop already-expired modifiers up front.
-        if (mod.expiresAt !== undefined && mod.expiresAt <= this.clock.now()) continue;
+        // Boundary case: modifiers whose expiresAt has already passed at
+        // the clock's current time are dropped on restore AND a
+        // `ModifierExpired` event fires exactly once so downstream
+        // consumers (stores, UIs, logs) see the expiration in the same
+        // shape they would from a normal tick.
+        if (mod.expiresAt !== undefined && mod.expiresAt <= nowMs) {
+          this.publish({
+            type: MODIFIER_EXPIRED,
+            at: nowMs,
+            agentId: this.identity.id,
+            modifierId: mod.id,
+            source: mod.source,
+            ...(mod.visual?.fxHint !== undefined ? { fxHint: mod.visual.fxHint } : {}),
+          });
+          continue;
+        }
         this.modifiers.apply(mod);
       }
     }

@@ -133,4 +133,50 @@ describe('Agent snapshot/restore — R-01 animation + mood + active skill', () =
     const withoutAnim = agent.snapshot({ include: ['lifecycle'] });
     expect(withoutAnim.animation).toBeUndefined();
   });
+
+  it('R-16: modifier with expiresAt at clock.now drops on restore and emits ModifierExpired once', async () => {
+    const clockA = new ManualClock(1_000);
+    const a = new Agent(baseDeps({ clock: clockA }));
+    // Apply a modifier whose expiresAt is exactly now.
+    a.applyModifier({
+      id: 'just-expired',
+      source: 'test',
+      appliedAt: clockA.now(),
+      expiresAt: clockA.now(),
+      stack: 'replace',
+      effects: [],
+    });
+    const snap = a.snapshot();
+    expect(snap.modifiers?.some((m) => m.id === 'just-expired')).toBe(true);
+
+    const busB = new InMemoryEventBus();
+    const clockB = new ManualClock(1_000);
+    const b = new Agent(baseDeps({ eventBus: busB, clock: clockB }));
+    const seen: DomainEvent[] = [];
+    busB.subscribe((e) => seen.push(e));
+
+    await b.restore(snap);
+
+    // The modifier is not active on the restored agent.
+    expect(b.modifiers.list().map((m) => m.id)).not.toContain('just-expired');
+
+    // Exactly one ModifierExpired fires for the boundary modifier.
+    const expiredEvents = seen.filter(
+      (e) =>
+        e.type === 'ModifierExpired' &&
+        (e as { modifierId?: string }).modifierId === 'just-expired',
+    );
+    expect(expiredEvents).toHaveLength(1);
+
+    // A subsequent tick doesn't re-fire the event.
+    seen.length = 0;
+    await b.tick(0.016);
+    expect(
+      seen.filter(
+        (e) =>
+          e.type === 'ModifierExpired' &&
+          (e as { modifierId?: string }).modifierId === 'just-expired',
+      ),
+    ).toHaveLength(0);
+  });
 });
