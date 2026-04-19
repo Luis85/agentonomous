@@ -1,5 +1,7 @@
 import type { Modifier } from './Modifier.js';
+import type { ModifierEffect } from './ModifierEffect.js';
 import type { ModifierTarget } from './ModifierTarget.js';
+import { NumericModifierResolver } from './NumericModifierResolver.js';
 
 /**
  * Reason a modifier left the collection — used by `Modifiers.tick(...)` to
@@ -19,6 +21,7 @@ export interface ModifierRemoval {
 export class Modifiers {
   private readonly entries: { key: string; mod: Modifier }[] = [];
   private ordinal = 0;
+  private readonly numericResolver = new NumericModifierResolver();
 
   /**
    * Apply a modifier. Returns the new or updated `Modifier` instance, plus
@@ -161,42 +164,21 @@ export class Modifiers {
 
   /**
    * Flat multiplier/bonus resolver. `identity` is the neutral value returned
-   * when no effect matches (0 for additive, 1 for multiplicative).
+   * when no effect matches (0 for additive, 1 for multiplicative). The actual
+   * set/multiply/add/clamp folding lives on `NumericModifierResolver` (R-18);
+   * this method is a thin adapter that flattens the active modifiers' effects
+   * into the resolver's input.
    */
   private resolveNumeric(match: (target: ModifierTarget) => boolean, identity: number): number {
-    let setValue: number | null = null;
-    let product = 1;
-    let sum = 0;
-    let clamp: number | null = null;
-    let matched = false;
+    return this.numericResolver.resolve(this.iterEffects(), identity, match);
+  }
 
+  /** Lazy iterator over every active modifier's effects, in apply order. */
+  private *iterEffects(): IterableIterator<ModifierEffect> {
     for (const entry of this.entries) {
       for (const effect of entry.mod.effects) {
-        if (!match(effect.target)) continue;
-        matched = true;
-        switch (effect.kind) {
-          case 'set':
-            setValue = effect.value;
-            break;
-          case 'multiply':
-            product *= effect.value;
-            break;
-          case 'add':
-            sum += effect.value;
-            break;
-          case 'clamp':
-            clamp = clamp === null ? effect.value : Math.min(clamp, effect.value);
-            break;
-        }
+        yield effect;
       }
     }
-
-    if (!matched) return identity;
-    if (setValue !== null) {
-      return clamp !== null ? Math.min(setValue, clamp) : setValue;
-    }
-    // Treat identity=1 as multiplicative base and identity=0 as additive base.
-    const base = identity === 0 ? sum : product * identity + sum;
-    return clamp !== null ? Math.min(base, clamp) : base;
   }
 }
