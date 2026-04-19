@@ -1,4 +1,5 @@
 import {
+  AGENT_TICKED,
   createAgent,
   defaultPetInteractionModule,
   defineRandomEvent,
@@ -8,6 +9,7 @@ import {
   InMemoryMemoryAdapter,
   RandomEventTicker,
   SkillRegistry,
+  type AgentTickedEvent,
 } from 'agentonomous';
 import { catSpecies } from './species.js';
 import {
@@ -170,22 +172,40 @@ const unsubscribeModifierDecorator = pet.subscribe((event) => {
   }
 });
 
+// Drive HUD + trace panel off the AgentTicked bus event. The event
+// fires once per non-halted tick, synchronously during `pet.tick(dt)`,
+// and carries the full `DecisionTrace` on its payload — no closure
+// cache needed. See `InMemoryEventBus.publish` for the sync-publish
+// semantics that guarantee `event.trace` matches the tick that just
+// completed. The rAF loop below is a pure tick driver.
+const unsubscribeUiRefresh = pet.subscribe((event) => {
+  if (event.type !== AGENT_TICKED) return;
+  const ticked = event as AgentTickedEvent;
+  const state = pet.getState();
+  hud.update(state);
+  traceView.render(ticked.trace, state, ticked.tickNumber);
+});
+
 // --- Game loop ----------------------------------------------------------------
-// Needs decay, age advances, and modifier timers count down silently
-// between agent events — without this per-frame repaint the HUD would
-// appear frozen until the next critical-threshold crossing or skill
-// result.
+// rAF drives `pet.tick(dt)` at display refresh rate. UI refresh
+// happens in the AgentTicked subscriber above — no per-frame DOM
+// work here, except a one-shot HUD render on the halt transition
+// (AgentTicked doesn't fire on halted ticks by library spec, so
+// without this fallback the HUD would stay frozen at the
+// pre-death state after the agent dies).
 let last = performance.now();
 let rafHandle = 0;
 let stopped = false;
+let haltRendered = false;
 async function loop(now: number): Promise<void> {
   const dt = Math.min((now - last) / 1000, 0.25);
   last = now;
   const trace = await pet.tick(dt);
   if (stopped) return;
-  const state = pet.getState();
-  hud.update(state);
-  traceView.render(trace, state);
+  if (trace.halted && !haltRendered) {
+    haltRendered = true;
+    hud.update(pet.getState());
+  }
   rafHandle = requestAnimationFrame((t) => {
     void loop(t);
   });
@@ -207,6 +227,7 @@ function disposeDemo(): void {
   stopped = true;
   if (rafHandle !== 0) cancelAnimationFrame(rafHandle);
   unsubscribeModifierDecorator();
+  unsubscribeUiRefresh();
   hud.dispose();
 }
 

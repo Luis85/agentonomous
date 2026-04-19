@@ -17,7 +17,9 @@ and watch it react and act autonomously between your inputs.
   (`pet.interact('feed')` etc.) to the default skill library.
 - Zero-config persistence via `LocalStorageSnapshotStore` — close the tab
   and the pet remembers.
-- Reactive state binding via `bindAgentToStore` + a minimal DOM HUD.
+- Event-driven UI refresh via `agent.subscribe(AGENT_TICKED)` — a single
+  listener reads the full `DecisionTrace` off `event.trace` and drives HUD +
+  trace panel each tick. The rAF loop is a pure tick driver.
 - **Runtime speed control** via `agent.setTimeScale(scale)` — HUD exposes
   Pause / 0.5× / 1× / 2× / 4× / 8× buttons. The chosen speed persists to
   `localStorage` across reloads (separate from the agent snapshot).
@@ -71,6 +73,30 @@ export const usePetStore = defineStore('pet', {
 const store = usePetStore();
 bindAgentToStore(pet, (state) => store.syncFromAgent(state));
 ```
+
+## Event-driven UI refresh
+
+`AgentTicked` fires once per non-halted tick, carrying the full
+`DecisionTrace` on its payload. This is the recommended way to drive
+per-tick UI updates from a library consumer:
+
+```ts
+import { AGENT_TICKED, type AgentTickedEvent } from 'agentonomous';
+
+const unsubscribe = pet.subscribe((event) => {
+  if (event.type !== AGENT_TICKED) return;
+  const ticked = event as AgentTickedEvent;
+  hud.update(pet.getState());
+  traceView.render(ticked.trace, pet.getState());
+});
+
+// On teardown:
+unsubscribe();
+```
+
+Pair this with a `requestAnimationFrame` loop that calls
+`pet.tick(dt)` but does not render — the event drives UI. See
+`src/main.ts` for the reference implementation.
 
 ## localStorage key layout
 

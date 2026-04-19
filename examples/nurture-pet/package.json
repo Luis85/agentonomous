@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Nurture-pet MVP demo for the agentonomous library.",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --open",
     "build": "vite build",
     "preview": "vite preview"
   },

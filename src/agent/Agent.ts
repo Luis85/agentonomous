@@ -395,8 +395,13 @@ export class Agent {
     );
     await this.cognitionPipeline.executeActions(actions, tickStartedAt);
 
-    // Stage 9: persist + autosave.
-    if (this.autoSaveTracker) {
+    // Stage 9: persist + autosave. Skip advance at pause — paused
+    // ticks shouldn't count toward `everyTicks` (would otherwise churn
+    // the snapshot store at 60fps while `setTimeScale(0)` freezes
+    // every other stage). Event-triggered saves still fire via
+    // observeEvent() in publish(), so a critical event during pause
+    // still persists.
+    if (this.autoSaveTracker && !paused) {
       this.autoSaveTracker.advance(virtualDtSeconds);
     }
 

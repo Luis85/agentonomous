@@ -140,6 +140,8 @@ export const AGENT_TICKED = 'AgentTicked' as const;
  * published, so the meta-event cannot self-reference. Replay
  * equivalence under a fixed seed: identical input sequence produces
  * identical `AgentTicked` sequence (ordering, payloads).
+ *
+ * @see examples/nurture-pet/src/main.ts — reference consumer.
  */
 export interface AgentTickedEvent extends DomainEvent {
   type: typeof AGENT_TICKED;
