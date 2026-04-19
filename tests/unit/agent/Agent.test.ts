@@ -181,7 +181,9 @@ describe('Agent (M2 shell)', () => {
     const healthyA = vi.fn();
     const healthyB = vi.fn();
 
-    async function runWith(handlers: AgentModule['reactiveHandlers']): Promise<number[]> {
+    async function runWith(
+      handlers: NonNullable<AgentModule['reactiveHandlers']>,
+    ): Promise<number[]> {
       const bus = new InMemoryEventBus();
       const agent = new Agent(
         baseDeps({
@@ -205,7 +207,7 @@ describe('Agent (M2 shell)', () => {
       return Array.from({ length: 4 }, () => agent.rng.next());
     }
 
-    const throwing: AgentModule['reactiveHandlers'] = [
+    const throwing: NonNullable<AgentModule['reactiveHandlers']> = [
       {
         on: 'ping',
         handle: () => {
@@ -214,7 +216,7 @@ describe('Agent (M2 shell)', () => {
       },
       { on: 'ping', handle: healthyA },
     ];
-    const clean: AgentModule['reactiveHandlers'] = [{ on: 'ping', handle: healthyB }];
+    const clean: NonNullable<AgentModule['reactiveHandlers']> = [{ on: 'ping', handle: healthyB }];
 
     const rngAfterThrow = await runWith(throwing);
     const rngAfterClean = await runWith(clean);
