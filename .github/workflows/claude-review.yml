@@ -11,7 +11,9 @@ name: Claude PR review
 
 on:
   pull_request:
-    types: [ready_for_review, reopened, synchronize]
+    # `opened` covers PRs created directly as non-draft;
+    # `ready_for_review` covers draft→ready transitions.
+    types: [opened, ready_for_review, reopened, synchronize]
     branches: [develop]
 
 concurrency:
@@ -20,8 +22,12 @@ concurrency:
 
 jobs:
   review:
-    # Skip drafts — only run once the PR is actually ready for review.
-    if: github.event.pull_request.draft == false
+    # Skip drafts, and skip forked PRs — repository secrets (ANTHROPIC_API_KEY)
+    # are not exposed to workflows triggered from forks, and the GITHUB_TOKEN is
+    # read-only there, so the review job can't post feedback.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     name: Claude reviews the PR
     runs-on: ubuntu-latest
     permissions:
