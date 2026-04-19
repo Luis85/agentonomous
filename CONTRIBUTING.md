@@ -6,12 +6,13 @@ for branches, commits, releases, and local development.
 ## Branch model
 
 We follow a [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/)–flavored
-layout with two long-lived branches:
+layout with three long-lived branches:
 
-| Branch    | Purpose                                                                        |
-| --------- | ------------------------------------------------------------------------------ |
-| `main`    | Tracks what's currently published on npm. Tagged `vX.Y.Z` per release.         |
-| `develop` | Integration branch. Reflects the latest accepted work toward the next release. |
+| Branch    | Purpose                                                                                                                                                                                                                             |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main`    | Tracks what's currently published on npm. Tagged `vX.Y.Z` per release.                                                                                                                                                              |
+| `develop` | Integration branch. Reflects the latest accepted work toward the next release.                                                                                                                                                      |
+| `demo`    | Powers the GitHub Pages demo at `https://<owner>.github.io/agentonomous/`. Promoted from `develop` on demand — decoupled from `main` so demo updates don't require a release. See [PUBLISHING.md](./PUBLISHING.md#demo-deployment). |
 
 Feature branches, bug fixes, and remediation work all live on short-lived
 topic branches cut from `develop`:
@@ -130,7 +131,7 @@ carried one, leaving stale state on partial restores. …
 - Body: summary + test plan. Link to relevant R-XX or issue numbers.
 - Required gates before merge: `npm run verify` (= format:check + lint +
   typecheck + test + build), GitHub Actions CI green. CI runs on every
-  push to and PR against `develop` or `main` (see
+  push to and PR against `develop`, `main`, or `demo` (see
   `.github/workflows/ci.yml`).
 - Reviews: at least one approving review for anything beyond a
   one-line docs tweak.

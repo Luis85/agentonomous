@@ -7,6 +7,10 @@ see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 - `main` — tracks what's on npm. Each release is a tagged commit here.
 - `develop` — integration branch; all work lands here first.
+- `demo` — long-lived branch powering the public GitHub Pages demo. Promoted
+  from `develop` on demand (see [Demo deployment](#demo-deployment)) and
+  deliberately decoupled from `main` so docs/demo updates can ship without
+  cutting a release.
 - Releases flow `develop` → `main`, then a tag triggers the publish workflow.
 
 ## Prerequisites
@@ -105,8 +109,9 @@ After a release lands:
 
 ## Demo deployment
 
-Separate from npm publishing, the browser demo auto-deploys to GitHub Pages
-via `.github/workflows/pages.yml` on every push to `main`:
+The browser demo is decoupled from npm releases. It auto-deploys to GitHub
+Pages via `.github/workflows/pages.yml` on every push to the long-lived
+`demo` branch (plus manual `workflow_dispatch` runs):
 
 - URL: `https://<owner>.github.io/agentonomous/`
 - Builds the library (`npm run build`), then the example (`cd
@@ -115,10 +120,36 @@ examples/nurture-pet && npm install && npm run build`), then uploads
 - The example's `vite.config.ts` reads `PAGES_BASE` at build time so assets
   resolve under the `/agentonomous/` subpath.
 
+### Promoting `develop` → `demo`
+
+When you want a new demo live, promote `develop` onto `demo`. Fast-forward
+is the common case:
+
+```bash
+git switch demo
+git pull origin demo
+git merge --ff-only develop
+git push origin demo
+```
+
+If `demo` has diverged (hotfix landed there, or the demo got a
+demo-specific tweak), open a PR `develop` → `demo` instead and
+squash-merge via the GitHub UI. Same review bar as `main`.
+
+Triggering a rebuild **without** advancing the branch (e.g. Pages
+cleared its artifact, or you want to re-deploy the current tip): use
+**Actions → Deploy demo to GitHub Pages → Run workflow** against the
+`demo` branch.
+
 First-time setup (one-off):
 
 1. Repo → Settings → Pages → Source = **GitHub Actions**.
-2. Push to `main` and watch the `Deploy demo to GitHub Pages` workflow.
+2. Create the `demo` branch from `develop` (`git switch -c demo develop &&
+git push -u origin demo`).
+3. Add branch protection for `demo`: require PR, require CI green, disallow
+   force-push.
+4. Push to `demo` (or dispatch the workflow) and watch the
+   `Deploy demo to GitHub Pages` workflow.
 
 ## Rolling back
 
