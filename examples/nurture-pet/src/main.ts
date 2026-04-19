@@ -108,7 +108,7 @@ pet.subscribe((event) => {
       effects: [
         { target: { type: 'skill-effectiveness', skillId: 'feed' }, kind: 'multiply', value: 0.5 },
       ],
-      visual: { hudIcon: '🤒', fxHint: 'sick-swirl' },
+      visual: { label: 'Sick', hudIcon: '🤒', fxHint: 'sick-swirl' },
     });
   } else if (re.subtype === 'surpriseTreat') {
     pet.applyModifier({
@@ -118,7 +118,7 @@ pet.subscribe((event) => {
       expiresAt: pet.clock.now() + 20_000,
       stack: 'refresh',
       effects: [{ target: { type: 'mood-bias', category: 'playful' }, kind: 'add', value: 0.5 }],
-      visual: { hudIcon: '🎁', fxHint: 'sparkle-gold' },
+      visual: { label: 'Happy glow', hudIcon: '🎁', fxHint: 'sparkle-gold' },
     });
   } else if (re.subtype === 'messyPlay') {
     // R-10: a mess to clean up + R-12: a reason to scold.
@@ -129,7 +129,7 @@ pet.subscribe((event) => {
       expiresAt: pet.clock.now() + 120_000,
       stack: 'refresh',
       effects: [{ target: { type: 'mood-bias', category: 'sad' }, kind: 'add', value: 0.2 }],
-      visual: { hudIcon: '🧹', fxHint: 'dust-cloud' },
+      visual: { label: 'Dirty', hudIcon: '🧹', fxHint: 'dust-cloud' },
     });
     pet.applyModifier({
       id: 'disobedient',
@@ -138,7 +138,7 @@ pet.subscribe((event) => {
       expiresAt: pet.clock.now() + 60_000,
       stack: 'replace',
       effects: [],
-      visual: { hudIcon: '😼', fxHint: 'mischief' },
+      visual: { label: 'Disobedient', hudIcon: '😼', fxHint: 'mischief' },
     });
   }
 });
