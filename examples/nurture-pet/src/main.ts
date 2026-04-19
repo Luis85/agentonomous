@@ -11,6 +11,7 @@ import {
   SkillRegistry,
   type AgentTickedEvent,
 } from 'agentonomous';
+import { ApproachTreatSkill } from './skills/ApproachTreatSkill.js';
 import { catSpecies } from './species.js';
 import {
   mountExportImport,
@@ -84,6 +85,7 @@ skills.registerAll(defaultPetInteractionModule.skills ?? []);
 skills.register(ExpressMeowSkill);
 skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
+skills.register(ApproachTreatSkill);
 
 // --- Species (base + optional user JSON override) -----------------------------
 const speciesOverride = loadConfigOverride(catSpecies);
