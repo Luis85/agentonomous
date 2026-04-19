@@ -3,8 +3,10 @@ import dts from 'vite-plugin-dts';
 import { resolve } from 'node:path';
 
 // Library mode build. Entries:
-// - main:      src/index.ts                        → dist/index.js
-// - excalibur: src/integrations/excalibur/index.ts → dist/integrations/excalibur/index.js
+// - main:        src/index.ts                        → dist/index.js
+// - excalibur:   src/integrations/excalibur/index.ts → dist/integrations/excalibur/index.js
+// - mistreevous: src/cognition/adapters/mistreevous/index.ts
+//                                                    → dist/cognition/adapters/mistreevous/index.js
 //
 // All peer dependencies are marked external so consumers provide them.
 
@@ -29,6 +31,10 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
         'integrations/excalibur/index': resolve(__dirname, 'src/integrations/excalibur/index.ts'),
+        'cognition/adapters/mistreevous/index': resolve(
+          __dirname,
+          'src/cognition/adapters/mistreevous/index.ts',
+        ),
       },
       formats: ['es'],
     },
