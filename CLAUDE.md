@@ -20,6 +20,12 @@ MVP is a virtual-pet nurture demo (`examples/nurture-pet`).
   `develop` (`feat/…`, `fix/…`, `refactor/…`, `docs/…`, `chore/…`).
   **Never push directly to `main` or `develop`.** PRs target `develop`
   (except hotfixes, which target `main`).
+- **One PR, one branch, from the start.** If a session covers multiple
+  independent tasks, cut a fresh topic branch from `develop` for each
+  one — never stack them on a shared branch and split later. Splitting
+  after the fact means cherry-picking, three parallel review rounds, and
+  three verify cycles. Only share a branch when a later task genuinely
+  depends on an earlier unmerged one (rare).
 - **Pre-PR gate.** `npm run verify` must be green before opening a PR.
   Equivalent to `format:check && lint && typecheck && test && build`.
 - **No `--no-verify`.** If a pre-commit hook fails, fix the cause — don't
