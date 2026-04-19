@@ -28,7 +28,10 @@ type LifetimeCounters = {
   petCount: number;
 };
 
-export function mountHud(agent: Agent): { update: (state: AgentState) => void } {
+export function mountHud(agent: Agent): {
+  update: (state: AgentState) => void;
+  dispose: () => void;
+} {
   const bars = document.getElementById('bars') as HTMLElement;
   const modifiersEl = document.getElementById('modifier-list') as HTMLElement;
   const buttonsEl = document.getElementById('buttons') as HTMLElement;
@@ -39,7 +42,9 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
   const moodEl = document.getElementById('pet-mood') as HTMLElement;
   const animEl = document.getElementById('pet-animation') as HTMLElement;
 
-  // Build need bars
+  // Build need bars and cache refs so the per-frame `update` loop never hits
+  // `document.querySelector` — which was ~10 DOM traversals per RAF.
+  const needRefs = new Map<string, { fill: HTMLElement; value: HTMLElement }>();
   for (const need of NEEDS) {
     const row = document.createElement('div');
     row.className = 'bar';
@@ -49,6 +54,9 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
       <span class="bar-value" data-need-value="${need.id}">1.00</span>
     `;
     bars.appendChild(row);
+    const fill = row.querySelector<HTMLElement>(`[data-need="${need.id}"]`);
+    const value = row.querySelector<HTMLElement>(`[data-need-value="${need.id}"]`);
+    if (fill && value) needRefs.set(need.id, { fill, value });
   }
 
   // Build interaction buttons
@@ -69,7 +77,7 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
     illnessCount: 0,
     petCount: 0,
   };
-  agent.subscribe((event) => {
+  const unsubscribe = agent.subscribe((event) => {
     const line = formatEventLine(event);
     if (line) {
       traceLines.unshift(line);
@@ -97,6 +105,8 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 
   nameEl.textContent = agent.identity.name;
 
+  const modifierTray = createModifierTrayRenderer(modifiersEl);
+
   return {
     update(state: AgentState): void {
       const stageLabel = STAGE_LABELS[state.stage] ?? state.stage;
@@ -106,16 +116,15 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 
       for (const need of NEEDS) {
         const level = state.needs[need.id] ?? 0;
-        const fill = document.querySelector<HTMLElement>(`[data-need="${need.id}"]`);
-        const value = document.querySelector<HTMLElement>(`[data-need-value="${need.id}"]`);
-        if (fill) {
-          fill.style.width = `${Math.max(0, Math.min(100, level * 100))}%`;
-          fill.classList.toggle('critical', level < 0.25);
+        const refs = needRefs.get(need.id);
+        if (refs) {
+          refs.fill.style.width = `${Math.max(0, Math.min(100, level * 100))}%`;
+          refs.fill.classList.toggle('critical', level < 0.25);
+          refs.value.textContent = level.toFixed(2);
         }
-        if (value) value.textContent = level.toFixed(2);
       }
 
-      renderModifierTray(modifiersEl, agent, agent.getTimeScale() === 0);
+      modifierTray.update(agent, agent.getTimeScale() === 0);
 
       // Halt / animation visual cue.
       if (state.halted) {
@@ -143,6 +152,9 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
         petEl.textContent = '🐱';
         petEl.style.background = '#fde68a';
       }
+    },
+    dispose(): void {
+      unsubscribe();
     },
   };
 }
@@ -260,19 +272,21 @@ export function mountExportImport(agent: Agent): void {
   );
 
   exportBtn.addEventListener('click', () => {
+    let url: string | null = null;
     try {
       const snap = agent.snapshot();
       const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `${agent.identity.id}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
     } catch (err) {
       globalThis.alert?.(`Export failed: ${(err as Error).message}`);
+    } finally {
+      if (url !== null) URL.revokeObjectURL(url);
     }
   });
 
@@ -349,38 +363,98 @@ function writeSavedMult(key: string, mult: number | 'pause'): void {
 }
 
 /**
- * Render active modifiers as a chip list with the modifier's HUD icon (if
- * declared on `Modifier.visual.hudIcon`) and a live remaining-time
- * countdown for time-bound modifiers.
+ * Diffing renderer for the active-modifier chip list. Keeps `<li>` nodes
+ * alive across frames so the per-frame HUD update only touches the
+ * countdown text (the only thing that actually changes most ticks).
  *
- * When `paused` is true, the countdown is rendered as `paused` instead of
- * a wall-clock-derived figure. Modifier expiry is itself wall-clock-bound
- * (a documented quirk — see `setTimeScale` JSDoc), so during pause the
- * actual countdown still elapses; this label keeps the UI honest about
- * the user's intent without misrepresenting the underlying state.
+ * Chips are keyed by `id` + occurrence index within the current
+ * `agent.modifiers.list()` so `stack: 'stack'` entries (which share an
+ * `id`) each get their own row. Reusing positional keys across frames
+ * preserves diffing in the common case; when a middle entry expires the
+ * remaining chips shift up, which rewrites their text but not the DOM
+ * node count.
+ *
+ * When `paused` is true the countdown reads `paused` rather than a wall
+ * clock figure. Modifier expiry is itself wall-clock-bound (see
+ * `setTimeScale` JSDoc), so the countdown still elapses during pause;
+ * this label keeps the UI honest about the user's intent without
+ * misrepresenting the underlying state.
  */
-function renderModifierTray(host: HTMLElement, agent: Agent, paused: boolean): void {
-  host.innerHTML = '';
-  const now = agent.clock.now();
-  for (const mod of agent.modifiers.list()) {
-    const li = document.createElement('li');
-    const icon = mod.visual?.hudIcon;
-    const name = mod.visual?.label ?? mod.id;
-    const label = icon ? `${icon} ${name}` : name;
-    li.textContent = label;
-    if (typeof mod.expiresAt === 'number') {
-      const time = document.createElement('span');
-      time.className = 'mod-time';
-      if (paused) {
-        time.textContent = ' paused';
-      } else {
-        const remainingMs = Math.max(0, mod.expiresAt - now);
-        time.textContent = ` ${formatRemaining(remainingMs)}`;
+type ModifierChip = { li: HTMLLIElement; time: HTMLSpanElement | null; label: string };
+
+function createModifierTrayRenderer(host: HTMLElement): {
+  update: (agent: Agent, paused: boolean) => void;
+} {
+  const chips = new Map<string, ModifierChip>();
+  return {
+    update(agent, paused) {
+      const now = agent.clock.now();
+      const list = agent.modifiers.list();
+      const seen = new Set<string>();
+      const nthById = new Map<string, number>();
+
+      for (const mod of list) {
+        const nth = nthById.get(mod.id) ?? 0;
+        nthById.set(mod.id, nth + 1);
+        const key = `${mod.id}#${nth}`;
+        seen.add(key);
+
+        const icon = mod.visual?.hudIcon;
+        const name = mod.visual?.label ?? mod.id;
+        const label = icon ? `${icon} ${name}` : name;
+        const hasTime = typeof mod.expiresAt === 'number';
+
+        let chip = chips.get(key);
+        if (!chip) {
+          const li = document.createElement('li');
+          li.textContent = label;
+          let time: HTMLSpanElement | null = null;
+          if (hasTime) {
+            time = document.createElement('span');
+            time.className = 'mod-time';
+            li.appendChild(time);
+          }
+          chip = { li, time, label };
+          chips.set(key, chip);
+          host.appendChild(li);
+        } else {
+          if (chip.label !== label) {
+            // Positional slot now holds a different modifier (middle entry
+            // expired and later ones shifted up) or the visual changed —
+            // rewrite the label text while preserving the time span.
+            chip.li.textContent = label;
+            if (chip.time) chip.li.appendChild(chip.time);
+            chip.label = label;
+          }
+          // Time span presence can flip if a chip slot is reused for a
+          // modifier with/without `expiresAt`. Reconcile both directions.
+          if (hasTime && !chip.time) {
+            const time = document.createElement('span');
+            time.className = 'mod-time';
+            chip.li.appendChild(time);
+            chip.time = time;
+          } else if (!hasTime && chip.time) {
+            chip.time.remove();
+            chip.time = null;
+          }
+        }
+
+        if (chip.time) {
+          const nextText = paused
+            ? ' paused'
+            : ` ${formatRemaining(Math.max(0, (mod.expiresAt ?? now) - now))}`;
+          if (chip.time.textContent !== nextText) chip.time.textContent = nextText;
+        }
       }
-      li.appendChild(time);
-    }
-    host.appendChild(li);
-  }
+
+      for (const [key, chip] of chips) {
+        if (!seen.has(key)) {
+          chip.li.remove();
+          chips.delete(key);
+        }
+      }
+    },
+  };
 }
 
 function formatAge(seconds: number): string {

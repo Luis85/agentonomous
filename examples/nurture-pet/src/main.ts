@@ -8,7 +8,6 @@ import {
   InMemoryMemoryAdapter,
   RandomEventTicker,
   SkillRegistry,
-  bindAgentToStore,
 } from 'agentonomous';
 import { catSpecies } from './species.js';
 import {
@@ -112,16 +111,18 @@ mountResetButton(pet);
 mountConfigPanel(catSpecies, currentEditableConfig(effectiveSpecies), () =>
   resetSimulation(pet.identity.id),
 );
-bindAgentToStore(pet, (state) => {
-  hud.update(state);
-});
+
+// HUD updates run from the per-frame RAF loop below — a prior
+// `bindAgentToStore` hook also called `hud.update` on every agent event,
+// causing two renders on event ticks. The RAF loop already covers
+// steady-state repaints.
 
 // Additional listener to decorate mildIllness / surpriseTreat side-effects.
 // Note: `Modifier.expiresAt` is wall-clock ms — it does not scale with
 // `setTimeScale`. At 8× the pet ages eight times faster but a 45 000 ms
 // `sick` modifier still expires after 45 s of real time. See
 // `CLAUDE.md → setTimeScale(0) pause semantics` for the full quirk.
-pet.subscribe((event) => {
+const unsubscribeModifierDecorator = pet.subscribe((event) => {
   if (event.type !== 'RandomEvent') return;
   const re = event as { subtype?: string };
   if (re.subtype === 'mildIllness') {
@@ -170,23 +171,47 @@ pet.subscribe((event) => {
 });
 
 // --- Game loop ----------------------------------------------------------------
-// `bindAgentToStore` fires the HUD updater only when the agent publishes an
-// event. Between events (most ticks) needs decay, age advances, and modifier
-// timers count down silently — without this per-frame repaint the HUD would
-// appear frozen until the next critical-threshold crossing or skill result.
+// Needs decay, age advances, and modifier timers count down silently
+// between agent events — without this per-frame repaint the HUD would
+// appear frozen until the next critical-threshold crossing or skill
+// result.
 let last = performance.now();
+let rafHandle = 0;
+let stopped = false;
 async function loop(now: number): Promise<void> {
   const dt = Math.min((now - last) / 1000, 0.25);
   last = now;
   const trace = await pet.tick(dt);
+  if (stopped) return;
   const state = pet.getState();
   hud.update(state);
   traceView.render(trace, state);
-  requestAnimationFrame((t) => {
+  rafHandle = requestAnimationFrame((t) => {
     void loop(t);
   });
 }
-requestAnimationFrame((t) => {
+rafHandle = requestAnimationFrame((t) => {
   last = t;
   void loop(t);
 });
+
+/**
+ * Tear down the demo cleanly: stop the RAF loop, drop the modifier-decorator
+ * subscription, and dispose the HUD's event subscription. Safe to call
+ * multiple times. The production flow resets via `location.reload()` so
+ * this path is mostly a safety net for future in-place reset flows and for
+ * HMR correctness (it prevents listener stacks across hot reloads).
+ */
+function disposeDemo(): void {
+  if (stopped) return;
+  stopped = true;
+  if (rafHandle !== 0) cancelAnimationFrame(rafHandle);
+  unsubscribeModifierDecorator();
+  hud.dispose();
+}
+
+// Wire Vite HMR teardown so an edit-triggered reload doesn't stack a second
+// RAF loop / subscription on top of the old one. Typed inline to avoid
+// depending on `vite/client` ambient types from the demo tsconfig.
+const meta = import.meta as unknown as { hot?: { dispose: (cb: () => void) => void } };
+if (meta.hot) meta.hot.dispose(disposeDemo);
