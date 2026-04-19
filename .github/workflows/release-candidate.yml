@@ -23,13 +23,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies (npm ci)
         run: npm ci
@@ -64,3 +65,5 @@ jobs:
 
       - name: Publish dry-run (npm publish --dry-run)
         run: npm publish --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

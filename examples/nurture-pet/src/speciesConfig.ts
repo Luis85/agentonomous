@@ -192,11 +192,18 @@ export function applyOverride(
   });
 }
 
-export function loadConfigOverride(): EditableSpeciesConfig | null {
+/**
+ * Read a persisted override from localStorage and validate its shape
+ * against `base` before returning it. Malformed, stale, or
+ * schema-incompatible stored values fall back to `null` (defaults) so a
+ * bad blob can't crash `applyOverride` at startup.
+ */
+export function loadConfigOverride(base: SpeciesDescriptor): EditableSpeciesConfig | null {
   try {
     const raw = globalThis.localStorage?.getItem(CONFIG_STORAGE_KEY);
     if (typeof raw !== 'string' || raw.length === 0) return null;
-    return JSON.parse(raw) as EditableSpeciesConfig;
+    const result = validateEditableConfig(raw, base);
+    return result.ok ? result.config : null;
   } catch {
     return null;
   }

@@ -32,17 +32,24 @@ Baseline (all three):
 
 - Require a pull request before merging; require at least 1 approving
   review.
-- Require status checks to pass before merging; include the `CI` workflow
-  (both `test (node 20)` and `test (node 22)` matrix rows).
+- Require status checks to pass before merging; include every job in the
+  `CI` workflow (`Format (Prettier)`, `Lint (ESLint)`,
+  `Typecheck (tsc --noEmit)`, `Test (Vitest + coverage)`,
+  `Build & size budget`).
 - Require branches to be up to date before merging.
 - Disallow force pushes. Disallow deletions.
 - Do **not** allow bypass for administrators (hold yourself to the same bar).
 
 Per-branch additions:
 
-- **`main`** — also require the `Release candidate` workflow (both matrix
-  rows) when the incoming branch matches `release/v*`. Optional: require
-  signed commits.
+- **`main`** — do **not** add the `Release candidate` workflow as a
+  required status check. Required checks in GitHub branch protection are
+  enforced for every incoming PR, but `release-candidate.yml` only runs
+  on pushes to `release/v*` branches (or manual dispatch), so marking it
+  required would wedge every non-release PR into `main` on a check that
+  never reports. Instead, reviewers verify the latest
+  `Release candidate` run is green on the source `release/v*` branch
+  before approving the release PR. Optional: require signed commits.
 - **`develop`** — baseline is sufficient.
 - **`demo`** — baseline is sufficient. Remember to add `demo` to the
   `github-pages` environment's deployment branch allow-list (see
@@ -82,7 +89,7 @@ a one-line justification in the commit message.
 
 Any branch matching `release/v*` (e.g. `release/v1.0.0`) is gated by the
 `.github/workflows/release-candidate.yml` workflow on every push. It
-runs on Node 20 + 22 and does everything `CI` does plus:
+runs on Node 22 and does everything `CI` does plus:
 
 - **`npm run size`** — the gzip bundle-size budget.
 - **Pack + smoke install** — `npm pack` into a tarball, install it into
@@ -167,8 +174,8 @@ Release (on `release/v1.0.0`, cut from `develop`):
    rewrites `CHANGELOG.md`, deletes consumed changesets.
 4. Commit: `chore(release): v1.0.0`. Push: `git push -u origin
 release/v1.0.0`.
-5. **`release-candidate.yml` runs.** Wait for all matrix rows green.
-   If the publish dry-run fails, fix and re-push before moving on.
+5. **`release-candidate.yml` runs.** Wait for the `Preflight` job to go
+   green. If the publish dry-run fails, fix and re-push before moving on.
 6. Open PR: base `main`, head `release/v1.0.0`. Title:
    `release: v1.0.0`. Wait for CI + release-candidate green, at least
    one approving review.
