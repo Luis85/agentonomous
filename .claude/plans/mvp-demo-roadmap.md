@@ -1,5 +1,9 @@
 # MVP demo roadmap
 
+> **Status: superseded by [[v1-comprehensive-plan]] (2026-04-19).**
+> Sequencing for the demo closeout now lives in the 0.9.0 train of the
+> v1 plan. Kept for historical context; do not plan against this file.
+
 Session handoff + sequencing plan for the rescoped MVP demo defined in
 [`docs/specs/mvp-demo.md`](../../docs/specs/mvp-demo.md). Supersedes
 [`pre-v1-next-session.md`](./pre-v1-next-session.md) (its P1/P2/P3 all
