@@ -33,4 +33,9 @@ describe('AgentTicked event vocabulary', () => {
     expect(event.tickNumber).toBe(1);
     expect(event.trace).toBe(traceStub);
   });
+
+  it('is re-exported from the public barrel', async () => {
+    const barrel = await import('../../../src/index.js');
+    expect(barrel.AGENT_TICKED).toBe('AgentTicked');
+  });
 });
