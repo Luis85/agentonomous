@@ -183,7 +183,7 @@ const unsubscribeUiRefresh = pet.subscribe((event) => {
   const ticked = event as AgentTickedEvent;
   const state = pet.getState();
   hud.update(state);
-  traceView.render(ticked.trace, state);
+  traceView.render(ticked.trace, state, ticked.tickNumber);
 });
 
 // --- Game loop ----------------------------------------------------------------

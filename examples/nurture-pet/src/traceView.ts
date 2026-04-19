@@ -14,7 +14,7 @@ const TOP_CANDIDATES = 5;
  * panel is collapsed, `render` is a near-no-op.
  */
 export function mountTraceView(agent: Agent): {
-  render(trace: DecisionTrace, state: AgentState): void;
+  render(trace: DecisionTrace, state: AgentState, tickNumber: number): void;
 } {
   const panel = document.getElementById('decision-trace') as HTMLElement | null;
   const toggle = document.getElementById('decision-trace-toggle') as HTMLButtonElement | null;
@@ -51,11 +51,11 @@ export function mountTraceView(agent: Agent): {
   const prev = { summary: '', needs: '', candidates: '', selection: '' };
 
   return {
-    render(trace, state) {
+    render(trace, state, tickNumber) {
       if (panel.dataset.visible !== 'true') return;
       const timeScale = agent.getTimeScale();
 
-      const summary = buildSummary(trace, state, timeScale);
+      const summary = buildSummary(trace, state, timeScale, tickNumber);
       if (summary !== prev.summary) {
         summaryEl.innerHTML = summary;
         prev.summary = summary;
@@ -82,11 +82,17 @@ export function mountTraceView(agent: Agent): {
   };
 }
 
-function buildSummary(trace: DecisionTrace, state: AgentState, timeScale: number): string {
+function buildSummary(
+  trace: DecisionTrace,
+  state: AgentState,
+  timeScale: number,
+  tickNumber: number,
+): string {
   const paused = timeScale === 0;
   const mode = paused ? 'paused' : trace.controlMode;
   const dt = trace.virtualDtSeconds.toFixed(3);
   return (
+    `<div class="trace-row"><span class="trace-k">tick</span><span class="trace-v">#${tickNumber}</span></div>` +
     `<div class="trace-row"><span class="trace-k">mode</span><span class="trace-v">${escapeHtml(mode)}</span></div>` +
     `<div class="trace-row"><span class="trace-k">stage</span><span class="trace-v">${escapeHtml(state.stage)}</span></div>` +
     `<div class="trace-row"><span class="trace-k">virtual dt</span><span class="trace-v">${escapeHtml(dt)}s</span></div>`
