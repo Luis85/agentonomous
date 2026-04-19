@@ -9,14 +9,14 @@ const wellFed = defineModifier({
   id: 'well-fed',
   source: 'skill:feed',
   stack: 'refresh',
-  durationSeconds: 120,
+  durationSeconds: 60,
   effects: [{ target: { type: 'need-decay', needId: 'hunger' }, kind: 'multiply', value: 0.5 }],
   visual: { hudIcon: 'icon-wellfed', fxHint: 'sparkle-green' },
 });
 
 /**
  * Default `feed` skill. Raises the `hunger` need and applies a `well-fed`
- * buff that slows hunger decay for 120s.
+ * buff that slows hunger decay for 60s.
  */
 export const FeedSkill: Skill = {
   id: 'feed',
