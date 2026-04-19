@@ -199,6 +199,7 @@ export class CognitionPipeline {
       },
       applyModifier: (mod) => agent.applyModifier(mod),
       removeModifier: (id) => agent.removeModifier(id),
+      hasModifier: (id) => agent.modifiers.has(id),
       publishEvent: (event) => {
         agent._internalPublish(event);
       },
