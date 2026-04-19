@@ -43,4 +43,23 @@ describe('runCatchUp', () => {
     expect(r2.chunksProcessed).toBe(0);
     expect(step).not.toHaveBeenCalled();
   });
+
+  it('preserves total virtual-dt under long, tiny-chunk catch-up (no float drift)', async () => {
+    // Pathological case: 10 000 virtual seconds split into 0.001 s chunks
+    // is 10 million iterations of repeated subtraction. We assert the sum
+    // of chunks handed to `step` recovers the total to within 1e-9.
+    const total = 10_000;
+    let sum = 0;
+    const result = await runCatchUp(
+      total,
+      (dt) => {
+        sum += dt;
+        return Promise.resolve();
+      },
+      { chunkVirtualSeconds: 0.001, maxChunks: 100_000_000 },
+    );
+    expect(result.truncated).toBe(false);
+    expect(Math.abs(sum - total)).toBeLessThan(1e-9);
+    expect(Math.abs(result.totalVirtualSeconds - total)).toBeLessThan(1e-9);
+  });
 });
