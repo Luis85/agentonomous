@@ -42,6 +42,14 @@ const ambientDtsEntries: AmbientDtsEntry[] = [
       'dist/cognition/adapters/js-son/JsSonReasoner.d.ts',
     ],
   },
+  {
+    from: 'src/cognition/adapters/brainjs/brain.d.ts',
+    to: 'dist/cognition/adapters/brainjs/brain.d.ts',
+    referencedBy: [
+      'dist/cognition/adapters/brainjs/index.d.ts',
+      'dist/cognition/adapters/brainjs/BrainJsReasoner.d.ts',
+    ],
+  },
 ];
 
 function copyAmbientDts(): Plugin {
