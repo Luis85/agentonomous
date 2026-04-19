@@ -32,11 +32,18 @@ export interface CognitionSwitcherHandle {
  * **Re-mount invariant:** `dispose()` marks a closure-local flag and
  * the late-probe guard uses it. After `dispose()`, a fresh
  * `mountCognitionSwitcher` call builds a new closure with a new
- * `disposed = false` and a fresh option set (innerHTML replacement
- * detaches the old option nodes). Stale probes from the old closure
- * no-op via the `disposed` guard before any DOM mutation — even
- * though `select.querySelector` on the old closure would now return
- * the NEW option nodes (same `<select>` element, new children).
+ * `disposed = false` and a fresh option set (via a `removeChild`
+ * loop that detaches the old option nodes). Stale probes from the
+ * old closure no-op via the `disposed` guard before any DOM mutation
+ * — even though `select.querySelector` on the old closure would now
+ * return the NEW option nodes (same `<select>` element, new children).
+ *
+ * **Concurrent-change guard:** each `change` invocation captures an
+ * epoch; if a later `change` starts before the previous `construct()`
+ * resolves, only the most-recent epoch is allowed to call
+ * `setReasoner`. Without this, rapid selection could land the agent
+ * on whichever reasoner's `construct()` finishes last rather than
+ * whichever the user picked last.
  *
  * The switcher intentionally does not persist selection across
  * reloads or demo resets — a fresh mount always starts at heuristic.
@@ -69,13 +76,16 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   }
 
   let disposed = false;
+  let changeEpoch = 0;
 
   const onChange = async (): Promise<void> => {
     if (disposed) return;
     const mode = COGNITION_MODES.find((m) => m.id === select.value);
     if (!mode) return;
+    const myEpoch = ++changeEpoch;
     const reasoner = await mode.construct();
-    if (disposed) return; // re-check after await in case dispose() fired mid-await
+    // Bail if disposed mid-await OR if a newer change has superseded us.
+    if (disposed || myEpoch !== changeEpoch) return;
     agent.setReasoner(reasoner);
     status.dataset.mode = mode.id;
     status.textContent = 'active';

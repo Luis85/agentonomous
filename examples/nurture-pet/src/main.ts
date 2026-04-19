@@ -104,6 +104,10 @@ const pet = createAgent({
   memory: new InMemoryMemoryAdapter(),
   modules: [defaultPetInteractionModule],
   skills,
+  // Behavior runner — only consulted for reasoner-committed intentions.
+  // Player button interactions invoke skills directly via `pet.invokeSkill`
+  // and bypass this table. The single mapping routes the BT cognition
+  // mode's `approach-treat` interrupt intention to its namesake skill.
   behavior: new DirectBehaviorRunner({
     skillByIntentionType: {
       'approach-treat': 'approach-treat',
