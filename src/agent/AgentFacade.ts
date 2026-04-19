@@ -33,4 +33,13 @@ export interface AgentFacade {
    * in-tick skill execution.
    */
   invokeSkill(skillId: string, params?: Record<string, unknown>): Promise<void>;
+
+  /**
+   * Current wall-to-virtual time multiplier. `0` means paused. Read-only
+   * on the facade; use `Agent.setTimeScale(scale)` at the harness layer to
+   * change it. A reactive handler that wants to defer work during pause
+   * can check `facade.getTimeScale() === 0` without reaching past the
+   * facade boundary.
+   */
+  getTimeScale(): number;
 }

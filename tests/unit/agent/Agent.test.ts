@@ -279,5 +279,30 @@ describe('Agent (M2 shell)', () => {
       expect(trace.virtualDtSeconds).toBeCloseTo(1e-9, 12);
       expect(trace.virtualDtSeconds).toBeGreaterThan(0);
     });
+
+    it('exposes getTimeScale() on the AgentFacade for reactive handlers', async () => {
+      const observed: number[] = [];
+      const probe: AgentModule = {
+        id: 'scale-probe',
+        reactiveHandlers: [
+          {
+            on: 'probe',
+            handle: (_event, facade) => {
+              observed.push(facade.getTimeScale());
+            },
+          },
+        ],
+      };
+      const bus = new InMemoryEventBus();
+      const agent = new Agent(baseDeps({ eventBus: bus, modules: [probe], timeScale: 3 }));
+
+      bus.publish({ type: 'probe', at: 0 });
+      await agent.tick(0.016);
+      agent.setTimeScale(0);
+      bus.publish({ type: 'probe', at: 0 });
+      await agent.tick(0.016);
+
+      expect(observed).toEqual([3, 0]);
+    });
   });
 });

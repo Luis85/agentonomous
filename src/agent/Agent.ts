@@ -812,6 +812,7 @@ export class Agent {
           this.clock.now(),
         );
       },
+      getTimeScale: () => this.timeScale,
     };
   }
 
