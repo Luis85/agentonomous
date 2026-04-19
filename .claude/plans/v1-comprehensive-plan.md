@@ -466,6 +466,39 @@ bundling options noted below). 1.0.0 in **~2 sessions** (5 PRs) after.
 10. Published to npm. `demo` branch follows per
     [`PUBLISHING.md#demo-deployment`](../../PUBLISHING.md#demo-deployment).
 
+## Plan chunking
+
+This roadmap is a **superplan**. Each numbered step below gets its own
+self-contained implementation plan under `.claude/plans/`, drafted and
+executed one at a time. Plans are written with the
+`superpowers:writing-plans` skill and executed with
+`superpowers:subagent-driven-development` (or
+`superpowers:executing-plans` when subagents aren't available).
+
+Plan-document edits may be committed directly to `develop` (see
+memory: `feedback_plan_crafting_on_develop`). Implementation PRs still
+follow the standard topic-branch flow defined in `CLAUDE.md`.
+
+| #   | Step  | Plan file                               | PRs inside                | Status      |
+| --- | ----- | --------------------------------------- | ------------------------- | ----------- |
+| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo            | Not drafted |
+| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo            | Not drafted |
+| 3   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo                      | Not drafted |
+| 4   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled                 | Not drafted |
+| 5   | 0.9.5 | `0.9.5-excalibur-subpath-rename.md`     | 1 breaking                | Not drafted |
+| 6   | 0.9.6 | `0.9.6-d-items-cleanup.md`              | D1 + D2 + D3/5/6/7 bundle | Not drafted |
+| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release               | Not drafted |
+| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major                   | Not drafted |
+| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                         | Not drafted |
+| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                         | Not drafted |
+| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                         | Not drafted |
+| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release               | Not drafted |
+
+**Update this table** as plans are drafted (`Drafted`), enter execution
+(`In progress`), or ship (`Shipped — <PR link or tag>`). The table is
+the single source of truth for roadmap progress; individual plan files
+are the source of truth for the work inside each chunk.
+
 ## Open questions
 
 1. **Which scenario best contrasts BT vs BDI in the cognition switcher?**
