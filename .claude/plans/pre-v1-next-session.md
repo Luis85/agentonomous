@@ -1,5 +1,10 @@
 # Pre-v1 handoff
 
+> **Status: superseded.** P1, P2, P3 all shipped (PRs #7, #8, #9).
+> The D-table below is tracked in
+> [`mvp-demo-roadmap.md`](./mvp-demo-roadmap.md) alongside the
+> rescoped MVP demo plan. Keep this file for historical context.
+
 ## Where we are
 
 `agentonomous` is a TypeScript library for autonomous agents in browser /
