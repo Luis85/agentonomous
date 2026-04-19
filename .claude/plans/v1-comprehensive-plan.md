@@ -479,20 +479,20 @@ Plan-document edits may be committed directly to `develop` (see
 memory: `feedback_plan_crafting_on_develop`). Implementation PRs still
 follow the standard topic-branch flow defined in `CLAUDE.md`.
 
-| #   | Step  | Plan file                               | PRs inside                | Status      |
-| --- | ----- | --------------------------------------- | ------------------------- | ----------- |
-| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo            | Drafted     |
-| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo            | Not drafted |
-| 3   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo                      | Not drafted |
-| 4   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled                 | Not drafted |
-| 5   | 0.9.5 | `0.9.5-excalibur-subpath-rename.md`     | 1 breaking                | Not drafted |
-| 6   | 0.9.6 | `0.9.6-d-items-cleanup.md`              | D1 + D2 + D3/5/6/7 bundle | Not drafted |
-| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release               | Not drafted |
-| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major                   | Not drafted |
-| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                         | Not drafted |
-| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                         | Not drafted |
-| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                         | Not drafted |
-| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release               | Not drafted |
+| #   | Step  | Plan file                               | PRs inside                | Status                                                            |
+| --- | ----- | --------------------------------------- | ------------------------- | ----------------------------------------------------------------- |
+| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo            | Library shipped (#44); demo under review (see plan Chunk 2 notes) |
+| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo            | Not drafted                                                       |
+| 3   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo                      | Not drafted                                                       |
+| 4   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled                 | Not drafted                                                       |
+| 5   | 0.9.5 | `0.9.5-excalibur-subpath-rename.md`     | 1 breaking                | Not drafted                                                       |
+| 6   | 0.9.6 | `0.9.6-d-items-cleanup.md`              | D1 + D2 + D3/5/6/7 bundle | Not drafted                                                       |
+| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release               | Not drafted                                                       |
+| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major                   | Not drafted                                                       |
+| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                         | Not drafted                                                       |
+| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                         | Not drafted                                                       |
+| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                         | Not drafted                                                       |
+| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release               | Not drafted                                                       |
 
 **Update this table** as plans are drafted (`Drafted`), enter execution
 (`In progress`), or ship (`Shipped — <PR link or tag>`). The table is
