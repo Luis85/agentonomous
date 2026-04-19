@@ -98,6 +98,7 @@
     "excalibur": "^0.32.0",
     "husky": "^9.1.7",
     "js-son-agent": "^0.0.17",
+    "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
     "mistreevous": "^4.3.1",
     "prettier": "^3.8.3",
