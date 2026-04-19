@@ -104,3 +104,9 @@ the same PR.
   and lives in its own bundle entry.
 - **Random events:** `emit()` receives a factory — seed comes from the
   context, never `Math.random()`.
+- **`setTimeScale(0)` pause semantics:** Stage 2 / 2.7 / 2.8 (modifier
+  expiry, mood, animation reconciliation) are skipped at scale 0 to
+  keep the pause observably frozen. `Modifier.expiresAt` is still an
+  absolute wall-clock ms — deferred expiry fires on the first
+  post-resume tick. Phase B may re-base expiry on virtual time;
+  see `.claude/plans/pause-semantics.md`.
