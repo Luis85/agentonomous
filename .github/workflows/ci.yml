@@ -1,8 +1,9 @@
 # CI — runs on every push and PR to main, develop, and demo.
 #
-# Static checks (format, lint, typecheck) run in parallel for fast
-# feedback. Tests depend on all three passing. Build + bundle-size
-# budget runs last. Mirrors the `npm run verify` pre-PR gate.
+# Static checks (format, lint, typecheck, workflow lint) run in
+# parallel for fast feedback. Tests depend on all four passing. Build +
+# bundle-size budget runs last. Mirrors the `npm run verify` pre-PR
+# gate.
 
 name: CI
 
@@ -65,10 +66,22 @@ jobs:
       - name: Run TypeScript compiler
         run: npm run typecheck
 
+  actionlint:
+    name: Lint workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@v1
+        with:
+          fail_level: error
+          reporter: github-check
+
   test:
     name: Test (Vitest + coverage)
     runs-on: ubuntu-latest
-    needs: [format-check, lint, typecheck]
+    needs: [format-check, lint, typecheck, actionlint]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
