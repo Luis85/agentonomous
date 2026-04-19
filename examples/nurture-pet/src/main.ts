@@ -14,7 +14,24 @@ import { catSpecies } from './species.js';
 import { mountExportImport, mountHud, mountResetButton, mountSpeedPicker } from './ui.js';
 
 const STORAGE_KEY = 'whiskers';
-const SPEED_STORAGE_KEY = 'whiskers:speed';
+const SPEED_STORAGE_KEY = 'agentonomous/speed';
+const LEGACY_SPEED_STORAGE_KEY = 'whiskers:speed';
+
+// D4: one-shot migration from the old `whiskers:speed` key to the
+// prefix-aligned `agentonomous/speed`. Runs once per browser on the
+// first load after this change ships; subsequent loads find no legacy
+// key and no-op.
+try {
+  const legacy = globalThis.localStorage?.getItem(LEGACY_SPEED_STORAGE_KEY);
+  if (legacy !== null && legacy !== undefined) {
+    if (globalThis.localStorage?.getItem(SPEED_STORAGE_KEY) === null) {
+      globalThis.localStorage?.setItem(SPEED_STORAGE_KEY, legacy);
+    }
+    globalThis.localStorage?.removeItem(LEGACY_SPEED_STORAGE_KEY);
+  }
+} catch {
+  // localStorage unavailable (private mode, quota) — skip migration.
+}
 // Base wall→virtual scale. The speed picker multiplies this; 1× == base.
 // Tuned alongside catSpecies decay rates so hunger reaches its critical
 // threshold in ~45 s of wall time at 1×, per the Phase A demo spec.
