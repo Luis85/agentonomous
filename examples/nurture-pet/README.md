@@ -22,6 +22,14 @@ and watch it react and act autonomously between your inputs.
 
 ## Running locally
 
+Make sure that the core library is build
+
+```bash
+# in the project root
+npm install
+npm run build
+```
+
 ```bash
 cd examples/nurture-pet
 npm install
