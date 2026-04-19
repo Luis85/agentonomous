@@ -299,6 +299,14 @@ export function mountExportImport(agent: Agent): void {
       fileInput.value = ''; // allow re-importing the same file name
       try {
         const parsed = JSON.parse(text) as Parameters<Agent['restore']>[0];
+        // `snapshot()` omits the `modifiers` field when the list is empty,
+        // and `restore()` only touches modifiers when the field is present.
+        // That means importing a clean save over a sick/dirty pet would
+        // leave stale modifiers active. Clear them explicitly before
+        // restore so the imported state wins cleanly.
+        for (const mod of agent.modifiers.list()) {
+          agent.removeModifier(mod.id);
+        }
         void agent.restore(parsed, { catchUp: false }).catch((err: Error) => {
           globalThis.alert?.(`Import failed: ${err.message}`);
         });
