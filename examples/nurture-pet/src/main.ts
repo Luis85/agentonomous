@@ -3,6 +3,7 @@ import {
   createAgent,
   defaultPetInteractionModule,
   defineRandomEvent,
+  DirectBehaviorRunner,
   ExpressMeowSkill,
   ExpressSadSkill,
   ExpressSleepySkill,
@@ -12,6 +13,7 @@ import {
   type AgentTickedEvent,
 } from 'agentonomous';
 import { ApproachTreatSkill } from './skills/ApproachTreatSkill.js';
+import { mountCognitionSwitcher } from './cognitionSwitcher.js';
 import { catSpecies } from './species.js';
 import {
   mountExportImport,
@@ -102,6 +104,11 @@ const pet = createAgent({
   memory: new InMemoryMemoryAdapter(),
   modules: [defaultPetInteractionModule],
   skills,
+  behavior: new DirectBehaviorRunner({
+    skillByIntentionType: {
+      'approach-treat': 'approach-treat',
+    },
+  }),
   randomEvents,
 });
 
@@ -115,6 +122,11 @@ mountResetButton(pet);
 mountConfigPanel(catSpecies, currentEditableConfig(effectiveSpecies), () =>
   resetSimulation(pet.identity.id),
 );
+const cognitionSwitcherRoot = document.querySelector<HTMLElement>('#cognition-switcher');
+if (!cognitionSwitcherRoot) {
+  throw new Error('main: #cognition-switcher slot not found in index.html');
+}
+const cognitionSwitcher = mountCognitionSwitcher(pet, cognitionSwitcherRoot);
 
 // HUD updates run from the per-frame RAF loop below — a prior
 // `bindAgentToStore` hook also called `hud.update` on every agent event,
@@ -230,6 +242,7 @@ function disposeDemo(): void {
   if (rafHandle !== 0) cancelAnimationFrame(rafHandle);
   unsubscribeModifierDecorator();
   unsubscribeUiRefresh();
+  cognitionSwitcher.dispose();
   hud.dispose();
 }
 

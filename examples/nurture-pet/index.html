@@ -152,6 +152,43 @@
           background: #1b2140;
         }
       }
+      .cognition-switcher {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      @media (prefers-color-scheme: dark) {
+        .cognition-switcher {
+          background: #1b2140;
+        }
+      }
+      .cognition-label {
+        font-size: 12px;
+        opacity: 0.7;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      #cognition-mode-select {
+        padding: 4px 8px;
+        font-size: 13px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        background: inherit;
+        color: inherit;
+      }
+      #cognition-mode-select:disabled {
+        opacity: 0.5;
+      }
+      .cognition-status {
+        font-size: 12px;
+        opacity: 0.6;
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+      }
       .speed-label {
         font-size: 12px;
         opacity: 0.7;
@@ -443,6 +480,13 @@
     </section>
 
     <section class="hud">
+      <div class="cognition-switcher" id="cognition-switcher">
+        <span class="cognition-label">Cognition</span>
+        <select id="cognition-mode-select" aria-label="Cognition mode">
+          <option value="heuristic">Heuristic (urgency)</option>
+        </select>
+        <span class="cognition-status" id="cognition-status" data-mode="heuristic">active</span>
+      </div>
       <div class="speed">
         <span class="speed-label">Speed</span>
         <div class="speed-buttons" id="speed-picker"></div>
