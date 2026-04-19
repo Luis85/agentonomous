@@ -481,7 +481,7 @@ follow the standard topic-branch flow defined in `CLAUDE.md`.
 
 | #   | Step  | Plan file                               | PRs inside                | Status      |
 | --- | ----- | --------------------------------------- | ------------------------- | ----------- |
-| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo            | Not drafted |
+| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo            | Drafted     |
 | 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo            | Not drafted |
 | 3   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo                      | Not drafted |
 | 4   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled                 | Not drafted |
