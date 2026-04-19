@@ -71,6 +71,18 @@ describe('AnimationStateMachine', () => {
     expect(sm.history().map((t) => t.to)).toEqual(['happy', 'playing', 'idle']);
   });
 
+  it('caps history at maxHistorySize and evicts oldest on overflow', () => {
+    const sm = new AnimationStateMachine({ maxHistorySize: 3 });
+    sm.transition('happy', 1);
+    sm.transition('idle', 2);
+    sm.transition('happy', 3);
+    sm.transition('idle', 4);
+    sm.transition('happy', 5);
+    const history = sm.history();
+    expect(history).toHaveLength(3);
+    expect(history.map((t) => t.at)).toEqual([3, 4, 5]);
+  });
+
   it('snapshot + restore preserves state', () => {
     const sm = new AnimationStateMachine();
     sm.transition('playing', 0);

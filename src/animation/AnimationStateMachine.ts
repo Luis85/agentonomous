@@ -29,13 +29,19 @@ export interface ReconcileContext {
  * - `moodMap` maps a mood category onto an animation state when no skill
  *   or modifier is driving.
  * - `idleState` is the fallback. Default `'idle'`.
+ * - `maxHistorySize` caps the in-memory transition log. Default `1000`.
+ *   On overflow the oldest entry is evicted. Guards long-running agents
+ *   against unbounded history growth.
  */
 export interface AnimationStateMachineOptions {
   skillMap?: Readonly<Record<string, AnimationState>>;
   modifierOverrides?: Readonly<Record<string, AnimationState>>;
   moodMap?: Readonly<Record<string, AnimationState>>;
   idleState?: AnimationState;
+  maxHistorySize?: number;
 }
+
+export const DEFAULT_ANIMATION_HISTORY_SIZE = 1000;
 
 /**
  * State machine routing (active skill + mood + modifiers) to a single
@@ -49,6 +55,7 @@ export class AnimationStateMachine {
   private readonly modifierOverrides: Readonly<Record<string, AnimationState>>;
   private readonly moodMap: Readonly<Record<string, AnimationState>>;
   private readonly idleState: AnimationState;
+  private readonly maxHistorySize: number;
 
   constructor(opts: AnimationStateMachineOptions = {}) {
     this.skillMap = opts.skillMap ?? {};
@@ -63,6 +70,14 @@ export class AnimationStateMachine {
     };
     this.idleState = opts.idleState ?? 'idle';
     this.currentState = this.idleState;
+    this.maxHistorySize = Math.max(1, opts.maxHistorySize ?? DEFAULT_ANIMATION_HISTORY_SIZE);
+  }
+
+  private pushHistory(t: AnimationTransition): void {
+    this.historyLog.push(t);
+    if (this.historyLog.length > this.maxHistorySize) {
+      this.historyLog.shift();
+    }
   }
 
   current(): AnimationState {
@@ -94,7 +109,7 @@ export class AnimationStateMachine {
       ...(fxHint !== undefined ? { fxHint } : {}),
     };
     this.currentState = next;
-    this.historyLog.push(t);
+    this.pushHistory(t);
     return t;
   }
 
@@ -116,7 +131,7 @@ export class AnimationStateMachine {
       reason: this.reasonFor(ctx, next),
     };
     this.currentState = next;
-    this.historyLog.push(t);
+    this.pushHistory(t);
     return t;
   }
 
