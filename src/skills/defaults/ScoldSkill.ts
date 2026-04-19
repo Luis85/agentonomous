@@ -1,4 +1,5 @@
 import { ok, type Result } from '../../agent/result.js';
+import { SKILL_DEFAULTS } from '../../cognition/tuning.js';
 import { defineModifier } from '../../modifiers/defineModifier.js';
 import type { Skill, SkillError, SkillOutcome } from '../Skill.js';
 import type { SkillContext } from '../SkillContext.js';
@@ -8,8 +9,14 @@ const scolded = defineModifier({
   id: 'scolded',
   source: 'skill:scold',
   stack: 'replace',
-  durationSeconds: 60,
-  effects: [{ target: { type: 'mood-bias', category: 'sad' }, kind: 'add', value: 0.3 }],
+  durationSeconds: SKILL_DEFAULTS.scold.scoldedDurationSeconds,
+  effects: [
+    {
+      target: { type: 'mood-bias', category: 'sad' },
+      kind: 'add',
+      value: SKILL_DEFAULTS.scold.scoldedMoodBias,
+    },
+  ],
   visual: { hudIcon: 'icon-scolded', fxHint: 'cloud-gray' },
 });
 
@@ -24,7 +31,7 @@ export const ScoldSkill: Skill = {
   execute(_params, ctx: SkillContext): Promise<Result<SkillOutcome, SkillError>> {
     const effectiveness = effectivenessFor(ScoldSkill, ctx);
     ctx.applyModifier(scolded.instantiate(ctx.clock.now()));
-    ctx.satisfyNeed('happiness', -0.3);
+    ctx.satisfyNeed('happiness', -SKILL_DEFAULTS.scold.happinessCost);
     return Promise.resolve(ok({ fxHint: 'cloud-gray', effectiveness }));
   },
 };

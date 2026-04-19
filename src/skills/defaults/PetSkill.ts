@@ -1,4 +1,5 @@
 import { ok, type Result } from '../../agent/result.js';
+import { SKILL_DEFAULTS } from '../../cognition/tuning.js';
 import { defineModifier } from '../../modifiers/defineModifier.js';
 import type { Skill, SkillError, SkillOutcome } from '../Skill.js';
 import type { SkillContext } from '../SkillContext.js';
@@ -8,8 +9,14 @@ const happyGlow = defineModifier({
   id: 'happy-glow',
   source: 'skill:pet',
   stack: 'refresh',
-  durationSeconds: 30,
-  effects: [{ target: { type: 'mood-bias', category: 'playful' }, kind: 'add', value: 0.4 }],
+  durationSeconds: SKILL_DEFAULTS.pet.happyGlowDurationSeconds,
+  effects: [
+    {
+      target: { type: 'mood-bias', category: 'playful' },
+      kind: 'add',
+      value: SKILL_DEFAULTS.pet.happyGlowMoodBias,
+    },
+  ],
   visual: { hudIcon: 'icon-happy', fxHint: 'hearts-soft' },
 });
 
@@ -23,7 +30,7 @@ export const PetSkill: Skill = {
   baseEffectiveness: 1,
   execute(_params, ctx: SkillContext): Promise<Result<SkillOutcome, SkillError>> {
     const effectiveness = effectivenessFor(PetSkill, ctx);
-    ctx.satisfyNeed('happiness', 0.3 * effectiveness);
+    ctx.satisfyNeed('happiness', SKILL_DEFAULTS.pet.happinessSatisfy * effectiveness);
     ctx.applyModifier(happyGlow.instantiate(ctx.clock.now()));
     return Promise.resolve(ok({ fxHint: 'hearts-soft', effectiveness }));
   },

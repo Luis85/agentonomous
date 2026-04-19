@@ -1,4 +1,5 @@
 import type { IntentionCandidate } from '../cognition/IntentionCandidate.js';
+import { EXPRESSIVE_POLICY_DEFAULTS } from '../cognition/tuning.js';
 import type { Persona } from '../agent/Persona.js';
 import type { Needs } from './Needs.js';
 import type { NeedsPolicy } from './NeedsPolicy.js';
@@ -24,7 +25,7 @@ export class ExpressiveNeedsPolicy implements NeedsPolicy {
   private readonly expressionByNeed: Readonly<Record<string, string>>;
 
   constructor(opts: ExpressiveNeedsPolicyOptions = {}) {
-    this.minUrgency = opts.minUrgency ?? 0.4;
+    this.minUrgency = opts.minUrgency ?? EXPRESSIVE_POLICY_DEFAULTS.minUrgency;
     this.expressionByNeed = opts.expressionByNeed ?? {};
   }
 

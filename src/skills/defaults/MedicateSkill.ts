@@ -1,4 +1,5 @@
 import { err, ok, type Result } from '../../agent/result.js';
+import { SKILL_DEFAULTS } from '../../cognition/tuning.js';
 import type { Skill, SkillError, SkillOutcome } from '../Skill.js';
 import type { SkillContext } from '../SkillContext.js';
 import { effectivenessFor } from './effectiveness.js';
@@ -17,7 +18,7 @@ export const MedicateSkill: Skill = {
       return Promise.resolve(err({ code: 'not-sick', message: 'Not sick.' }));
     }
     const effectiveness = effectivenessFor(MedicateSkill, ctx);
-    ctx.satisfyNeed('health', 0.4 * effectiveness);
+    ctx.satisfyNeed('health', SKILL_DEFAULTS.medicate.healthSatisfy * effectiveness);
     return Promise.resolve(ok({ fxHint: 'flash-white', effectiveness }));
   },
 };

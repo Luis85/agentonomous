@@ -1,4 +1,5 @@
 import { ok, type Result } from '../../agent/result.js';
+import { SKILL_DEFAULTS } from '../../cognition/tuning.js';
 import { defineModifier } from '../../modifiers/defineModifier.js';
 import { SKILL_COMPLETED, type SkillCompletedEvent } from '../../events/standardEvents.js';
 import type { Skill, SkillError, SkillOutcome } from '../Skill.js';
@@ -9,8 +10,14 @@ const wellFed = defineModifier({
   id: 'well-fed',
   source: 'skill:feed',
   stack: 'refresh',
-  durationSeconds: 60,
-  effects: [{ target: { type: 'need-decay', needId: 'hunger' }, kind: 'multiply', value: 0.5 }],
+  durationSeconds: SKILL_DEFAULTS.feed.wellFedDurationSeconds,
+  effects: [
+    {
+      target: { type: 'need-decay', needId: 'hunger' },
+      kind: 'multiply',
+      value: SKILL_DEFAULTS.feed.wellFedDecayMultiplier,
+    },
+  ],
   visual: { hudIcon: 'icon-wellfed', fxHint: 'sparkle-green' },
 });
 
@@ -24,7 +31,7 @@ export const FeedSkill: Skill = {
   baseEffectiveness: 1,
   execute(_params, ctx: SkillContext): Promise<Result<SkillOutcome, SkillError>> {
     const effectiveness = effectivenessFor(FeedSkill, ctx);
-    ctx.satisfyNeed('hunger', 0.6 * effectiveness);
+    ctx.satisfyNeed('hunger', SKILL_DEFAULTS.feed.hungerSatisfy * effectiveness);
     ctx.applyModifier(wellFed.instantiate(ctx.clock.now()));
     const completed: SkillCompletedEvent = {
       type: SKILL_COMPLETED,

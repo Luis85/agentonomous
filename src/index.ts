@@ -83,6 +83,15 @@ export type { Learner, LearningOutcome } from './cognition/learning/Learner.js';
 /** Learner that ignores outcomes. Default when no learner is wired. */
 export { NoopLearner } from './cognition/learning/NoopLearner.js';
 
+// Tuning constants.
+export {
+  MOOD_URGENCY_THRESHOLDS,
+  PERSONA_TRAIT_WEIGHTS,
+  SKILL_DEFAULTS,
+  OFFLINE_CATCHUP_DEFAULTS,
+  EXPRESSIVE_POLICY_DEFAULTS,
+} from './cognition/tuning.js';
+
 // Skills (M7).
 export type { Skill, SkillOutcome, SkillError } from './skills/Skill.js';
 export type { SkillContext } from './skills/SkillContext.js';
