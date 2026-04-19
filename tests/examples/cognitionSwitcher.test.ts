@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+/**
+ * Module-level DOM test for the demo's cognition switcher. Runs under
+ * jsdom via the file-level directive. Uses the real peer-module imports
+ * at runtime (mistreevous / js-son-agent / brain.js), so probe-resolution
+ * timing depends on npm's resolver rather than the clock — wait with
+ * `waitForProbes` (bounded poll) instead of a fixed sleep.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 // Path is relative from tests/examples/ to examples/nurture-pet/src/.
 // The switcher itself imports from 'agentonomous' (bare specifier) and
@@ -8,17 +15,59 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
 
 interface FakeAgent {
-  setReasoner: (r: unknown) => void;
+  setReasoner: Mock<(r: unknown) => void>;
 }
 
 function renderRoot(): HTMLElement {
-  document.body.innerHTML = `
-    <div id="cognition-switcher">
-      <select id="cognition-mode-select"></select>
-      <span id="cognition-status" data-mode="heuristic">active</span>
-    </div>
-  `;
+  document.body.innerHTML =
+    '<div id="cognition-switcher">' +
+    '<select id="cognition-mode-select"></select>' +
+    '<span id="cognition-status" data-mode="heuristic">active</span>' +
+    '</div>';
   return document.querySelector<HTMLElement>('#cognition-switcher')!;
+}
+
+/**
+ * Poll until every `<option>` under `select` has reached a settled
+ * probe state — either enabled (probe resolved true) or has a non-empty
+ * `title` (probe resolved false and the switcher stamped the install
+ * hint). The `heuristic` option is always-enabled from the mount loop,
+ * so it's considered settled regardless.
+ *
+ * Replaces a fixed `setTimeout(50)` that was flaky on cold-cache runs:
+ * a real dynamic `import('brain.js')` rejection can exceed 50ms on
+ * slow disks, which left the option in its initial
+ * `disabled=true, title=''` state and tripped the asymmetric assertion.
+ */
+async function waitForProbes(select: HTMLSelectElement, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pending = Array.from(select.options).some(
+      (o) => o.value !== 'heuristic' && o.disabled && o.title === '',
+    );
+    if (!pending) return;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  throw new Error('waitForProbes: probes did not settle within timeout');
+}
+
+/**
+ * Wait until `mock` has been called at least `n` times (default 1).
+ * Replaces a fixed-yield flush that was flaky for BT mode — its
+ * `construct()` awaits two dynamic imports and parses the MDSL tree,
+ * which exceeds the couple-of-macrotask budget on slow machines.
+ */
+async function waitForCalls(
+  mock: Mock<(r: unknown) => void>,
+  n = 1,
+  timeoutMs = 2000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (mock.mock.calls.length >= n) return;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  throw new Error(`waitForCalls: mock called ${mock.mock.calls.length} times (expected ${n})`);
 }
 
 describe('mountCognitionSwitcher', () => {
@@ -44,11 +93,10 @@ describe('mountCognitionSwitcher', () => {
   it('enables available modes and disables missing-peer modes with a tooltip', async () => {
     const root = renderRoot();
     mountCognitionSwitcher(fakeAgent as never, root);
-
-    // Wait a macrotask for Promise.all to settle.
-    await new Promise((r) => setTimeout(r, 50));
-
     const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
+
+    await waitForProbes(select);
+
     const heuristic = select.querySelector<HTMLOptionElement>('option[value="heuristic"]')!;
     expect(heuristic.disabled).toBe(false);
 
@@ -69,24 +117,19 @@ describe('mountCognitionSwitcher', () => {
   it('calls agent.setReasoner with the constructed reasoner on change', async () => {
     const root = renderRoot();
     mountCognitionSwitcher(fakeAgent as never, root);
-    // Wait for probes to resolve and BT to become enabled (requires
-    // mistreevous to be installed — it's a root devDep, so this should
-    // succeed in the normal test env).
-    await new Promise((r) => setTimeout(r, 100));
-
     const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
+
+    await waitForProbes(select);
+
     // Switch to 'bt' (not 'heuristic' — heuristic is already selected,
     // so `select.value = 'heuristic'` is a no-op change). `construct()`
-    // is async, so wait a macrotask for the await chain to land before
-    // asserting.
+    // is async, so flush the microtask queue before asserting.
     select.value = 'bt';
     select.dispatchEvent(new Event('change'));
-    await new Promise((r) => setTimeout(r, 50));
+    await waitForCalls(fakeAgent.setReasoner);
 
     expect(fakeAgent.setReasoner).toHaveBeenCalledTimes(1);
-    const mockCalls = (fakeAgent.setReasoner as unknown as { mock: { calls: unknown[][] } }).mock
-      .calls;
-    const firstCall = mockCalls[0]?.[0];
+    const firstCall = fakeAgent.setReasoner.mock.calls[0]?.[0];
     expect(firstCall).toBeDefined();
     expect(typeof (firstCall as { selectIntention?: unknown }).selectIntention).toBe('function');
   });
@@ -94,10 +137,10 @@ describe('mountCognitionSwitcher', () => {
   it('dispose() removes the change listener (subsequent change events are no-ops)', async () => {
     const root = renderRoot();
     const handle = mountCognitionSwitcher(fakeAgent as never, root);
-    await new Promise((r) => setTimeout(r, 50));
-
-    handle.dispose();
     const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
+
+    await waitForProbes(select);
+    handle.dispose();
     select.dispatchEvent(new Event('change'));
     expect(fakeAgent.setReasoner).not.toHaveBeenCalled();
   });
@@ -107,9 +150,11 @@ describe('mountCognitionSwitcher', () => {
     const handle = mountCognitionSwitcher(fakeAgent as never, root);
 
     handle.dispose();
-    // Wait for probes to resolve. Disabled flags should NOT flip to
-    // enabled because the probe callbacks guard on `disposed`.
-    await new Promise((r) => setTimeout(r, 50));
+    // Poll-with-timeout is the wrong wait here (we expect it to time out,
+    // which would be slow and noisy). Instead wait a generous macrotask
+    // for any in-flight probe promises to try to flip options — the
+    // `disposed` guard should bail before any DOM mutation.
+    await new Promise((r) => setTimeout(r, 100));
 
     const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
     for (const id of ['bt', 'bdi', 'learning'] as const) {
