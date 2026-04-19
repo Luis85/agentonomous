@@ -331,8 +331,18 @@ export class Agent {
     this.virtualNowSeconds += virtualDtSeconds;
     this.runRandomEventsTick(virtualDtSeconds, tickStartedAt);
 
-    // Stage 2: modifier tick — expire time-bound modifiers.
-    const expired = this.modifiersTicker.run(tickStartedAt);
+    // Pause short-circuit: `setTimeScale(0)` freezes not just virtual-time
+    // progress but also the three wall-clock-driven reconciliation stages
+    // (modifier expiry, mood, animation), so consumers see a consistently
+    // frozen agent while paused. Deferred expiries fire on the first
+    // post-resume tick — see `.claude/plans/pause-semantics.md` (Option A).
+    const paused = this.timeScale === 0;
+
+    // Stage 2: modifier tick — expire time-bound modifiers. Skipped at
+    // scale 0; `expiresAt` is still absolute wall-clock ms, so any
+    // modifier whose window elapses during the pause is detected here
+    // on the first post-resume tick.
+    const expired = paused ? [] : this.modifiersTicker.run(tickStartedAt);
 
     // Stage 2.5: needs tick. Decay (scaled by modifier multipliers), critical crossings → events.
     // If health just hit 0 during decay we die here and short-circuit.
@@ -351,10 +361,10 @@ export class Agent {
       };
     }
 
-    // Stage 2.7: mood evaluate.
-    const moodChange = this.moodReconciler.run(tickStartedAt);
-    // Stage 2.8: animation reconcile.
-    const animationTransition = this.animationReconciler.run(tickStartedAt);
+    // Stage 2.7: mood evaluate. Skipped at scale 0.
+    const moodChange = paused ? null : this.moodReconciler.run(tickStartedAt);
+    // Stage 2.8: animation reconcile. Skipped at scale 0.
+    const animationTransition = paused ? null : this.animationReconciler.run(tickStartedAt);
 
     // Stages 3–7: cognition pipeline. `collectActions` dispatches by
     // control mode (autonomous → reasoner + behavior runner, else
@@ -492,11 +502,12 @@ export class Agent {
    *
    * Applies from the NEXT `tick()` onward — the in-flight tick (if any)
    * keeps its original scale, so determinism under a fixed clock + rng is
-   * preserved. Pass `0` to freeze virtual-time-driven progress (needs
-   * decay, aging, random events) without killing the agent. Note that
-   * modifier expiry, mood reconciliation, and animation transitions are
-   * keyed off wall-clock time and therefore continue to advance even at
-   * scale `0`. Use `kill(reason)` for terminal halts.
+   * preserved. Pass `0` to freeze the agent: virtual-time-driven progress
+   * (needs decay, aging, random events) halts AND the wall-clock-driven
+   * reconciliation stages (modifier expiry, mood, animation) are skipped,
+   * so no state transitions leak while paused. `Modifier.expiresAt` is
+   * still an absolute wall-clock ms — deferred expiries fire on the first
+   * post-resume tick. Use `kill(reason)` for terminal halts.
    *
    * Throws `InvalidTimeScaleError` if `scale` is not finite or is
    * negative.
