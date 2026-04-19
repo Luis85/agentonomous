@@ -5,7 +5,7 @@ import type { AgentModule } from '../../../src/agent/AgentModule.js';
 import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
-import { MissingDependencyError } from '../../../src/agent/errors.js';
+import { InvalidTimeScaleError, MissingDependencyError } from '../../../src/agent/errors.js';
 
 function baseDeps(overrides: Partial<AgentDependencies> = {}): AgentDependencies {
   const identity: AgentIdentity = {
@@ -261,10 +261,23 @@ describe('Agent (M2 shell)', () => {
 
     it('rejects negative, NaN, and infinite scales', () => {
       const agent = new Agent(baseDeps());
-      expect(() => agent.setTimeScale(-1)).toThrow(RangeError);
-      expect(() => agent.setTimeScale(Number.NaN)).toThrow(RangeError);
-      expect(() => agent.setTimeScale(Number.POSITIVE_INFINITY)).toThrow(RangeError);
+      expect(() => agent.setTimeScale(-1)).toThrow(InvalidTimeScaleError);
+      expect(() => agent.setTimeScale(Number.NaN)).toThrow(InvalidTimeScaleError);
+      expect(() => agent.setTimeScale(Number.POSITIVE_INFINITY)).toThrow(InvalidTimeScaleError);
       expect(agent.getTimeScale()).toBe(1); // unchanged after rejection
+    });
+
+    it('getTimeScale() reflects the constructor value before any setter call', () => {
+      expect(new Agent(baseDeps({ timeScale: 7 })).getTimeScale()).toBe(7);
+      expect(new Agent(baseDeps()).getTimeScale()).toBe(1);
+    });
+
+    it('preserves sub-unit positive scales without underflow', async () => {
+      const agent = new Agent(baseDeps());
+      agent.setTimeScale(1e-6);
+      const trace = await agent.tick(0.001);
+      expect(trace.virtualDtSeconds).toBeCloseTo(1e-9, 12);
+      expect(trace.virtualDtSeconds).toBeGreaterThan(0);
     });
   });
 });

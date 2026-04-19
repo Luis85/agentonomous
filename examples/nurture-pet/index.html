@@ -158,6 +158,15 @@
         background: #16a34a;
         box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
       }
+      .reset-button {
+        margin-left: auto;
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #94a3b8;
+      }
+      .reset-button:hover {
+        background: #64748b;
+      }
       .modifiers li {
         display: inline-flex;
         align-items: center;
@@ -208,6 +217,7 @@
       <div class="speed">
         <span class="speed-label">Speed</span>
         <div class="speed-buttons" id="speed-picker"></div>
+        <button id="reset-button" class="reset-button" type="button">🔄 Reset</button>
       </div>
       <div class="bars" id="bars"></div>
       <div class="modifiers">

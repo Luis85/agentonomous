@@ -63,7 +63,7 @@ import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
 import type { ControlMode } from './ControlMode.js';
 import type { DecisionTrace } from './DecisionTrace.js';
-import { MissingDependencyError } from './errors.js';
+import { InvalidTimeScaleError, MissingDependencyError } from './errors.js';
 import { LifecycleTicker } from './internal/LifecycleTicker.js';
 import { ModifiersTicker } from './internal/ModifiersTicker.js';
 import { NeedsTicker } from './internal/NeedsTicker.js';
@@ -492,14 +492,18 @@ export class Agent {
    *
    * Applies from the NEXT `tick()` onward — the in-flight tick (if any)
    * keeps its original scale, so determinism under a fixed clock + rng is
-   * preserved. Pass `0` to freeze simulated time (events still drain;
-   * needs / age / random events advance by zero virtual seconds).
+   * preserved. Pass `0` to freeze virtual-time-driven progress (needs
+   * decay, aging, random events) without killing the agent. Note that
+   * modifier expiry, mood reconciliation, and animation transitions are
+   * keyed off wall-clock time and therefore continue to advance even at
+   * scale `0`. Use `kill(reason)` for terminal halts.
    *
-   * Throws if `scale` is not a finite, non-negative number.
+   * Throws `InvalidTimeScaleError` if `scale` is not finite or is
+   * negative.
    */
   setTimeScale(scale: number): void {
     if (!Number.isFinite(scale) || scale < 0) {
-      throw new RangeError(
+      throw new InvalidTimeScaleError(
         `setTimeScale: expected a finite, non-negative number, got ${String(scale)}`,
       );
     }

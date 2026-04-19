@@ -11,7 +11,7 @@ import {
   bindAgentToStore,
 } from 'agentonomous';
 import { catSpecies } from './species.js';
-import { mountHud, mountSpeedPicker } from './ui.js';
+import { mountHud, mountResetButton, mountSpeedPicker } from './ui.js';
 
 const STORAGE_KEY = 'whiskers';
 const SPEED_STORAGE_KEY = 'whiskers:speed';
@@ -67,6 +67,7 @@ const pet = createAgent({
 // --- Mount UI + reactive binding ----------------------------------------------
 const hud = mountHud(pet);
 mountSpeedPicker(pet, { baseScale: BASE_TIME_SCALE, storageKey: SPEED_STORAGE_KEY });
+mountResetButton(pet);
 bindAgentToStore(pet, (state) => {
   hud.update(state);
 });
