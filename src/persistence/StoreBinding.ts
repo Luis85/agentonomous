@@ -16,6 +16,15 @@ import type { AgentState } from './AgentState.js';
  * fresh `getState()` projection into the consumer's store. It's
  * intentionally minimal — any reactive framework (Pinia, Zustand, Redux,
  * Svelte stores, signals, React atoms) can plug in via the callback.
+ *
+ * **Event-driven only.** The listener fires on bus events — not on silent
+ * per-tick state changes. Needs decay, age advances, and time-bound
+ * modifier countdowns all happen between events, so a UI driven purely
+ * by this helper will appear frozen until the next `NeedCritical`,
+ * `SkillCompleted`, `ModifierApplied`, lifecycle transition, etc. For a
+ * smoothly-animated HUD, combine this subscription with a
+ * `requestAnimationFrame` loop (or equivalent host tick) that reads
+ * `agent.getState()` every frame.
  */
 export type AgentStateListener = (state: AgentState, event: DomainEvent) => void;
 

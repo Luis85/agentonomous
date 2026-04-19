@@ -117,6 +117,10 @@ bindAgentToStore(pet, (state) => {
 });
 
 // Additional listener to decorate mildIllness / surpriseTreat side-effects.
+// Note: `Modifier.expiresAt` is wall-clock ms — it does not scale with
+// `setTimeScale`. At 8× the pet ages eight times faster but a 45 000 ms
+// `sick` modifier still expires after 45 s of real time. See
+// `CLAUDE.md → setTimeScale(0) pause semantics` for the full quirk.
 pet.subscribe((event) => {
   if (event.type !== 'RandomEvent') return;
   const re = event as { subtype?: string };
@@ -166,12 +170,18 @@ pet.subscribe((event) => {
 });
 
 // --- Game loop ----------------------------------------------------------------
+// `bindAgentToStore` fires the HUD updater only when the agent publishes an
+// event. Between events (most ticks) needs decay, age advances, and modifier
+// timers count down silently — without this per-frame repaint the HUD would
+// appear frozen until the next critical-threshold crossing or skill result.
 let last = performance.now();
 async function loop(now: number): Promise<void> {
   const dt = Math.min((now - last) / 1000, 0.25);
   last = now;
   const trace = await pet.tick(dt);
-  traceView.render(trace, pet.getState());
+  const state = pet.getState();
+  hud.update(state);
+  traceView.render(trace, state);
   requestAnimationFrame((t) => {
     void loop(t);
   });

@@ -1,12 +1,5 @@
 import type { Agent, AgentState } from 'agentonomous';
-
-const NEEDS: { id: string; label: string }[] = [
-  { id: 'hunger', label: 'Hunger' },
-  { id: 'cleanliness', label: 'Cleanliness' },
-  { id: 'happiness', label: 'Happiness' },
-  { id: 'energy', label: 'Energy' },
-  { id: 'health', label: 'Health' },
-];
+import { NEEDS } from './constants.js';
 
 const INTERACTION_BUTTONS: { verb: string; label: string }[] = [
   { verb: 'feed', label: '🍖 Feed' },
@@ -68,7 +61,7 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
     buttonsEl.appendChild(btn);
   }
 
-  // Recent-event log (trimmed tail) + R-26 lifetime counters.
+  // Recent-event log (newest on top, trimmed tail) + R-26 lifetime counters.
   const traceLines: string[] = [];
   const counters: LifetimeCounters = {
     ateCount: 0,
@@ -77,13 +70,12 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
     petCount: 0,
   };
   agent.subscribe((event) => {
-    traceLines.push(
-      `${new Date(event.at).toISOString().slice(11, 19)}  ${event.type}${
-        typeof event.agentId === 'string' ? ` (${event.agentId})` : ''
-      }`,
-    );
-    if (traceLines.length > 40) traceLines.shift();
-    trace.textContent = traceLines.join('\n');
+    const line = formatEventLine(event);
+    if (line) {
+      traceLines.unshift(line);
+      if (traceLines.length > 40) traceLines.pop();
+      trace.textContent = traceLines.join('\n');
+    }
 
     // Tally the events we care about for the life-summary modal.
     if (event.type === 'SkillCompleted') {
@@ -483,4 +475,141 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+const INTERACTION_VERB_LABELS: Record<string, string> = {
+  feed: '🍖 Feed',
+  clean: '🫧 Clean',
+  play: '🎾 Play',
+  rest: '💤 Rest',
+  pet: '❤️ Pet',
+  medicate: '💊 Medicate',
+  scold: '😠 Scold',
+};
+
+const SKILL_LABELS: Record<string, string> = {
+  feed: '🍖 Fed',
+  clean: '🫧 Cleaned',
+  play: '🎾 Played',
+  rest: '💤 Rested',
+  pet: '❤️ Petted',
+  medicate: '💊 Medicated',
+  scold: '😠 Scolded',
+  'express-meow': '😺 Meowed',
+  'express-sad': '😢 Cried',
+  'express-sleepy': '😴 Yawned',
+};
+
+const RANDOM_EVENT_LABELS: Record<string, string> = {
+  mildIllness: '🤒 Fell ill',
+  surpriseTreat: '🎁 Surprise treat',
+  messyPlay: '🧹 Made a mess',
+};
+
+const NEED_LABELS: Record<string, string> = {
+  hunger: 'hunger',
+  cleanliness: 'cleanliness',
+  happiness: 'happiness',
+  energy: 'energy',
+  health: 'health',
+};
+
+function formatTimestamp(at: number): string {
+  return new Date(at).toISOString().slice(11, 19);
+}
+
+function needLabel(id: string): string {
+  return NEED_LABELS[id] ?? id;
+}
+
+/**
+ * Turn a domain event into a single-line, human-friendly log entry. Returns
+ * `null` for events we intentionally skip (e.g. the synthetic `__init__`
+ * emitted by `bindAgentToStore`) so the log stays focused on simulation
+ * activity.
+ */
+function formatEventLine(
+  event: { type: string; at: number } & Record<string, unknown>,
+): string | null {
+  const ts = formatTimestamp(event.at);
+  const t = event.type;
+
+  if (t === '__init__') return null;
+
+  if (t === 'InteractionRequested') {
+    const verb = typeof event['verb'] === 'string' ? (event['verb'] as string) : 'unknown';
+    const label = INTERACTION_VERB_LABELS[verb] ?? verb;
+    return `${ts}  → ${label} requested`;
+  }
+  if (t === 'SkillCompleted') {
+    const skillId = typeof event['skillId'] === 'string' ? (event['skillId'] as string) : 'skill';
+    const eff = typeof event['effectiveness'] === 'number' ? (event['effectiveness'] as number) : 1;
+    const label = SKILL_LABELS[skillId] ?? skillId;
+    const pct = Math.round(eff * 100);
+    return `${ts}  ✓ ${label}${pct === 100 ? '' : ` (${pct}% effective)`}`;
+  }
+  if (t === 'SkillFailed') {
+    const skillId = typeof event['skillId'] === 'string' ? (event['skillId'] as string) : 'skill';
+    const code = typeof event['code'] === 'string' ? (event['code'] as string) : 'failed';
+    const msg = typeof event['message'] === 'string' ? (event['message'] as string) : '';
+    const label = SKILL_LABELS[skillId] ?? skillId;
+    return `${ts}  ✗ ${label} failed — ${code}${msg ? `: ${msg}` : ''}`;
+  }
+  if (t === 'RandomEvent') {
+    const subtype = typeof event['subtype'] === 'string' ? (event['subtype'] as string) : '';
+    const label = RANDOM_EVENT_LABELS[subtype] ?? `random: ${subtype || 'unknown'}`;
+    return `${ts}  ⚡ ${label}`;
+  }
+  if (t === 'NeedCritical') {
+    const needId = typeof event['needId'] === 'string' ? (event['needId'] as string) : '?';
+    const level = typeof event['level'] === 'number' ? (event['level'] as number) : NaN;
+    return `${ts}  ⚠ ${needLabel(needId)} critical (${level.toFixed(2)})`;
+  }
+  if (t === 'NeedSafe') {
+    const needId = typeof event['needId'] === 'string' ? (event['needId'] as string) : '?';
+    const level = typeof event['level'] === 'number' ? (event['level'] as number) : NaN;
+    return `${ts}  ✓ ${needLabel(needId)} recovered (${level.toFixed(2)})`;
+  }
+  if (t === 'NeedSatisfied') {
+    const needId = typeof event['needId'] === 'string' ? (event['needId'] as string) : '?';
+    const before = typeof event['before'] === 'number' ? (event['before'] as number) : NaN;
+    const after = typeof event['after'] === 'number' ? (event['after'] as number) : NaN;
+    return `${ts}  + ${needLabel(needId)} ${before.toFixed(2)} → ${after.toFixed(2)}`;
+  }
+  if (t === 'ModifierApplied') {
+    const mod = event['modifier'] as
+      | { id?: string; visual?: { label?: string }; source?: string }
+      | undefined;
+    const id = mod?.visual?.label ?? mod?.id ?? 'modifier';
+    const source = mod?.source ? ` (${mod.source})` : '';
+    return `${ts}  + ${id}${source}`;
+  }
+  if (t === 'ModifierExpired') {
+    const id =
+      typeof event['modifierId'] === 'string' ? (event['modifierId'] as string) : 'modifier';
+    return `${ts}  − ${id} expired`;
+  }
+  if (t === 'ModifierRemoved') {
+    const id =
+      typeof event['modifierId'] === 'string' ? (event['modifierId'] as string) : 'modifier';
+    const reason = typeof event['reason'] === 'string' ? (event['reason'] as string) : 'removed';
+    return `${ts}  − ${id} ${reason}`;
+  }
+  if (t === 'MoodChanged') {
+    const from = typeof event['from'] === 'string' ? (event['from'] as string) : '—';
+    const to = typeof event['to'] === 'string' ? (event['to'] as string) : '?';
+    return `${ts}  mood ${from} → ${to}`;
+  }
+  if (t === 'LifeStageChanged') {
+    const from = typeof event['from'] === 'string' ? (event['from'] as string) : '?';
+    const to = typeof event['to'] === 'string' ? (event['to'] as string) : '?';
+    return `${ts}  🎂 ${from} → ${to}`;
+  }
+  if (t === 'AgentDied') {
+    const cause = typeof event['cause'] === 'string' ? (event['cause'] as string) : 'unknown';
+    const reason = typeof event['reason'] === 'string' ? ` — ${event['reason'] as string}` : '';
+    return `${ts}  🪦 died: ${cause}${reason}`;
+  }
+
+  return `${ts}  ${t}`;
 }
