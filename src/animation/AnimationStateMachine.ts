@@ -115,7 +115,7 @@ export class AnimationStateMachine {
 
   /**
    * Derive the right state from context priority:
-   *   1. Deceased: forced 'dead' (caller sets reason = 'deceased').
+   *   1. Deceased: forced 'dead' (caller sets reason = DECEASED_STAGE).
    *   2. Modifier override wins (sick / stunned / etc).
    *   3. Running skill.
    *   4. Mood mapping.

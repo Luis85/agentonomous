@@ -280,7 +280,7 @@ export class Agent {
         tickStartedAt,
         virtualDtSeconds,
         controlMode: this.controlMode,
-        stage: 'deceased',
+        stage: DECEASED_STAGE,
         halted: true,
         perceived: [],
         actions: [],
@@ -723,7 +723,7 @@ export class Agent {
     // Force the animation into its 'dead' state so renderers update
     // immediately; reconciliation is inert from now on since halted=true
     // short-circuits future ticks.
-    const animationT = this.animation.transition('dead', at, 'deceased');
+    const animationT = this.animation.transition('dead', at, DECEASED_STAGE);
     if (animationT) {
       const animEvent: AnimationTransitionEvent = {
         type: ANIMATION_TRANSITION,
@@ -731,7 +731,7 @@ export class Agent {
         agentId: this.identity.id,
         from: animationT.from,
         to: animationT.to,
-        reason: 'deceased',
+        reason: DECEASED_STAGE,
       };
       this.publish(animEvent);
     }
