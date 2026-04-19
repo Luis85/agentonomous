@@ -1,5 +1,5 @@
-import type { CognitionModeSpec } from './index.js';
 import type { Reasoner } from 'agentonomous';
+import type { CognitionModeSpec } from './index.js';
 
 /**
  * Stub BDI mode. Routes selection through js-son's belief / desire /

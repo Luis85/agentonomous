@@ -1,5 +1,5 @@
-import type { CognitionModeSpec } from './index.js';
 import type { Reasoner, ReasonerContext } from 'agentonomous';
+import type { CognitionModeSpec } from './index.js';
 import networkJson from './learning.network.json';
 
 /**

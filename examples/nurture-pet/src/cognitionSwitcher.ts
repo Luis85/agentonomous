@@ -45,6 +45,14 @@ export interface CognitionSwitcherHandle {
  * on whichever reasoner's `construct()` finishes last rather than
  * whichever the user picked last.
  *
+ * **Construct-error handling:** if `mode.construct()` rejects (e.g.
+ * the peer's runtime export shape disagrees with the adapter — the
+ * CJS-interop case in the plan's §Risks table), the switcher leaves
+ * the previously-active reasoner in place, marks the failing option
+ * disabled with an error tooltip, and reverts the `<select>` + status
+ * span to the last working mode so the user isn't stranded with a UI
+ * that lies about which reasoner is running.
+ *
  * The switcher intentionally does not persist selection across
  * reloads or demo resets — a fresh mount always starts at heuristic.
  */
@@ -77,18 +85,40 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
 
   let disposed = false;
   let changeEpoch = 0;
+  // Tracks the mode id currently wired into the agent, so a failing
+  // `construct()` can revert the `<select>` + status to the last-good
+  // mode rather than leaving the UI inconsistent with reality.
+  let activeModeId: CognitionModeSpec['id'] = 'heuristic';
 
   const onChange = async (): Promise<void> => {
     if (disposed) return;
     const mode = COGNITION_MODES.find((m) => m.id === select.value);
     if (!mode) return;
     const myEpoch = ++changeEpoch;
-    const reasoner = await mode.construct();
-    // Bail if disposed mid-await OR if a newer change has superseded us.
-    if (disposed || myEpoch !== changeEpoch) return;
-    agent.setReasoner(reasoner);
-    status.dataset.mode = mode.id;
-    status.textContent = 'active';
+    try {
+      const reasoner = await mode.construct();
+      // Bail if disposed mid-await OR if a newer change has superseded us.
+      if (disposed || myEpoch !== changeEpoch) return;
+      agent.setReasoner(reasoner);
+      activeModeId = mode.id;
+      status.dataset.mode = mode.id;
+      status.textContent = 'active';
+    } catch (err) {
+      if (disposed || myEpoch !== changeEpoch) return;
+      // eslint-disable-next-line no-console -- user-visible diagnostic.
+      console.error('cognitionSwitcher: construct() failed for mode', mode.id, err);
+      const failed = select.querySelector<HTMLOptionElement>(`option[value="${mode.id}"]`);
+      if (failed) {
+        failed.disabled = true;
+        failed.title = `${mode.label} failed to load (see console)`;
+      }
+      // Programmatic assignment does NOT refire the change event, so
+      // no recursion risk here. Status span reflects the actually-
+      // active reasoner (unchanged).
+      select.value = activeModeId;
+      status.dataset.mode = activeModeId;
+      status.textContent = 'active';
+    }
   };
   const onChangeWrapped = (): void => {
     void onChange();

@@ -1,4 +1,8 @@
 import type { Reasoner } from 'agentonomous';
+import { bdiMode } from './bdi.js';
+import { btMode } from './bt.js';
+import { heuristicMode } from './heuristic.js';
+import { learningMode } from './learning.js';
 
 /**
  * Describes one cognition mode offered by the nurture-pet demo's
@@ -26,6 +30,14 @@ export interface CognitionModeSpec {
    * Probes availability. For peer-dep modes, try/catches a dynamic
    * `import()` of the peer module. Returns `true` iff the import
    * resolves. Called once on mount; result is cached by the switcher.
+   *
+   * **Note to future refactors:** each mode's `probe()` and
+   * `construct()` MUST use a literal string at the `import()` call
+   * site (`import('mistreevous')`, not `import(name)`). Vite's static
+   * analysis needs the literal to emit a per-peer async chunk;
+   * passing a parameter would bundle the peer into the main chunk
+   * (or fail outright). This is why the boilerplate is repeated
+   * across mode files rather than collapsed into a helper.
    */
   probe(): Promise<boolean>;
   /**
@@ -40,13 +52,6 @@ export interface CognitionModeSpec {
    */
   construct(): Promise<Reasoner>;
 }
-
-// Modes are imported for their side effect of being discoverable here;
-// the array literal below is the canonical registry + dropdown order.
-import { heuristicMode } from './heuristic.js';
-import { btMode } from './bt.js';
-import { bdiMode } from './bdi.js';
-import { learningMode } from './learning.js';
 
 /** Registry ordered to match the dropdown display order. */
 export const COGNITION_MODES: readonly CognitionModeSpec[] = [

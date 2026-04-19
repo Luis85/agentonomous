@@ -1,5 +1,5 @@
-import type { CognitionModeSpec } from './index.js';
 import type { Reasoner, ReasonerContext } from 'agentonomous';
+import type { CognitionModeSpec } from './index.js';
 
 const TREAT_EVENT_SUBTYPE = 'surpriseTreat';
 const INTERRUPT_TICKS = 3;
@@ -9,10 +9,11 @@ const INTERRUPT_TICKS = 3;
  * `surpriseTreat` random event. Normal ticks mirror the heuristic's
  * top-candidate pick via `PickTopCandidate`. When a `surpriseTreat`
  * event arrives in `ctx.perceived`, the BT locks in the
- * `approach-treat` skill for `INTERRUPT_TICKS` ticks measured from the
- * most recent treat — a second treat during the window resets the
- * counter rather than stacking a new burst. Effective behaviour:
- * "keep approaching while treats keep arriving, then resume urgency."
+ * `approach-treat` skill for `INTERRUPT_TICKS` ticks measured from
+ * the most recent treat. A second treat during the window refreshes
+ * the counter back to `INTERRUPT_TICKS` rather than adding another
+ * burst on top. Effective behaviour: "keep approaching while treats
+ * keep arriving, then resume urgency."
  *
  * Counter state lives in the closure returned by `construct()` — a
  * mode swap produces a fresh closure, wiping the counter. Matches the
