@@ -24,7 +24,13 @@ export interface ValidationIssue {
   code?: string;
 }
 
-/** No-op validator: accepts everything unchanged. Default when no validator is wired. */
+/**
+ * No-op validator: accepts every input unchanged. Intended as a no-op /
+ * testing utility and the zero-config default when no `Validator` is wired
+ * into `createAgent`. Production consumers typically inject a zod-,
+ * valibot-, or ajv-backed implementation that actually enforces the
+ * schema contract on skill parameters, tool inputs, and remote commands.
+ */
 export class PassthroughValidator implements Validator {
   validate<T = unknown>(_schema: unknown, input: unknown): ValidationResult<T> {
     return { ok: true, value: input as T };
