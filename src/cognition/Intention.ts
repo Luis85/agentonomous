@@ -6,15 +6,16 @@
  * - `satisfy`   — active state-changing action (eat food, drink water).
  * - `idle`      — nothing to do right now.
  * - `react`     — responding to a specific perceived event.
- * - `do-task`   — executing a task from the queue (Phase B).
+ * - `do-task`   — executing a task from a queue. Reserved for jobs/tasks
+ *                 extensions; unused by the default `UrgencyReasoner`.
  * - `string & {}` escape hatch for consumer-defined kinds.
  */
 export type IntentionKind = 'express' | 'satisfy' | 'idle' | 'react' | 'do-task' | (string & {});
 
 /**
  * Structured description of "what I want to do next". Produced by
- * `NeedsPolicy` / reactive handlers / (Phase B) reasoners; consumed by the
- * `BehaviorRunner` to produce `AgentAction`s.
+ * `NeedsPolicy` / reactive handlers / consumer-supplied reasoners;
+ * consumed by the `BehaviorRunner` to produce `AgentAction`s.
  */
 export interface Intention {
   kind: IntentionKind;

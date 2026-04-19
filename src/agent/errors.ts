@@ -60,7 +60,10 @@ export class SkillInvocationError extends AgentError {
   }
 }
 
-/** An LLM call would exceed its configured `LlmBudget`. Phase B. */
+/**
+ * An LLM or tool call would exceed its configured budget. Reserved for
+ * LLM-tool integrations; unused by the core tick pipeline.
+ */
 export class BudgetExceededError extends AgentError {
   constructor(message: string, options?: { cause?: unknown }) {
     super('E_BUDGET_EXCEEDED', message, options);

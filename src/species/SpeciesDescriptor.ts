@@ -32,7 +32,11 @@ export interface SpeciesDescriptor {
   appearance?: Appearance;
   /** Default locomotion mode. */
   locomotion?: LocomotionMode;
-  /** Whether agents of this species can engage in dialogue (Phase B). */
+  /**
+   * Whether agents of this species can engage in dialogue. Reserved for a
+   * future dialogue / LLM tool extension; currently informational — the
+   * core library does not gate any behavior on this flag.
+   */
   dialogueCapable?: boolean;
   /**
    * If non-empty, only these skill ids are permitted at runtime across all

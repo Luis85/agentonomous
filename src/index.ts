@@ -151,7 +151,7 @@ export type { LocomotionMode } from './body/LocomotionMode.js';
 export { type Appearance, type AgentShape, defaultAppearance } from './body/Appearance.js';
 export { type Embodiment, defaultEmbodiment } from './body/Embodiment.js';
 
-// Memory (M10 — Markdown adapter is Phase B).
+// Memory (M10).
 export type { MemoryKind, MemoryRecord } from './memory/MemoryRecord.js';
 export type { MemoryFilter, MemoryRepository } from './memory/MemoryRepository.js';
 export { InMemoryMemoryAdapter } from './memory/InMemoryMemoryAdapter.js';

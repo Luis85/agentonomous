@@ -3,13 +3,15 @@ import type { Intention } from '../Intention.js';
 import type { Reasoner, ReasonerContext } from './Reasoner.js';
 
 /**
- * The Phase A default reasoner. Takes all candidates from the context,
- * applies `personaBias(type, persona)` and `modifiers.intentionBonus(type)`,
- * picks the single highest-scored one above a threshold. If no candidate
- * clears the threshold, returns `null` (the agent is idle this tick).
+ * Default weighted-scoring reasoner. Takes all candidates from the
+ * context, applies `personaBias(type, persona)` and
+ * `modifiers.intentionBonus(type)`, picks the single highest-scored one
+ * above a threshold. If no candidate clears the threshold, returns
+ * `null` (the agent is idle this tick).
  *
  * No beliefs, no planning — just weighted scoring. Adequate for the MVP
- * nurture-pet; Phase B swaps in `JsSonReasoner` / BDI plugins.
+ * nurture-pet; consumers who want BDI / planning can plug in a richer
+ * `Reasoner` implementation through the same port.
  */
 export interface UrgencyReasonerOptions {
   /** Minimum weighted score to commit to an intention. Default: 0. */

@@ -953,9 +953,9 @@ export class Agent {
 
   /**
    * Install an `AgentModule` after construction. `createAgent` installs
-   * modules via its config at construction time; this method is exposed so
-   * tests can add handlers mid-scenario. Runtime install for consumer use
-   * is a Phase B concern.
+   * modules via its config at construction time; this method is exposed
+   * so tests can add handlers mid-scenario. Runtime install for consumer
+   * use is not yet part of the supported public surface.
    */
   installModule(mod: AgentModule): void {
     this.modules.push(mod);
