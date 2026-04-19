@@ -20,6 +20,7 @@ export interface NeedCriticalEvent extends DomainEvent {
   agentId: string;
   needId: string;
   level: number;
+  fxHint?: string;
 }
 
 export interface NeedSafeEvent extends DomainEvent {
@@ -27,6 +28,7 @@ export interface NeedSafeEvent extends DomainEvent {
   agentId: string;
   needId: string;
   level: number;
+  fxHint?: string;
 }
 
 export interface NeedSatisfiedEvent extends DomainEvent {
@@ -35,6 +37,7 @@ export interface NeedSatisfiedEvent extends DomainEvent {
   needId: string;
   before: number;
   after: number;
+  fxHint?: string;
 }
 
 // --- Modifiers (M4) ---
@@ -46,6 +49,7 @@ export interface ModifierAppliedEvent extends DomainEvent {
   type: typeof MODIFIER_APPLIED;
   agentId: string;
   modifier: Modifier;
+  fxHint?: string;
 }
 
 export interface ModifierExpiredEvent extends DomainEvent {
@@ -53,6 +57,7 @@ export interface ModifierExpiredEvent extends DomainEvent {
   agentId: string;
   modifierId: string;
   source: string;
+  fxHint?: string;
 }
 
 export interface ModifierRemovedEvent extends DomainEvent {
@@ -61,6 +66,7 @@ export interface ModifierRemovedEvent extends DomainEvent {
   modifierId: string;
   source: string;
   reason: 'removed' | 'replaced';
+  fxHint?: string;
 }
 
 // --- Lifecycle (M5) ---
@@ -73,6 +79,7 @@ export interface LifeStageChangedEvent extends DomainEvent {
   from: LifeStage;
   to: LifeStage;
   atAgeSeconds: number;
+  fxHint?: string;
 }
 
 export interface AgentDiedEvent extends DomainEvent {
@@ -81,6 +88,7 @@ export interface AgentDiedEvent extends DomainEvent {
   cause: 'health-depleted' | 'stage-transition' | 'explicit' | (string & {});
   reason?: string;
   atAgeSeconds: number;
+  fxHint?: string;
 }
 
 // --- Skills (M7) ---
@@ -93,6 +101,7 @@ export interface SkillCompletedEvent extends DomainEvent {
   skillId: string;
   effectiveness: number;
   details?: Record<string, unknown>;
+  fxHint?: string;
 }
 
 export interface SkillFailedEvent extends DomainEvent {
@@ -102,6 +111,7 @@ export interface SkillFailedEvent extends DomainEvent {
   code: string;
   message: string;
   details?: Record<string, unknown>;
+  fxHint?: string;
 }
 
 // --- Mood (M5) ---
@@ -113,4 +123,5 @@ export interface MoodChangedEvent extends DomainEvent {
   from: MoodCategory | undefined;
   to: MoodCategory;
   valence: number | undefined;
+  fxHint?: string;
 }
