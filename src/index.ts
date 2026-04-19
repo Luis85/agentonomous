@@ -49,11 +49,14 @@ export type { Need, NeedsDelta } from './needs/Need.js';
 export { DEFAULT_URGENCY_CURVE } from './needs/Need.js';
 export { Needs, type DecayMultiplierFn } from './needs/Needs.js';
 export type { NeedsPolicy } from './needs/NeedsPolicy.js';
+/** Needs policy that emits expressive intentions ("meow", "look sad") when a need is critical; no side effects. */
 export {
   ExpressiveNeedsPolicy,
   type ExpressiveNeedsPolicyOptions,
 } from './needs/ExpressiveNeedsPolicy.js';
+/** Needs policy that emits state-changing "satisfy-need" intentions — the autonomous-action cousin of `ExpressiveNeedsPolicy`. */
 export { ActiveNeedsPolicy, type ActiveNeedsPolicyOptions } from './needs/ActiveNeedsPolicy.js';
+/** Composite policy that fans a needs context out to multiple child policies and concatenates their candidates. */
 export { ComposedNeedsPolicy } from './needs/ComposedNeedsPolicy.js';
 
 // Cognition (M3 types + M7 defaults + ports).
@@ -61,19 +64,33 @@ export type { Intention, IntentionKind } from './cognition/Intention.js';
 export type { IntentionCandidate } from './cognition/IntentionCandidate.js';
 export { defaultPersonaBias, type PersonaBiasFn } from './cognition/personaBias.js';
 export type { Reasoner, ReasonerContext } from './cognition/reasoning/Reasoner.js';
+/** Reasoner that picks no intention. Default when no `Reasoner` is wired. */
 export { NoopReasoner } from './cognition/reasoning/NoopReasoner.js';
+/** Default weighted-scoring reasoner: applies persona bias + modifier bonus, picks the highest-scoring intention above a threshold. */
 export {
   UrgencyReasoner,
   type UrgencyReasonerOptions,
 } from './cognition/reasoning/UrgencyReasoner.js';
 export type { BehaviorRunner } from './cognition/behavior/BehaviorRunner.js';
+/** Table-driven behavior runner: maps `Intention` ids to concrete `AgentAction[]` via a consumer-supplied lookup. */
 export {
   DirectBehaviorRunner,
   type DirectBehaviorRunnerOptions,
 } from './cognition/behavior/DirectBehaviorRunner.js';
+/** Behavior runner that produces no actions. Default when no runner is wired. */
 export { NoopBehavior } from './cognition/behavior/NoopBehavior.js';
 export type { Learner, LearningOutcome } from './cognition/learning/Learner.js';
+/** Learner that ignores outcomes. Default when no learner is wired. */
 export { NoopLearner } from './cognition/learning/NoopLearner.js';
+
+// Tuning constants.
+export {
+  MOOD_URGENCY_THRESHOLDS,
+  PERSONA_TRAIT_WEIGHTS,
+  SKILL_DEFAULTS,
+  OFFLINE_CATCHUP_DEFAULTS,
+  EXPRESSIVE_POLICY_DEFAULTS,
+} from './cognition/tuning.js';
 
 // Skills (M7).
 export type { Skill, SkillOutcome, SkillError } from './skills/Skill.js';
@@ -129,6 +146,7 @@ export {
 // Mood (M5).
 export type { Mood, MoodCategory } from './mood/Mood.js';
 export type { MoodModel, MoodEvaluationContext } from './mood/MoodModel.js';
+/** Default mood model: blends normalized needs + modifier bias to pick a `MoodCategory` ({ happy, sad, playful, sleepy, bored, sick }). */
 export { DefaultMoodModel } from './mood/DefaultMoodModel.js';
 
 // Control modes (M6).
@@ -151,7 +169,7 @@ export type { LocomotionMode } from './body/LocomotionMode.js';
 export { type Appearance, type AgentShape, defaultAppearance } from './body/Appearance.js';
 export { type Embodiment, defaultEmbodiment } from './body/Embodiment.js';
 
-// Memory (M10 — Markdown adapter is Phase B).
+// Memory (M10).
 export type { MemoryKind, MemoryRecord } from './memory/MemoryRecord.js';
 export type { MemoryFilter, MemoryRepository } from './memory/MemoryRepository.js';
 export { InMemoryMemoryAdapter } from './memory/InMemoryMemoryAdapter.js';

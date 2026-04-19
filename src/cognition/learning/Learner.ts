@@ -2,9 +2,9 @@ import type { AgentAction } from '../../agent/AgentAction.js';
 import type { Intention } from '../Intention.js';
 
 /**
- * Scoring / adaptation slot. Consumers who care about reinforcement pass a
- * concrete `Learner` (Phase B `BrainJsLearner` wraps brain.js); the default
- * is `NoopLearner`, which ignores outcomes.
+ * Scoring / adaptation slot. Consumers who care about reinforcement pass
+ * a concrete `Learner` (e.g., a brain.js-backed adapter); the default is
+ * `NoopLearner`, which ignores outcomes.
  *
  * Exposed now so the tick pipeline's Stage 8 (score) has a stable seam.
  */

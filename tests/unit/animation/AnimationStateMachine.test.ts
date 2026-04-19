@@ -56,23 +56,36 @@ describe('AnimationStateMachine', () => {
 
   it('explicit transition() bypasses reconciliation and records history', () => {
     const sm = new AnimationStateMachine();
-    const t = sm.transition('dead', 'deceased');
+    const t = sm.transition('dead', 42, 'deceased');
     expect(t?.to).toBe('dead');
+    expect(t?.at).toBe(42);
     expect(sm.history()).toHaveLength(1);
     expect(sm.history()[0]?.reason).toBe('deceased');
   });
 
   it('history accumulates transitions', () => {
     const sm = new AnimationStateMachine();
-    sm.transition('happy');
-    sm.transition('playing');
-    sm.transition('idle');
+    sm.transition('happy', 1);
+    sm.transition('playing', 2);
+    sm.transition('idle', 3);
     expect(sm.history().map((t) => t.to)).toEqual(['happy', 'playing', 'idle']);
+  });
+
+  it('caps history at maxHistorySize and evicts oldest on overflow', () => {
+    const sm = new AnimationStateMachine({ maxHistorySize: 3 });
+    sm.transition('happy', 1);
+    sm.transition('idle', 2);
+    sm.transition('happy', 3);
+    sm.transition('idle', 4);
+    sm.transition('happy', 5);
+    const history = sm.history();
+    expect(history).toHaveLength(3);
+    expect(history.map((t) => t.at)).toEqual([3, 4, 5]);
   });
 
   it('snapshot + restore preserves state', () => {
     const sm = new AnimationStateMachine();
-    sm.transition('playing');
+    sm.transition('playing', 0);
     const snap = sm.snapshot();
 
     const copy = new AnimationStateMachine();

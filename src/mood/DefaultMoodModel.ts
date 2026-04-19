@@ -1,3 +1,4 @@
+import { MOOD_URGENCY_THRESHOLDS } from '../cognition/tuning.js';
 import type { Mood, MoodCategory } from './Mood.js';
 import type { MoodEvaluationContext, MoodModel } from './MoodModel.js';
 
@@ -43,15 +44,15 @@ function computeAvgUrgency(ctx: MoodEvaluationContext): number {
 function pickBaseCategory(avg: number, ctx: MoodEvaluationContext): MoodCategory {
   if (ctx.needs) {
     for (const need of ctx.needs.list()) {
-      if (ctx.needs.urgency(need.id) > 0.85) {
+      if (ctx.needs.urgency(need.id) > MOOD_URGENCY_THRESHOLDS.critical) {
         return need.id === 'health' ? 'sick' : 'sad';
       }
     }
   }
-  if (avg > 0.6) return 'sad';
-  if (avg > 0.3) return 'bored';
+  if (avg > MOOD_URGENCY_THRESHOLDS.sad) return 'sad';
+  if (avg > MOOD_URGENCY_THRESHOLDS.bored) return 'bored';
   const playfulness = ctx.persona?.traits.playfulness ?? 0;
-  return playfulness > 0.6 ? 'playful' : 'happy';
+  return playfulness > MOOD_URGENCY_THRESHOLDS.playfulTraitCutoff ? 'playful' : 'happy';
 }
 
 function applyModifierBias(base: MoodCategory, ctx: MoodEvaluationContext): MoodCategory {
@@ -70,7 +71,7 @@ function applyModifierBias(base: MoodCategory, ctx: MoodEvaluationContext): Mood
   let winningBias = 0;
   for (const category of candidates) {
     const bias = ctx.modifiers.moodBias(category);
-    if (bias > winningBias + 0.1) {
+    if (bias > winningBias + MOOD_URGENCY_THRESHOLDS.biasOverrideDelta) {
       winning = category;
       winningBias = bias;
     }

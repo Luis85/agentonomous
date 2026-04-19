@@ -1,4 +1,5 @@
 import type { Persona } from '../agent/Persona.js';
+import { PERSONA_TRAIT_WEIGHTS } from './tuning.js';
 
 /**
  * Pure function mapping `(intentionType, persona)` to a bias scalar.
@@ -24,19 +25,19 @@ export const defaultPersonaBias: PersonaBiasFn = (intentionType, persona) => {
   let bias = 0;
 
   if (intentionType === 'do-task' || intentionType.startsWith('do-task:')) {
-    bias += (traits.ambition ?? 0) * 0.5;
+    bias += (traits.ambition ?? 0) * PERSONA_TRAIT_WEIGHTS.ambition;
   }
   if (intentionType.startsWith('react:greet') || intentionType.startsWith('react:talk')) {
-    bias += (traits.sociability ?? 0) * 0.4;
+    bias += (traits.sociability ?? 0) * PERSONA_TRAIT_WEIGHTS.sociability;
   }
   if (intentionType.startsWith('react:attack') || intentionType === 'satisfy-need:dominance') {
-    bias += (traits.aggression ?? 0) * 0.5;
+    bias += (traits.aggression ?? 0) * PERSONA_TRAIT_WEIGHTS.aggression;
   }
   if (intentionType.startsWith('explore') || intentionType.startsWith('investigate')) {
-    bias += (traits.curiosity ?? 0) * 0.4;
+    bias += (traits.curiosity ?? 0) * PERSONA_TRAIT_WEIGHTS.curiosity;
   }
   if (intentionType.includes('play')) {
-    bias += (traits.playfulness ?? 0) * 0.4;
+    bias += (traits.playfulness ?? 0) * PERSONA_TRAIT_WEIGHTS.playfulness;
   }
 
   return bias;

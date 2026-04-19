@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   createAgent,
   defaultPetInteractionModule,
+  defineModifier,
   defineRandomEvent,
   defineSpecies,
+  err,
   ExpressMeowSkill,
   InMemoryMemoryAdapter,
   ManualClock,
+  NEED_CRITICAL,
   RandomEventTicker,
   SeededRng,
+  SKILL_FAILED,
   SkillRegistry,
   type Agent,
+  type AgentModule,
   type DecisionTrace,
   type DomainEvent,
+  type Skill,
 } from '../../src/index.js';
 
 /**
@@ -178,5 +184,148 @@ describe('nurture-pet deterministic replay', () => {
     expect(second.getState().ageSeconds).toBeCloseTo(first.getState().ageSeconds);
     expect(second.getState().needs).toEqual(first.getState().needs);
     expect(second.getState().stage).toBe(first.getState().stage);
+  });
+
+  // ---------------------------------------------------------------------
+  // R-02 — deepen the determinism claim: reactive handlers, skill failures,
+  // and long replays. Every it-block runs the same scripted scenario twice
+  // with a fixed seed and asserts byte-identical outputs.
+  // ---------------------------------------------------------------------
+
+  it('reactive handler applying a modifier on NeedCritical — 100 s byte-identical', async () => {
+    const panicBuff = defineModifier({
+      id: 'panic',
+      source: 'reactive:need-critical',
+      stack: 'refresh',
+      durationSeconds: 5,
+      effects: [{ target: { type: 'mood-bias', category: 'sad' }, kind: 'add', value: 0.3 }],
+    });
+
+    function buildWithReactive(): {
+      agent: Agent;
+      clock: ManualClock;
+      events: DomainEvent[];
+      traces: DecisionTrace[];
+    } {
+      const { agent, clock, events } = buildPet();
+      const reactive: AgentModule = {
+        id: 'panic-on-critical',
+        reactiveHandlers: [
+          {
+            on: NEED_CRITICAL,
+            handle: (_event, facade) => {
+              facade.publishEvent({
+                type: 'ApplyingPanic',
+                at: facade.clock.now(),
+                agentId: facade.identity.id,
+              });
+              // Apply via facade → deterministic, no RNG draw.
+              agent.applyModifier(panicBuff.instantiate(facade.clock.now()));
+            },
+          },
+        ],
+      };
+      agent.installModule(reactive);
+      return { agent, clock, events, traces: [] };
+    }
+
+    async function run(): Promise<{ traces: DecisionTrace[]; events: DomainEvent[] }> {
+      const { agent, clock, traces, events } = buildWithReactive();
+      for (let i = 0; i < 100; i++) {
+        clock.advance(1_000);
+        traces.push(await agent.tick(1));
+      }
+      return { traces, events };
+    }
+
+    const runA = await run();
+    const runB = await run();
+    expect(runA.traces).toEqual(runB.traces);
+    expect(runA.events).toEqual(runB.events);
+  });
+
+  it('skill always returning err() produces identical SkillFailed ordering and RNG draws', async () => {
+    const forcedFail: Skill = {
+      id: 'forced',
+      label: 'Forced',
+      baseEffectiveness: 1,
+      execute() {
+        return Promise.resolve(err({ code: 'forced-fail', message: 'nope' }));
+      },
+    };
+
+    async function runOnce(): Promise<{ failures: DomainEvent[]; rngDraws: number[] }> {
+      const clock = new ManualClock(1_700_000_000_000);
+      const rng = new SeededRng('forced-fail-fixture');
+      const skills = new SkillRegistry();
+      skills.register(forcedFail);
+      const router: AgentModule = {
+        id: 'force-router',
+        reactiveHandlers: [
+          {
+            on: 'InteractionRequested',
+            handle: async (event, facade) => {
+              if ((event as { verb?: string }).verb === 'forced') {
+                await facade.invokeSkill('forced', undefined);
+              }
+            },
+          },
+        ],
+      };
+      const agent = createAgent({
+        id: 'whiskers',
+        species: defineSpecies({ id: 'cat' }),
+        clock,
+        rng,
+        skills,
+        modules: [router],
+        persistence: false,
+      });
+      const events: DomainEvent[] = [];
+      agent.subscribe((e) => events.push({ ...e }));
+
+      for (let i = 0; i < 3; i++) {
+        agent.interact('forced');
+        clock.advance(16);
+        await agent.tick(0.016);
+        // Second tick lets the reactive handler fire (perceived events come
+        // from the prior tick's bus drain).
+        clock.advance(16);
+        await agent.tick(0.016);
+      }
+
+      const failures = events.filter((e) => e.type === SKILL_FAILED);
+      const rngDraws = Array.from({ length: 6 }, () => agent.rng.next());
+      return { failures, rngDraws };
+    }
+
+    const a = await runOnce();
+    const b = await runOnce();
+    expect(a.failures).toEqual(b.failures);
+    expect(a.failures.length).toBe(3);
+    expect(a.rngDraws).toEqual(b.rngDraws);
+  });
+
+  it('long replay — 1000 virtual seconds with random events + modifiers is byte-identical', async () => {
+    async function longRun(): Promise<ReplayResult> {
+      const { agent, clock, events } = buildPet();
+      const traces: DecisionTrace[] = [];
+      for (let i = 0; i < 200; i++) {
+        clock.advance(5_000);
+        traces.push(await agent.tick(5));
+        // Sprinkle interactions at regular intervals to exercise mood +
+        // modifier rotations + skill flow alongside the random-event ticker.
+        if (i % 7 === 0) agent.interact('feed');
+        if (i % 11 === 0) agent.interact('play');
+        if (i % 13 === 0) agent.interact('clean');
+      }
+      return { traces, events, finalState: agent.getState() };
+    }
+
+    const a = await longRun();
+    const b = await longRun();
+    expect(a.traces).toEqual(b.traces);
+    expect(a.events).toEqual(b.events);
+    expect(a.finalState).toEqual(b.finalState);
   });
 });

@@ -1,6 +1,13 @@
 # Publishing
 
-Release flow for `agentonomous`.
+Release flow for `agentonomous`. For contribution workflow + branch model
+see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Branch model recap
+
+- `main` — tracks what's on npm. Each release is a tagged commit here.
+- `develop` — integration branch; all work lands here first.
+- Releases flow `develop` → `main`, then a tag triggers the publish workflow.
 
 ## Prerequisites
 
@@ -9,7 +16,7 @@ Release flow for `agentonomous`.
   The token must be an **automation token** (not a classic publish token) so
   npm's provenance attestation works.
 - `main` branch protected; releases happen only via Changesets PRs landing on
-  `main`.
+  `main` (and those PRs originate from `develop` or `release/*`).
 
 ## Local dry runs
 
@@ -47,14 +54,18 @@ changesets per PR are fine — they get merged at release time.
 
 The `.github/workflows/release.yml` workflow runs on every push to `main`:
 
-1. If unreleased changesets exist, the workflow opens (or updates) a
-   `chore(release): version packages` PR that bumps `package.json`, updates
-   `CHANGELOG.md`, and consumes the changeset files.
-2. Merging that PR into `main` re-triggers the workflow, which now has no
-   pending changesets and instead runs `npm run release` (`changeset
-publish` → `npm publish`).
+1. A release PR is prepared on `develop` (or a `release/vX.Y.Z` branch
+   cut from `develop`). It bumps `package.json`, regenerates
+   `CHANGELOG.md` from the pending `.changeset/` entries, and consumes
+   the changeset files. Open the PR with base = `main`.
+2. Merging that PR into `main` runs the workflow, which now has no
+   pending changesets and instead runs `npm run release` (`changeset publish`
+   → `npm publish`) and tags `vX.Y.Z`.
 3. npm provenance is attested automatically (`publishConfig.provenance: true`
    - `id-token: write` permission in the workflow + GitHub's OIDC token).
+4. After the tag lands, fast-forward `develop` with `main` (or open a
+   back-merge PR) so the version bump + changelog propagate back for the
+   next cycle.
 
 No manual `npm publish` calls are needed in the normal path.
 

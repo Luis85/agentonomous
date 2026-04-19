@@ -20,8 +20,9 @@ export interface MemoryFilter {
 
 /**
  * Port for memory persistence. Implementations decide storage format and
- * indexing strategy. The library ships an `InMemoryMemoryAdapter` in Phase A
- * and a `MarkdownMemoryAdapter` in Phase B.
+ * indexing strategy. The library ships an `InMemoryMemoryAdapter` out of
+ * the box; other adapters (filesystem, IndexedDB, Markdown) can be
+ * supplied by consumers.
  */
 export interface MemoryRepository {
   save(record: MemoryRecord): Promise<void>;

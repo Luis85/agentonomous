@@ -1,4 +1,5 @@
 import { ok, type Result } from '../../agent/result.js';
+import { SKILL_DEFAULTS } from '../../cognition/tuning.js';
 import { defineModifier } from '../../modifiers/defineModifier.js';
 import type { Skill, SkillError, SkillOutcome } from '../Skill.js';
 import type { SkillContext } from '../SkillContext.js';
@@ -8,8 +9,14 @@ const happyGlow = defineModifier({
   id: 'happy-glow',
   source: 'skill:play',
   stack: 'refresh',
-  durationSeconds: 30,
-  effects: [{ target: { type: 'mood-bias', category: 'playful' }, kind: 'add', value: 0.4 }],
+  durationSeconds: SKILL_DEFAULTS.play.happyGlowDurationSeconds,
+  effects: [
+    {
+      target: { type: 'mood-bias', category: 'playful' },
+      kind: 'add',
+      value: SKILL_DEFAULTS.play.happyGlowMoodBias,
+    },
+  ],
   visual: { hudIcon: 'icon-happy', fxHint: 'hearts-pink' },
 });
 
@@ -23,8 +30,8 @@ export const PlaySkill: Skill = {
   baseEffectiveness: 1,
   execute(_params, ctx: SkillContext): Promise<Result<SkillOutcome, SkillError>> {
     const effectiveness = effectivenessFor(PlaySkill, ctx);
-    ctx.satisfyNeed('happiness', 0.5 * effectiveness);
-    ctx.satisfyNeed('energy', -0.2 * effectiveness);
+    ctx.satisfyNeed('happiness', SKILL_DEFAULTS.play.happinessSatisfy * effectiveness);
+    ctx.satisfyNeed('energy', -SKILL_DEFAULTS.play.energyCost * effectiveness);
     ctx.applyModifier(happyGlow.instantiate(ctx.clock.now()));
     return Promise.resolve(ok({ fxHint: 'hearts-pink', effectiveness }));
   },

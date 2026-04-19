@@ -1,4 +1,5 @@
 import { ok, type Result } from '../../agent/result.js';
+import { SKILL_DEFAULTS } from '../../cognition/tuning.js';
 import type { Skill, SkillError, SkillOutcome } from '../Skill.js';
 import type { SkillContext } from '../SkillContext.js';
 import { effectivenessFor } from './effectiveness.js';
@@ -13,8 +14,8 @@ export const RestSkill: Skill = {
   baseEffectiveness: 1,
   execute(_params, ctx: SkillContext): Promise<Result<SkillOutcome, SkillError>> {
     const effectiveness = effectivenessFor(RestSkill, ctx);
-    ctx.satisfyNeed('energy', 0.8 * effectiveness);
-    ctx.satisfyNeed('hunger', -0.1);
+    ctx.satisfyNeed('energy', SKILL_DEFAULTS.rest.energySatisfy * effectiveness);
+    ctx.satisfyNeed('hunger', -SKILL_DEFAULTS.rest.hungerCost);
     return Promise.resolve(ok({ fxHint: 'zzz', effectiveness }));
   },
 };

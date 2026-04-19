@@ -1,3 +1,5 @@
+import { OFFLINE_CATCHUP_DEFAULTS } from '../cognition/tuning.js';
+
 /**
  * Shared helper for catch-up sub-stepping when restoring an agent after a
  * long offline period. The Agent owns the actual integration in its
@@ -34,8 +36,8 @@ export async function runCatchUp(
   step: (chunkSeconds: number, index: number) => Promise<void>,
   opts: CatchUpOptions = {},
 ): Promise<CatchUpResult> {
-  const chunkSize = opts.chunkVirtualSeconds ?? 0.5;
-  const maxChunks = opts.maxChunks ?? 100_000;
+  const chunkSize = opts.chunkVirtualSeconds ?? OFFLINE_CATCHUP_DEFAULTS.chunkVirtualSeconds;
+  const maxChunks = opts.maxChunks ?? OFFLINE_CATCHUP_DEFAULTS.maxChunks;
 
   if (!(totalVirtualDtSeconds > 0)) {
     return { chunksProcessed: 0, totalVirtualSeconds: 0, truncated: false };

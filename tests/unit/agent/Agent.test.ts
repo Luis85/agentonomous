@@ -173,6 +173,60 @@ describe('Agent (M2 shell)', () => {
     expect(warn).toHaveBeenCalled();
   });
 
+  it('bus + RNG remain consistent after a reactive handler throws', async () => {
+    // After a handler throws, a healthy handler on the same event type
+    // must still receive subsequent events, and the RNG state must match
+    // an equivalent run without any throwing handler (throws consume no
+    // RNG draws).
+    const healthyA = vi.fn();
+    const healthyB = vi.fn();
+
+    async function runWith(
+      handlers: NonNullable<AgentModule['reactiveHandlers']>,
+    ): Promise<number[]> {
+      const bus = new InMemoryEventBus();
+      const agent = new Agent(
+        baseDeps({
+          eventBus: bus,
+          rng: new SeededRng('fixed-seed'),
+          modules: [{ id: 'scenario', reactiveHandlers: handlers }],
+          logger: {
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+          },
+        }),
+      );
+
+      bus.publish({ type: 'ping', at: 0 });
+      await agent.tick(0.016);
+      bus.publish({ type: 'ping', at: 10 });
+      await agent.tick(0.016);
+
+      return Array.from({ length: 4 }, () => agent.rng.next());
+    }
+
+    const throwing: NonNullable<AgentModule['reactiveHandlers']> = [
+      {
+        on: 'ping',
+        handle: () => {
+          throw new Error('oh no');
+        },
+      },
+      { on: 'ping', handle: healthyA },
+    ];
+    const clean: NonNullable<AgentModule['reactiveHandlers']> = [{ on: 'ping', handle: healthyB }];
+
+    const rngAfterThrow = await runWith(throwing);
+    const rngAfterClean = await runWith(clean);
+
+    // Healthy handler still sees both events despite the earlier handler throwing.
+    expect(healthyA).toHaveBeenCalledTimes(2);
+    // Throws don't touch the RNG → byte-identical sequences.
+    expect(rngAfterThrow).toEqual(rngAfterClean);
+  });
+
   it('runs onInstall() for modules at construction', () => {
     const onInstall = vi.fn();
     const mod: AgentModule = { id: 'hook', onInstall };

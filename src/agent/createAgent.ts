@@ -20,6 +20,7 @@ import { DefaultMoodModel } from '../mood/DefaultMoodModel.js';
 import type { Need } from '../needs/Need.js';
 import { Needs } from '../needs/Needs.js';
 import type { NeedsPolicy } from '../needs/NeedsPolicy.js';
+import { ExpressiveNeedsPolicy } from '../needs/ExpressiveNeedsPolicy.js';
 import type { Skill } from '../skills/Skill.js';
 import { SkillRegistry } from '../skills/SkillRegistry.js';
 import type { AutoSavePolicy } from '../persistence/AutoSavePolicy.js';
@@ -194,6 +195,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
       : undefined;
 
   const moodModel = resolveMoodModel(config.moodModel, Boolean(needs ?? ageModel));
+  const needsPolicy = resolveNeedsPolicy(config.needsPolicy, needs);
   const randomEvents = resolveRandomEvents(config.randomEvents);
   const memory = config.memory ?? new InMemoryMemoryAdapter();
   const { snapshotStore, autoSave, autoSaveKey } = resolvePersistence(config.persistence);
@@ -258,7 +260,7 @@ export function createAgent(config: CreateAgentConfig): Agent {
     ...(config.reasoner !== undefined ? { reasoner: config.reasoner } : {}),
     ...(config.behavior !== undefined ? { behavior: config.behavior } : {}),
     ...(config.learner !== undefined ? { learner: config.learner } : {}),
-    ...(config.needsPolicy !== undefined ? { needsPolicy: config.needsPolicy } : {}),
+    ...(needsPolicy !== undefined ? { needsPolicy } : {}),
     ...(config.animation !== undefined ? { animation: config.animation } : {}),
     skills,
   });
@@ -345,6 +347,21 @@ function resolveNeeds(needs: Needs | readonly Need[] | undefined): Needs | undef
   if (needs === undefined) return undefined;
   if (needs instanceof Needs) return needs;
   return new Needs(needs);
+}
+
+/**
+ * Auto-wires an `ExpressiveNeedsPolicy` when the consumer configured
+ * `needs` but no explicit `needsPolicy`. Without this, the autonomous
+ * cognition pipeline silently produces zero candidates and the pet
+ * appears inert.
+ */
+function resolveNeedsPolicy(
+  explicit: NeedsPolicy | undefined,
+  needs: Needs | undefined,
+): NeedsPolicy | undefined {
+  if (explicit !== undefined) return explicit;
+  if (needs === undefined) return undefined;
+  return new ExpressiveNeedsPolicy();
 }
 
 function resolveRng(rng: Rng | number | string | undefined, fallbackSeed: string): Rng {

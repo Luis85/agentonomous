@@ -27,6 +27,9 @@ export interface SkillContext {
   /** Remove a modifier by id. Returns the removed Modifier or `null`. */
   removeModifier(id: string): Modifier | null;
 
+  /** True if a modifier with this id is currently active on the agent. */
+  hasModifier(id: string): boolean;
+
   /** Publish an event onto the bus. */
   publishEvent(event: DomainEvent): void;
 

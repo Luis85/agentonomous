@@ -53,7 +53,7 @@ export class AgeModel {
   /**
    * Advance age by `virtualDtSeconds`. Returns every schedule transition the
    * age crossed during this advance (zero or more, ordered by threshold).
-   * No-op if the agent is already `'deceased'`.
+   * No-op if the agent is already at `DECEASED_STAGE`.
    */
   advance(virtualDtSeconds: number): readonly LifeStageTransition[] {
     if (this._stage === DECEASED_STAGE || virtualDtSeconds <= 0) return [];
@@ -73,7 +73,7 @@ export class AgeModel {
     return transitions;
   }
 
-  /** Force the agent into `'deceased'`. Returns the transition if it changed. */
+  /** Force the agent into `DECEASED_STAGE`. Returns the transition if it changed. */
   markDeceased(): LifeStageTransition | null {
     if (this._stage === DECEASED_STAGE) return null;
     const from = this._stage;

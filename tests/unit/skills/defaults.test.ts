@@ -47,12 +47,23 @@ function makeCtx(): {
       return m;
     },
     removeModifier: (id) => modifiers.remove(id),
+    hasModifier: (id) => modifiers.has(id),
     publishEvent: (e) => {
       published.push(e);
     },
     ageSeconds: () => 0,
   };
   return { ctx, needs, modifiers, published, clock };
+}
+
+function applyDisobedient(modifiers: Modifiers): void {
+  modifiers.apply({
+    id: 'disobedient',
+    source: 'test-fixture',
+    appliedAt: 0,
+    stack: 'replace',
+    effects: [],
+  });
 }
 
 describe('FeedSkill', () => {
@@ -126,8 +137,9 @@ describe('RestSkill', () => {
 });
 
 describe('ScoldSkill', () => {
-  it('applies scolded modifier and drains happiness', async () => {
+  it('applies scolded modifier and drains happiness when disobedient is present', async () => {
     const { ctx, needs, modifiers } = makeCtx();
+    applyDisobedient(modifiers);
     const result = await ScoldSkill.execute(undefined, ctx);
     expect(result.ok).toBe(true);
     expect(modifiers.has('scolded')).toBe(true);
@@ -135,11 +147,20 @@ describe('ScoldSkill', () => {
     if (result.ok) expect(result.value.fxHint).toBe('cloud-gray');
   });
 
-  it('uses replace stacking (new scold evicts old)', async () => {
+  it('returns err("not-misbehaving") when disobedient is absent', async () => {
     const { ctx, modifiers } = makeCtx();
-    await ScoldSkill.execute(undefined, ctx);
-    await ScoldSkill.execute(undefined, ctx);
-    expect(modifiers.list().filter((m) => m.id === 'scolded')).toHaveLength(1);
+    const result = await ScoldSkill.execute(undefined, ctx);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('not-misbehaving');
+    expect(modifiers.has('scolded')).toBe(false);
+  });
+
+  it('clears disobedient on success', async () => {
+    const { ctx, modifiers } = makeCtx();
+    applyDisobedient(modifiers);
+    const result = await ScoldSkill.execute(undefined, ctx);
+    expect(result.ok).toBe(true);
+    expect(modifiers.has('disobedient')).toBe(false);
   });
 });
 

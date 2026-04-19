@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createAgent } from '../../../src/agent/createAgent.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
+import { Needs } from '../../../src/needs/Needs.js';
+import { DEFAULT_URGENCY_CURVE } from '../../../src/needs/Need.js';
 
 describe('createAgent (M2 builder)', () => {
   it('builds a running agent with only id + species', async () => {
@@ -38,6 +40,29 @@ describe('createAgent (M2 builder)', () => {
 
     const trace = await agent.tick(0);
     expect(trace.tickStartedAt).toBe(500);
+  });
+
+  it('auto-wires ExpressiveNeedsPolicy when needs are set but no policy is given', async () => {
+    // With a critical hunger need and no explicit policy, the autonomous
+    // cognition pipeline should still produce a candidate intention.
+    // Previously this path silently dropped to zero candidates, leaving
+    // the pet inert. We assert the DecisionTrace records a chosen
+    // intention rather than asserting on the emitted events (the exact
+    // event shape depends on the configured behavior runner).
+    const needs = new Needs([
+      {
+        id: 'hunger',
+        level: 0.05, // fully critical
+        decayPerSec: 0,
+        urgencyCurve: DEFAULT_URGENCY_CURVE,
+        criticalThreshold: 0.2,
+      },
+    ]);
+
+    const agent = createAgent({ id: 'hungry', species: 'cat', needs });
+    const trace = await agent.tick(1);
+
+    expect(trace.actions.length + trace.emitted.length).toBeGreaterThan(0);
   });
 
   it('honors role, persona, name, version overrides', () => {

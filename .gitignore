@@ -1,7 +1,7 @@
 node_modules
 dist
 coverage
-docs
+docs/api
 .DS_Store
 *.log
 .vite

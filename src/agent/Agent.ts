@@ -6,17 +6,10 @@ import {
   MODIFIER_APPLIED,
   MODIFIER_EXPIRED,
   MODIFIER_REMOVED,
-  MOOD_CHANGED,
-  NEED_CRITICAL,
-  NEED_SAFE,
   type AgentDiedEvent,
   type LifeStageChangedEvent,
   type ModifierAppliedEvent,
-  type ModifierExpiredEvent,
   type ModifierRemovedEvent,
-  type MoodChangedEvent,
-  type NeedCriticalEvent,
-  type NeedSafeEvent,
 } from '../events/standardEvents.js';
 import {
   ANIMATION_TRANSITION,
@@ -29,23 +22,19 @@ import {
 import type { Embodiment } from '../body/Embodiment.js';
 import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
 import { DirectBehaviorRunner } from '../cognition/behavior/DirectBehaviorRunner.js';
-import type { IntentionCandidate } from '../cognition/IntentionCandidate.js';
 import type { Learner } from '../cognition/learning/Learner.js';
 import { NoopLearner } from '../cognition/learning/NoopLearner.js';
 import type { Reasoner } from '../cognition/reasoning/Reasoner.js';
 import { UrgencyReasoner } from '../cognition/reasoning/UrgencyReasoner.js';
 import type { NeedsPolicy } from '../needs/NeedsPolicy.js';
-import type { AgeModel, LifeStageTransition } from '../lifecycle/AgeModel.js';
+import type { AgeModel } from '../lifecycle/AgeModel.js';
 import { DECEASED_STAGE, type LifeStage } from '../lifecycle/LifeStage.js';
 import type { StageCapabilityMap } from '../lifecycle/StageCapabilities.js';
-import { stageAllowsSkill } from '../lifecycle/StageCapabilities.js';
 import type { MemoryRepository } from '../memory/MemoryRepository.js';
 import type { Modifier } from '../modifiers/Modifier.js';
-import type { ModifierRemoval } from '../modifiers/Modifiers.js';
 import { Modifiers } from '../modifiers/Modifiers.js';
 import type { Mood } from '../mood/Mood.js';
 import type { MoodModel } from '../mood/MoodModel.js';
-import type { NeedsDelta } from '../needs/Need.js';
 import type { Needs } from '../needs/Needs.js';
 import type { AgentSnapshot, SnapshotPart } from '../persistence/AgentSnapshot.js';
 import { CURRENT_SNAPSHOT_VERSION } from '../persistence/AgentSnapshot.js';
@@ -58,17 +47,7 @@ import { runCatchUp } from '../persistence/offlineCatchUp.js';
 import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
 import type { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
 import { InMemoryMemoryAdapter } from '../memory/InMemoryMemoryAdapter.js';
-import type { SkillError, SkillOutcome } from '../skills/Skill.js';
-import type { SkillContext } from '../skills/SkillContext.js';
 import { SkillRegistry } from '../skills/SkillRegistry.js';
-import {
-  SKILL_COMPLETED,
-  SKILL_FAILED,
-  type SkillCompletedEvent,
-  type SkillFailedEvent,
-} from '../events/standardEvents.js';
-import type { Result } from './result.js';
-import { isInvokeSkillAction } from './AgentAction.js';
 import type { RemoteController } from './RemoteController.js';
 import type { ScriptedController } from './ScriptedController.js';
 import type { Rng } from '../ports/Rng.js';
@@ -85,6 +64,12 @@ import type { AgentModule, ReactiveHandler } from './AgentModule.js';
 import type { ControlMode } from './ControlMode.js';
 import type { DecisionTrace } from './DecisionTrace.js';
 import { MissingDependencyError } from './errors.js';
+import { LifecycleTicker } from './internal/LifecycleTicker.js';
+import { ModifiersTicker } from './internal/ModifiersTicker.js';
+import { NeedsTicker } from './internal/NeedsTicker.js';
+import { MoodReconciler } from './internal/MoodReconciler.js';
+import { AnimationReconciler } from './internal/AnimationReconciler.js';
+import { CognitionPipeline } from './internal/CognitionPipeline.js';
 
 const DEFAULT_TIME_SCALE = 1;
 
@@ -192,20 +177,37 @@ export class Agent {
   readonly skills: SkillRegistry;
   readonly needsPolicy: NeedsPolicy | undefined;
   readonly animation: AnimationStateMachine;
-  /** Id of the skill whose execution is currently driving the animation (if any). */
-  protected currentActiveSkillId: string | undefined;
+  /**
+   * Id of the skill whose execution is currently driving the animation
+   * (if any). Public for access by internal tick helpers under
+   * `src/agent/internal/`; consumers should not reach for it directly.
+   */
+  currentActiveSkillId: string | undefined;
   protected readonly autoSaveTracker: AutoSaveTracker | undefined;
-  protected currentMood: Mood | undefined;
+  /** Latest `Mood` evaluation — see `currentActiveSkillId` for the visibility rationale. */
+  currentMood: Mood | undefined;
   /** Cumulative virtual seconds tracked for random-event cooldown bookkeeping. */
   protected virtualNowSeconds = 0;
 
   protected readonly timeScale: number;
-  protected controlMode: ControlMode;
-  protected halted = false;
+  /** Current control mode — `autonomous` / `scripted` / `remote`. Mutable to support switching mid-run. */
+  controlMode: ControlMode;
+  /** `true` once the agent has died — ticks become no-ops. Public for helper access. */
+  halted = false;
   protected readonly reactiveHandlers: ReactiveHandler[] = [];
   protected readonly modules: AgentModule[] = [];
   /** Events queued for inclusion in the current tick's `emitted` field. */
   protected emittedThisTick: DomainEvent[] = [];
+
+  // =========================================================================
+  // Internal tick helpers (extracted under src/agent/internal/).
+  // =========================================================================
+  private readonly lifecycleTicker: LifecycleTicker;
+  private readonly modifiersTicker: ModifiersTicker;
+  private readonly needsTicker: NeedsTicker;
+  private readonly moodReconciler: MoodReconciler;
+  private readonly animationReconciler: AnimationReconciler;
+  private readonly cognitionPipeline: CognitionPipeline;
 
   constructor(deps: AgentDependencies) {
     if (!deps.identity) throw new MissingDependencyError('identity');
@@ -251,10 +253,38 @@ export class Agent {
       this.halted = true;
     }
 
+    // Wire up the tick-pipeline helpers. They keep a reference back to the
+    // agent and read/mutate state through the (now-public) field surface.
+    this.lifecycleTicker = new LifecycleTicker(this);
+    this.modifiersTicker = new ModifiersTicker(this);
+    this.needsTicker = new NeedsTicker(this);
+    this.moodReconciler = new MoodReconciler(this);
+    this.animationReconciler = new AnimationReconciler(this);
+    this.cognitionPipeline = new CognitionPipeline(this);
+
     // Install config-time modules.
     for (const mod of deps.modules ?? []) {
       this.installModule(mod);
     }
+  }
+
+  // =========================================================================
+  // Internal protocol (exposed for helper classes under src/agent/internal/).
+  // Underscore prefix signals "internal"; consumers should not call these.
+  // =========================================================================
+
+  /** @internal publish an event onto the bus and into the tick's emitted list. */
+  _internalPublish(event: DomainEvent): void {
+    this.publish(event);
+  }
+
+  /** @internal route the death path — used by NeedsTicker when health hits 0. */
+  _internalDie(
+    cause: 'health-depleted' | 'stage-transition' | 'explicit' | (string & {}),
+    reason: string | undefined,
+    at: number,
+  ): void {
+    this.die(cause, reason, at);
   }
 
   // =========================================================================
@@ -280,7 +310,7 @@ export class Agent {
         tickStartedAt,
         virtualDtSeconds,
         controlMode: this.controlMode,
-        stage: 'deceased',
+        stage: DECEASED_STAGE,
         halted: true,
         perceived: [],
         actions: [],
@@ -291,7 +321,7 @@ export class Agent {
     this.emittedThisTick = [];
 
     // Stage 0: advance age + life stages (catch-up-aware).
-    const stageTransitions = this.runLifecycleTick(virtualDtSeconds, tickStartedAt);
+    const stageTransitions = this.lifecycleTicker.run(virtualDtSeconds, tickStartedAt);
 
     // Stage 1: perceive — drain pending events from the bus.
     const perceived = this.eventBus.drain();
@@ -302,11 +332,11 @@ export class Agent {
     this.runRandomEventsTick(virtualDtSeconds, tickStartedAt);
 
     // Stage 2: modifier tick — expire time-bound modifiers.
-    const expired = this.runModifiersTick(tickStartedAt);
+    const expired = this.modifiersTicker.run(tickStartedAt);
 
     // Stage 2.5: needs tick. Decay (scaled by modifier multipliers), critical crossings → events.
     // If health just hit 0 during decay we die here and short-circuit.
-    const needsDeltas = this.runNeedsTick(virtualDtSeconds, tickStartedAt);
+    const needsDeltas = this.needsTicker.run(virtualDtSeconds, tickStartedAt);
     if (this.halted) {
       return {
         agentId: this.identity.id,
@@ -322,20 +352,22 @@ export class Agent {
     }
 
     // Stage 2.7: mood evaluate.
-    const moodChange = this.runMoodTick(tickStartedAt);
+    const moodChange = this.moodReconciler.run(tickStartedAt);
     // Stage 2.8: animation reconcile.
-    const animationTransition = this.runAnimationTick(tickStartedAt);
+    const animationTransition = this.animationReconciler.run(tickStartedAt);
 
-    // Stage 3: dispatch by control mode.
-    const actions: AgentAction[] = await this.collectActions(tickStartedAt, perceived);
+    // Stages 3–7: cognition pipeline. `collectActions` dispatches by
+    // control mode (autonomous → reasoner + behavior runner, else
+    // remote/scripted). `executeActions` then runs invoke-skill /
+    // emit-event / noop actions through the registry, emits
+    // SkillCompleted | SkillFailed, and lets the learner score outcomes.
+    const actions: AgentAction[] = await this.cognitionPipeline.collectActions(
+      tickStartedAt,
+      perceived,
+    );
+    await this.cognitionPipeline.executeActions(actions, tickStartedAt);
 
-    // Stage 7: execute actions (skills + noops + custom).
-    await this.executeActions(actions, tickStartedAt);
-
-    // Stage 4-7: cognition (M7 wires UrgencyReasoner + DirectBehaviorRunner).
-    // Stage 8:   score (learner) (M7 stub).
-
-    // Stage 9: persist + autosave (M10).
+    // Stage 9: persist + autosave.
     if (this.autoSaveTracker) {
       this.autoSaveTracker.advance(virtualDtSeconds);
     }
@@ -371,168 +403,6 @@ export class Agent {
     return trace;
   }
 
-  /** Collect actions for this tick based on `controlMode`. */
-  protected async collectActions(
-    wallNowMs: number,
-    perceived: readonly DomainEvent[],
-  ): Promise<AgentAction[]> {
-    switch (this.controlMode) {
-      case 'remote': {
-        if (!this.remote) return [];
-        const pulled = await this.remote.pull(this.identity.id, wallNowMs);
-        return [...pulled];
-      }
-      case 'scripted': {
-        if (!this.scripted) return [];
-        const next = this.scripted.next(this.identity.id, wallNowMs);
-        return next ? [...next] : [];
-      }
-      case 'autonomous':
-      default:
-        return this.runAutonomousCognition(perceived);
-    }
-  }
-
-  /** Autonomous cognition pipeline — Stage 4 (candidates) + 5 (select) + 6 (behavior). */
-  protected runAutonomousCognition(perceived: readonly DomainEvent[]): AgentAction[] {
-    const candidates: IntentionCandidate[] = [];
-    if (this.needs && this.needsPolicy) {
-      for (const c of this.needsPolicy.suggest(this.needs, this.identity.persona)) {
-        candidates.push(c);
-      }
-    }
-    const intention = this.reasoner.selectIntention({
-      perceived,
-      needs: this.needs,
-      modifiers: this.modifiers,
-      ...(this.identity.persona !== undefined ? { persona: this.identity.persona } : {}),
-      candidates,
-    });
-    if (!intention) return [];
-    return [...this.behavior.run(intention)];
-  }
-
-  /** Stage 7: dispatch actions — invoke-skill goes through the registry. */
-  protected async executeActions(
-    actions: readonly AgentAction[],
-    wallNowMs: number,
-  ): Promise<void> {
-    if (actions.length === 0) return;
-    const ctx = this.skillContext();
-    for (const action of actions) {
-      if (action.type === 'noop') continue;
-      if (isInvokeSkillAction(action)) {
-        await this.invokeSkillAction(action.skillId, action.params, ctx, wallNowMs);
-        continue;
-      }
-      if (action.type === 'emit-event' && 'event' in action) {
-        const event = (action as { event: DomainEvent }).event;
-        this.publish(event);
-        continue;
-      }
-      // Unknown action kinds are left for consumer modules to interpret;
-      // they can subscribe and react via reactive handlers next tick.
-    }
-  }
-
-  /**
-   * Invoke a skill through the registry, honoring stage capabilities + modifier
-   * effectiveness, and emit the appropriate SkillCompleted / SkillFailed event.
-   */
-  protected async invokeSkillAction(
-    skillId: string,
-    params: Record<string, unknown> | undefined,
-    ctx: SkillContext,
-    wallNowMs: number,
-  ): Promise<void> {
-    // Stage capability gate.
-    if (this.ageModel && this.stageCapabilities) {
-      if (!stageAllowsSkill(this.stageCapabilities, this.ageModel.stage, skillId)) {
-        const event: SkillFailedEvent = {
-          type: SKILL_FAILED,
-          at: wallNowMs,
-          agentId: this.identity.id,
-          skillId,
-          code: 'stage-blocked',
-          message: `Skill '${skillId}' is blocked at stage '${this.ageModel.stage}'.`,
-        };
-        this.publish(event);
-        return;
-      }
-    }
-    if (!this.skills.has(skillId)) {
-      const event: SkillFailedEvent = {
-        type: SKILL_FAILED,
-        at: wallNowMs,
-        agentId: this.identity.id,
-        skillId,
-        code: 'not-registered',
-        message: `No skill registered with id '${skillId}'.`,
-      };
-      this.publish(event);
-      return;
-    }
-    // Expose the running skill to the animation reconciler. Scoped to this
-    // invocation so multiple sequential skills don't leak state.
-    const previousActive = this.currentActiveSkillId;
-    this.currentActiveSkillId = skillId;
-    const result: Result<SkillOutcome, SkillError> = await this.skills
-      .invoke(skillId, params, ctx)
-      .finally(() => {
-        this.currentActiveSkillId = previousActive;
-      });
-    if (result.ok) {
-      const skill = this.skills.get(skillId);
-      const base = skill?.baseEffectiveness ?? 1;
-      const effectiveness =
-        (result.value.effectiveness ?? base) * this.modifiers.skillEffectiveness(skillId);
-      const event: SkillCompletedEvent = {
-        type: SKILL_COMPLETED,
-        at: wallNowMs,
-        agentId: this.identity.id,
-        skillId,
-        effectiveness,
-        ...(result.value.fxHint !== undefined ? { fxHint: result.value.fxHint } : {}),
-        ...(result.value.details !== undefined ? { details: result.value.details } : {}),
-      };
-      this.publish(event);
-      this.learner.score({
-        intention: { kind: 'satisfy', type: skillId },
-        actions: [{ type: 'invoke-skill', skillId, ...(params !== undefined ? { params } : {}) }],
-        details: { effectiveness },
-      });
-    } else {
-      const event: SkillFailedEvent = {
-        type: SKILL_FAILED,
-        at: wallNowMs,
-        agentId: this.identity.id,
-        skillId,
-        code: result.error.code,
-        message: result.error.message,
-        ...(result.error.details !== undefined ? { details: result.error.details } : {}),
-      };
-      this.publish(event);
-    }
-  }
-
-  /** Build the SkillContext passed to every skill execution. */
-  protected skillContext(): SkillContext {
-    return {
-      identity: this.identity,
-      clock: this.clock,
-      rng: this.rng,
-      satisfyNeed: (needId, amount) => {
-        this.needs?.satisfy(needId, amount);
-      },
-      applyModifier: (mod) => this.applyModifier(mod),
-      removeModifier: (id) => this.removeModifier(id),
-      publishEvent: (event) => {
-        this.publish(event);
-      },
-      ageSeconds: () => this.ageModel?.ageSeconds ?? 0,
-    };
-  }
-
   /** Publish random events onto the bus (step 1.5). */
   protected runRandomEventsTick(virtualDtSeconds: number, at: number): void {
     if (!this.randomEvents || virtualDtSeconds <= 0) return;
@@ -556,133 +426,6 @@ export class Agent {
     if (!this.autoSaveTracker.shouldSave()) return;
     await this.snapshotStore.save(this.autoSaveKey, this.snapshot());
     this.autoSaveTracker.markSaved();
-  }
-
-  /** Advance age + life stages; emit LifeStageChanged for each crossed threshold. */
-  protected runLifecycleTick(virtualDtSeconds: number, at: number): readonly LifeStageTransition[] {
-    if (!this.ageModel) return [];
-    const transitions = this.ageModel.advance(virtualDtSeconds);
-    for (const t of transitions) {
-      const event: LifeStageChangedEvent = {
-        type: LIFE_STAGE_CHANGED,
-        at,
-        agentId: this.identity.id,
-        from: t.from,
-        to: t.to,
-        atAgeSeconds: t.atAgeSeconds,
-      };
-      this.publish(event);
-    }
-    return transitions;
-  }
-
-  /** Reconcile the animation state machine and emit AnimationTransition if it rotated. */
-  protected runAnimationTick(at: number): { from: string; to: string; reason?: string } | null {
-    const transition = this.animation.reconcile({
-      modifiers: this.modifiers,
-      wallNowMs: at,
-      ...(this.currentActiveSkillId !== undefined
-        ? { activeSkillId: this.currentActiveSkillId }
-        : {}),
-      ...(this.currentMood?.category !== undefined ? { mood: this.currentMood.category } : {}),
-    });
-    if (!transition) return null;
-    const event: AnimationTransitionEvent = {
-      type: ANIMATION_TRANSITION,
-      at,
-      agentId: this.identity.id,
-      from: transition.from,
-      to: transition.to,
-      ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
-      ...(transition.fxHint !== undefined ? { fxHint: transition.fxHint } : {}),
-    };
-    this.publish(event);
-    return {
-      from: transition.from,
-      to: transition.to,
-      ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
-    };
-  }
-
-  /** Evaluate the mood model and emit MoodChanged if the category rotated. */
-  protected runMoodTick(
-    at: number,
-  ): { from: string | undefined; to: string; valence: number | undefined } | null {
-    if (!this.moodModel) return null;
-    const previous = this.currentMood;
-    const next = this.moodModel.evaluate({
-      needs: this.needs,
-      modifiers: this.modifiers,
-      persona: this.identity.persona,
-      wallNowMs: at,
-      previous,
-    });
-    this.currentMood = next;
-    if (previous && previous.category === next.category) return null;
-    const event: MoodChangedEvent = {
-      type: MOOD_CHANGED,
-      at,
-      agentId: this.identity.id,
-      from: previous?.category,
-      to: next.category,
-      valence: next.valence,
-    };
-    this.publish(event);
-    return { from: previous?.category, to: next.category, valence: next.valence };
-  }
-
-  /** Expire time-bound modifiers and publish `ModifierExpired` events. */
-  protected runModifiersTick(at: number): readonly ModifierRemoval[] {
-    const expired = this.modifiers.tick(at);
-    for (const removal of expired) {
-      const event: ModifierExpiredEvent = {
-        type: MODIFIER_EXPIRED,
-        at,
-        agentId: this.identity.id,
-        modifierId: removal.modifier.id,
-        source: removal.modifier.source,
-        ...(removal.modifier.visual?.fxHint !== undefined
-          ? { fxHint: removal.modifier.visual.fxHint }
-          : {}),
-      };
-      this.publish(event);
-    }
-    return expired;
-  }
-
-  /** Run the Needs.tick step and emit critical/safe events for threshold crossings. */
-  protected runNeedsTick(virtualDtSeconds: number, at: number): readonly NeedsDelta[] {
-    if (!this.needs || virtualDtSeconds <= 0) return [];
-    const deltas = this.needs.tick(virtualDtSeconds, (id) => this.modifiers.decayMultiplier(id));
-    let healthDepleted = false;
-    for (const delta of deltas) {
-      if (delta.crossedCritical) {
-        const event: NeedCriticalEvent = {
-          type: NEED_CRITICAL,
-          at,
-          agentId: this.identity.id,
-          needId: delta.needId,
-          level: delta.after,
-        };
-        this.publish(event);
-      } else if (delta.crossedSafe) {
-        const event: NeedSafeEvent = {
-          type: NEED_SAFE,
-          at,
-          agentId: this.identity.id,
-          needId: delta.needId,
-          level: delta.after,
-        };
-        this.publish(event);
-      }
-      if (delta.needId === 'health' && delta.after <= 0) {
-        healthDepleted = true;
-      }
-    }
-    if (healthDepleted && !this.halted) {
-      this.die('health-depleted', undefined, at);
-    }
-    return deltas;
   }
 
   /**
@@ -723,7 +466,7 @@ export class Agent {
     // Force the animation into its 'dead' state so renderers update
     // immediately; reconciliation is inert from now on since halted=true
     // short-circuits future ticks.
-    const animationT = this.animation.transition('dead', 'deceased');
+    const animationT = this.animation.transition('dead', at, DECEASED_STAGE);
     if (animationT) {
       const animEvent: AnimationTransitionEvent = {
         type: ANIMATION_TRANSITION,
@@ -731,7 +474,7 @@ export class Agent {
         agentId: this.identity.id,
         from: animationT.from,
         to: animationT.to,
-        reason: 'deceased',
+        reason: DECEASED_STAGE,
       };
       this.publish(animEvent);
     }
@@ -776,6 +519,12 @@ export class Agent {
     if (this.currentMood && wanted('mood')) {
       snap.mood = { ...this.currentMood };
     }
+    if (wanted('animation')) {
+      snap.animation = {
+        state: this.animation.current(),
+        activeSkillId: this.currentActiveSkillId,
+      };
+    }
     if (this.memory && wanted('memory') && isInMemoryMemoryAdapter(this.memory)) {
       const records = this.memory.snapshot();
       if (records.length > 0) snap.memory = [...records];
@@ -810,14 +559,33 @@ export class Agent {
       this.needs.restore(snapshot.needs);
     }
     if (snapshot.modifiers) {
+      const nowMs = this.clock.now();
       for (const mod of snapshot.modifiers) {
-        // Drop already-expired modifiers up front.
-        if (mod.expiresAt !== undefined && mod.expiresAt <= this.clock.now()) continue;
+        // Boundary case: modifiers whose expiresAt has already passed at
+        // the clock's current time are dropped on restore AND a
+        // `ModifierExpired` event fires exactly once so downstream
+        // consumers (stores, UIs, logs) see the expiration in the same
+        // shape they would from a normal tick.
+        if (mod.expiresAt !== undefined && mod.expiresAt <= nowMs) {
+          this.publish({
+            type: MODIFIER_EXPIRED,
+            at: nowMs,
+            agentId: this.identity.id,
+            modifierId: mod.id,
+            source: mod.source,
+            ...(mod.visual?.fxHint !== undefined ? { fxHint: mod.visual.fxHint } : {}),
+          });
+          continue;
+        }
         this.modifiers.apply(mod);
       }
     }
     if (snapshot.mood) {
       this.currentMood = { ...snapshot.mood };
+    }
+    if (snapshot.animation) {
+      this.animation.restore({ state: snapshot.animation.state });
+      this.currentActiveSkillId = snapshot.animation.activeSkillId;
     }
     if (snapshot.memory && this.memory && isInMemoryMemoryAdapter(this.memory)) {
       this.memory.restore(snapshot.memory);
@@ -953,9 +721,9 @@ export class Agent {
 
   /**
    * Install an `AgentModule` after construction. `createAgent` installs
-   * modules via its config at construction time; this method is exposed so
-   * tests can add handlers mid-scenario. Runtime install for consumer use
-   * is a Phase B concern.
+   * modules via its config at construction time; this method is exposed
+   * so tests can add handlers mid-scenario. Runtime install for consumer
+   * use is not yet part of the supported public surface.
    */
   installModule(mod: AgentModule): void {
     this.modules.push(mod);
@@ -980,7 +748,12 @@ export class Agent {
         this.eventBus.publish(event);
       },
       invokeSkill: async (skillId, params) => {
-        await this.invokeSkillAction(skillId, params, this.skillContext(), this.clock.now());
+        await this.cognitionPipeline.invokeSkillAction(
+          skillId,
+          params,
+          this.cognitionPipeline.skillContext(),
+          this.clock.now(),
+        );
       },
     };
   }
