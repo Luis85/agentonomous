@@ -301,7 +301,12 @@ export class Agent {
    */
   async tick(dtSeconds: number): Promise<DecisionTrace> {
     const tickStartedAt = this.clock.now();
-    const virtualDtSeconds = Math.max(0, dtSeconds) * this.timeScale;
+    // Snapshot timeScale once at tick entry so a mid-tick setTimeScale()
+    // from a reactive handler (Stage 1) takes effect on the NEXT tick,
+    // as documented on `setTimeScale()`. Both `virtualDtSeconds` and the
+    // Stage 2/2.7/2.8 pause gate read from this local.
+    const tickTimeScale = this.timeScale;
+    const virtualDtSeconds = Math.max(0, dtSeconds) * tickTimeScale;
 
     // Stage -1: halted short-circuit.
     if (this.halted) {
@@ -336,7 +341,9 @@ export class Agent {
     // (modifier expiry, mood, animation), so consumers see a consistently
     // frozen agent while paused. Deferred expiries fire on the first
     // post-resume tick — see `.claude/plans/pause-semantics.md` (Option A).
-    const paused = this.timeScale === 0;
+    // Read from the tick-entry snapshot so a reactive handler that called
+    // `setTimeScale(0)` during Stage 1 doesn't flip the gate mid-tick.
+    const paused = tickTimeScale === 0;
 
     // Stage 2: modifier tick — expire time-bound modifiers. Skipped at
     // scale 0; `expiresAt` is still absolute wall-clock ms, so any

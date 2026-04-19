@@ -125,6 +125,71 @@ describe('Agent pause semantics (setTimeScale(0) — Option A)', () => {
     expect(types.filter((t) => t === ANIMATION_TRANSITION)).toEqual([]);
   });
 
+  it('a reactive handler calling setTimeScale(0) does NOT flip the pause gate mid-tick', async () => {
+    // Contract (see setTimeScale JSDoc): a scale change applies from the
+    // NEXT tick. If a Stage-1 reactive handler calls setTimeScale(0), the
+    // current tick must still run Stages 2/2.7/2.8 using the tick-entry
+    // scale. Otherwise a single handler could desynchronize virtual-time
+    // progress (already committed in this tick) from reconciliation
+    // (skipped by a mid-tick flip).
+    const clock = new ManualClock(0);
+    const bus = new InMemoryEventBus();
+    const agent = createAgent({
+      id: 'pet',
+      species: 'cat',
+      clock,
+      rng: 0,
+      eventBus: bus,
+      lifecycle: [{ stage: 'adult', atSeconds: 0 }],
+      modules: [
+        {
+          id: 'pause-trap',
+          reactiveHandlers: [
+            {
+              on: 'TestTrigger',
+              handle: () => {
+                // Flip scale to 0 during Stage 1 of the current tick.
+                agent.setTimeScale(0);
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    // Seed an expiring modifier so Stage 2 has work to do.
+    agent.applyModifier({
+      id: 'well-fed',
+      source: 'skill:feed',
+      appliedAt: 0,
+      expiresAt: 1_000,
+      stack: 'replace',
+      effects: [],
+    });
+
+    // Queue the trigger event so it's drained in Stage 1 of the next tick.
+    bus.publish({ type: 'TestTrigger', at: 0 } as never);
+
+    // Advance wall clock past the modifier's expiresAt so Stage 2 has a
+    // real expiry to surface if the gate is NOT flipped.
+    clock.set(2_000);
+
+    const listener = vi.fn();
+    bus.subscribe(listener);
+
+    const trace = await agent.tick(0.016);
+
+    // The tick started with scale == 1, so reconciliation must have run
+    // and the modifier must have expired in this same tick.
+    const types = listener.mock.calls.map((a) => (a[0] as { type: string }).type);
+    expect(types.filter((t) => t === MODIFIER_EXPIRED)).toHaveLength(1);
+    expect(trace.deltas?.modifiersExpired).toEqual(['well-fed']);
+    expect(agent.modifiers.has('well-fed')).toBe(false);
+
+    // The scale flip persists for the NEXT tick.
+    expect(agent.getTimeScale()).toBe(0);
+  });
+
   it('resumes reconciliation cleanly on the first tick after scale becomes positive', async () => {
     const clock = new ManualClock(0);
     const bus = new InMemoryEventBus();
