@@ -409,7 +409,7 @@ function formatRemaining(ms: number): string {
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
   const rem = s % 60;
-  return rem === 0 ? `${m}m` : `${m}m${rem}s`;
+  return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
 }
 
 /**
