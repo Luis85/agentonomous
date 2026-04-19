@@ -1,3 +1,4 @@
+import type { DecisionTrace } from '../agent/DecisionTrace.js';
 import type { LifeStage } from '../lifecycle/LifeStage.js';
 import type { Modifier } from '../modifiers/Modifier.js';
 import type { MoodCategory } from '../mood/Mood.js';
@@ -124,4 +125,33 @@ export interface MoodChangedEvent extends DomainEvent {
   to: MoodCategory;
   valence: number | undefined;
   fxHint?: string;
+}
+
+// --- Tick lifecycle (0.9.1) ---
+export const AGENT_TICKED = 'AgentTicked' as const;
+
+/**
+ * Emitted at the end of every non-halted tick, after the `DecisionTrace`
+ * is assembled. Consumers subscribe via `agent.subscribe` to drive UI /
+ * store updates without polling `agent.getState()` in a companion loop.
+ *
+ * The event is **not** included in `trace.emitted` — the trace's
+ * `emitted` array is snapshot-copied at assembly, before this event is
+ * published, so the meta-event cannot self-reference. Replay
+ * equivalence under a fixed seed: identical input sequence produces
+ * identical `AgentTicked` sequence (ordering, payloads).
+ */
+export interface AgentTickedEvent extends DomainEvent {
+  type: typeof AGENT_TICKED;
+  agentId: string;
+  /** 1-indexed, monotonic. Resets only on reconstruction (not on restore). */
+  tickNumber: number;
+  /** `wallDtSeconds * timeScale` advanced this tick. */
+  virtualDtSeconds: number;
+  /** The `dtSeconds` argument the host loop passed to `tick()`. */
+  wallDtSeconds: number;
+  /** Summary of the action the agent selected this tick, or `null` if none. */
+  selectedAction: { type: string; skillId?: string } | null;
+  /** The full tick trace. Same object returned by `agent.tick()`. */
+  trace: DecisionTrace;
 }

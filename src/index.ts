@@ -250,6 +250,7 @@ export {
   MOOD_CHANGED,
   SKILL_COMPLETED,
   SKILL_FAILED,
+  AGENT_TICKED,
   type NeedCriticalEvent,
   type NeedSafeEvent,
   type NeedSatisfiedEvent,
@@ -261,6 +262,7 @@ export {
   type MoodChangedEvent,
   type SkillCompletedEvent,
   type SkillFailedEvent,
+  type AgentTickedEvent,
 } from './events/standardEvents.js';
 
 // Ports — the determinism seams.
