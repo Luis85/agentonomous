@@ -11,9 +11,21 @@ import {
   bindAgentToStore,
 } from 'agentonomous';
 import { catSpecies } from './species.js';
-import { mountExportImport, mountHud, mountResetButton, mountSpeedPicker } from './ui.js';
+import {
+  mountExportImport,
+  mountHud,
+  mountResetButton,
+  mountSpeedPicker,
+  resetSimulation,
+} from './ui.js';
 import { mountTraceView } from './traceView.js';
 import { loadSeed, mountSeedPanel } from './seed.js';
+import {
+  applyOverride,
+  currentEditableConfig,
+  loadConfigOverride,
+  mountConfigPanel,
+} from './speciesConfig.js';
 
 const STORAGE_KEY = 'whiskers';
 const SPEED_STORAGE_KEY = 'agentonomous/speed';
@@ -72,12 +84,16 @@ skills.register(ExpressMeowSkill);
 skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
 
+// --- Species (base + optional user JSON override) -----------------------------
+const speciesOverride = loadConfigOverride();
+const effectiveSpecies = speciesOverride ? applyOverride(catSpecies, speciesOverride) : catSpecies;
+
 // --- Agent --------------------------------------------------------------------
 const seed = loadSeed();
 const pet = createAgent({
   id: STORAGE_KEY,
   name: 'Whiskers',
-  species: catSpecies,
+  species: effectiveSpecies,
   timeScale: BASE_TIME_SCALE,
   rng: seed,
   memory: new InMemoryMemoryAdapter(),
@@ -93,6 +109,9 @@ mountSpeedPicker(pet, { baseScale: BASE_TIME_SCALE, storageKey: SPEED_STORAGE_KE
 mountSeedPanel(pet, seed);
 mountExportImport(pet);
 mountResetButton(pet);
+mountConfigPanel(catSpecies, currentEditableConfig(effectiveSpecies), () =>
+  resetSimulation(pet.identity.id),
+);
 bindAgentToStore(pet, (state) => {
   hud.update(state);
 });
