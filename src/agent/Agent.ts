@@ -356,19 +356,18 @@ export class Agent {
     // Stage 2.8: animation reconcile.
     const animationTransition = this.animationReconciler.run(tickStartedAt);
 
-    // Stage 3: dispatch by control mode.
+    // Stages 3–7: cognition pipeline. `collectActions` dispatches by
+    // control mode (autonomous → reasoner + behavior runner, else
+    // remote/scripted). `executeActions` then runs invoke-skill /
+    // emit-event / noop actions through the registry, emits
+    // SkillCompleted | SkillFailed, and lets the learner score outcomes.
     const actions: AgentAction[] = await this.cognitionPipeline.collectActions(
       tickStartedAt,
       perceived,
     );
-
-    // Stage 7: execute actions (skills + noops + custom).
     await this.cognitionPipeline.executeActions(actions, tickStartedAt);
 
-    // Stage 4-7: cognition (M7 wires UrgencyReasoner + DirectBehaviorRunner).
-    // Stage 8:   score (learner) (M7 stub).
-
-    // Stage 9: persist + autosave (M10).
+    // Stage 9: persist + autosave.
     if (this.autoSaveTracker) {
       this.autoSaveTracker.advance(virtualDtSeconds);
     }
