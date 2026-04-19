@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Agent, type AgentDependencies } from '../../../src/agent/Agent.js';
+import { InvalidTimeScaleError } from '../../../src/agent/errors.js';
 import type { AgentIdentity } from '../../../src/agent/AgentIdentity.js';
 import { AnimationStateMachine } from '../../../src/animation/AnimationStateMachine.js';
 import { ANIMATION_TRANSITION } from '../../../src/animation/AnimationTransitionEvent.js';
@@ -264,6 +265,24 @@ describe('Agent snapshot/restore — timeScale round-trip', () => {
     expect(b.getTimeScale()).toBe(0);
     expect(Number.isNaN(b.getState().ageSeconds)).toBe(false);
     expect(b.getState().ageSeconds).toBe(0);
+  });
+
+  it('restore rejects a snapshot whose timeScale is corrupted', async () => {
+    const a = new Agent(baseDeps({ timeScale: 4 }));
+    const snap = a.snapshot();
+
+    const b = new Agent(baseDeps({ timeScale: 1 }));
+    await expect(b.restore({ ...snap, timeScale: -1 })).rejects.toBeInstanceOf(
+      InvalidTimeScaleError,
+    );
+    // Failed restore must not have mutated the agent's timeScale.
+    expect(b.getTimeScale()).toBe(1);
+
+    const c = new Agent(baseDeps({ timeScale: 1 }));
+    await expect(c.restore({ ...snap, timeScale: Number.NaN })).rejects.toBeInstanceOf(
+      InvalidTimeScaleError,
+    );
+    expect(c.getTimeScale()).toBe(1);
   });
 
   it('pre-v2 snapshots without timeScale keep the restoring agent’s constructor value', async () => {

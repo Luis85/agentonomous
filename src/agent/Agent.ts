@@ -577,9 +577,12 @@ export class Agent {
     // Apply the snapshotted timeScale first so catch-up (below) and any
     // subsequent ticks run at the cadence the snapshot was taken at, not
     // the fresh agent's constructor value. Pre-v2 snapshots omit this
-    // field and keep the constructor value.
+    // field and keep the constructor value. Routed through
+    // `setTimeScale` so a corrupted snapshot (negative / NaN / Infinity)
+    // throws `InvalidTimeScaleError` instead of silently poisoning the
+    // tick loop.
     if (snapshot.timeScale !== undefined) {
-      this.timeScale = snapshot.timeScale;
+      this.setTimeScale(snapshot.timeScale);
     }
     if (snapshot.lifecycle && this.ageModel) {
       this.ageModel.restore({
