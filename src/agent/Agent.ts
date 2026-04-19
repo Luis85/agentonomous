@@ -57,7 +57,6 @@ import { NullLogger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
 import type { AgentState } from '../persistence/AgentState.js';
 import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.js';
-import type { AgentAction } from './AgentAction.js';
 import type { AgentFacade } from './AgentFacade.js';
 import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
@@ -378,7 +377,7 @@ export class Agent {
     // remote/scripted). `executeActions` then runs invoke-skill /
     // emit-event / noop actions through the registry, emits
     // SkillCompleted | SkillFailed, and lets the learner score outcomes.
-    const actions: AgentAction[] = await this.cognitionPipeline.collectActions(
+    const { actions, candidates } = await this.cognitionPipeline.collectActions(
       tickStartedAt,
       perceived,
     );
@@ -400,6 +399,7 @@ export class Agent {
     }
     if (moodChange) deltasRecord.mood = moodChange;
     if (animationTransition) deltasRecord.animation = animationTransition;
+    if (candidates.length > 0) deltasRecord.candidates = candidates;
     const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
 
     const stage: LifeStage = this.ageModel?.stage ?? 'alive';
