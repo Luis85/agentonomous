@@ -10,7 +10,9 @@ import type { ControlMode } from './ControlMode.js';
  *   - M3 adds `needs`.
  *   - M4 adds `modifiers` (applied / expired).
  *   - M5 adds `stageTransitions` and `moodChanges`.
- *   - M7 adds `intentionCandidates` and `selectedIntention`.
+ *   - M7 adds `candidates` — the `IntentionCandidate[]` considered this
+ *     tick when the control mode is autonomous (empty / omitted for
+ *     remote / scripted modes). Ordering is stable under a fixed seed.
  *   - M8 adds `animationTransitions`.
  */
 export interface DecisionTrace {
