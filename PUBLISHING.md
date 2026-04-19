@@ -22,6 +22,37 @@ see [CONTRIBUTING.md](./CONTRIBUTING.md).
 - `main` branch protected; releases happen only via Changesets PRs landing on
   `main` (and those PRs originate from `develop` or `release/*`).
 
+## Branch protection checklist
+
+All three long-lived branches (`main`, `develop`, `demo`) should be
+protected. Configure in Repo → Settings → Branches → Add rule. Apply the
+same baseline to each, with the deltas noted below.
+
+Baseline (all three):
+
+- Require a pull request before merging; require at least 1 approving
+  review.
+- Require status checks to pass before merging; include the `CI` workflow
+  (both `test (node 20)` and `test (node 22)` matrix rows).
+- Require branches to be up to date before merging.
+- Disallow force pushes. Disallow deletions.
+- Do **not** allow bypass for administrators (hold yourself to the same bar).
+
+Per-branch additions:
+
+- **`main`** — also require the `Release candidate` workflow (both matrix
+  rows) when the incoming branch matches `release/v*`. Optional: require
+  signed commits.
+- **`develop`** — baseline is sufficient.
+- **`demo`** — baseline is sufficient. Remember to add `demo` to the
+  `github-pages` environment's deployment branch allow-list (see
+  [Demo deployment first-time setup](#demo-deployment)) or the Pages
+  deploy job is rejected at the environment gate even when CI is green.
+
+The `.claude/settings.json` denies in this repo mirror these rules at the
+Claude Code permission layer; branch protection is the source of truth
+and applies to humans + bots alike.
+
 ## Local dry runs
 
 Before shipping anything, verify the package looks right:
@@ -30,6 +61,9 @@ Before shipping anything, verify the package looks right:
 # Run the full pre-publish gate (format, lint, typecheck, test, build).
 npm run verify
 
+# Check the bundle-size budget (gzip).
+npm run size
+
 # Inspect what npm would actually publish.
 npm run pack:dry
 ```
@@ -37,6 +71,31 @@ npm run pack:dry
 `pack:dry` prints the exact file list + tarball size. Only `dist/`,
 `README.md`, and `LICENSE` should appear (per the `files` field in
 `package.json`).
+
+`npm run size` runs the `size-limit` budget against the built
+`dist/index.js` and `dist/integrations/excalibur/index.js` (gzip). Budgets
+live in the `size-limit` field of `package.json`. If a legitimate
+feature pushes a bundle over budget, bump the limit in the same PR with
+a one-line justification in the commit message.
+
+## Release candidate pre-flight
+
+Any branch matching `release/v*` (e.g. `release/v1.0.0`) is gated by the
+`.github/workflows/release-candidate.yml` workflow on every push. It
+runs on Node 20 + 22 and does everything `CI` does plus:
+
+- **`npm run size`** — the gzip bundle-size budget.
+- **Pack + smoke install** — `npm pack` into a tarball, install it into
+  a scratch project, and verify the shipped ESM resolves and exports
+  `Agent`. Catches "builds fine, broken once users `npm install`" bugs
+  that repo-local tests can't see.
+- **`npm publish --dry-run`** — validates the would-be publish (files
+  list, `publishConfig`, registry auth surface) without actually
+  pushing a version to npm.
+
+The workflow can also be kicked off manually from
+**Actions → Release candidate → Run workflow** against any `release/v*`
+branch.
 
 ## Adding a changeset
 
@@ -72,6 +131,63 @@ The `.github/workflows/release.yml` workflow runs on every push to `main`:
    next cycle.
 
 No manual `npm publish` calls are needed in the normal path.
+
+## First release (v1.0.0)
+
+The initial release is a one-time setup. Everything below happens on
+short-lived branches; do **not** push directly to `main` until the
+final merge.
+
+Pre-flight (once, before cutting `release/v1.0.0`):
+
+1. **npm token.** Confirm `NPM_TOKEN` is set in Settings → Secrets →
+   Actions. Must be an **automation** token (not "Publish" classic)
+   for provenance attestation to work.
+2. **Branch protection.** Apply the rules in the [checklist
+   above](#branch-protection-checklist) to `main`, `develop`, `demo`.
+3. **Environment.** Settings → Environments → (create) `npm-publish`
+   if you want to add manual approval before npm publishes; otherwise
+   the `release` job runs automatically on push to `main`. The
+   `github-pages` environment should already include `demo`.
+4. **Sanity dry-run.** Locally: `npm run verify && npm run size && npm
+pack --dry-run`. All clean.
+5. **Changeset.** The v1 changeset should describe the initial public
+   API surface. Bump is **major** (pre-1.0 `0.x` → `1.0.0`).
+   ```bash
+   npm run changeset
+   # Pick: major — summary: "Initial public release."
+   ```
+   Commit the `.changeset/*.md` to `develop` via a regular PR.
+
+Release (on `release/v1.0.0`, cut from `develop`):
+
+1. `git switch develop && git pull origin develop`
+2. `git switch -c release/v1.0.0`
+3. `npx changeset version` — bumps `package.json` to `1.0.0`,
+   rewrites `CHANGELOG.md`, deletes consumed changesets.
+4. Commit: `chore(release): v1.0.0`. Push: `git push -u origin
+release/v1.0.0`.
+5. **`release-candidate.yml` runs.** Wait for all matrix rows green.
+   If the publish dry-run fails, fix and re-push before moving on.
+6. Open PR: base `main`, head `release/v1.0.0`. Title:
+   `release: v1.0.0`. Wait for CI + release-candidate green, at least
+   one approving review.
+7. **Squash-merge** via the GitHub UI.
+8. `release.yml` fires on the push to `main`, runs `npm run release`
+   (`changeset publish`), tags `v1.0.0`, publishes to npm with
+   provenance.
+
+Post-flight:
+
+1. Visit https://www.npmjs.com/package/agentonomous — v1.0.0 listed,
+   "Signed by GitHub Actions" provenance badge present.
+2. In a scratch project: `npm install agentonomous@1.0.0` and check
+   `import { Agent } from 'agentonomous'` resolves.
+3. Back-merge `main` → `develop` so the version bump + CHANGELOG
+   propagate: open a PR base `develop`, head `main`, merge-commit (no
+   squash — we want the tag reachable from `develop`).
+4. Delete the `release/v1.0.0` branch locally + remote.
+5. Announce, celebrate, nap.
 
 ## Manual / emergency publish
 
@@ -154,7 +270,12 @@ git push -u origin demo`) **before** enabling protection, so the
    initial push isn't blocked.
 3. Add branch protection for `demo`: require PR, require CI green, disallow
    force-push. From this point on, promotions use the PR path above.
-4. Open the first promotion PR (or dispatch the workflow) and watch the
+4. Repo → Settings → **Environments → `github-pages` → Deployment
+   branches and tags** → add `demo` to the allowed list (or switch to
+   "Protected branches only" now that `demo` is protected). GitHub
+   creates this environment with `main` pre-allowed; the deploy job
+   is rejected at the environment gate until `demo` is added.
+5. Open the first promotion PR (or dispatch the workflow) and watch the
    `Deploy demo to GitHub Pages` workflow.
 
 ## Rolling back
