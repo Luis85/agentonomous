@@ -30,6 +30,11 @@ and watch it react and act autonomously between your inputs.
 - **Reset / New pet flow** — a confirm-gated "🔄 Reset" button in the HUD
   speed bar, and a "🔄 New pet" button in the death modal. Both wipe the
   snapshot from `localStorage` and reload; speed preference is preserved.
+- Live cognition switching: a dropdown above the HUD lets the viewer
+  flip between four reasoner modes (heuristic / BT / BDI / learning).
+  Unavailable peer deps render disabled with an install hint. The BT
+  mode reactively interrupts on the `surpriseTreat` random event to
+  demonstrate stateful commitment.
 
 ## Running locally
 
@@ -97,6 +102,36 @@ unsubscribe();
 Pair this with a `requestAnimationFrame` loop that calls
 `pet.tick(dt)` but does not render — the event drives UI. See
 `src/main.ts` for the reference implementation.
+
+## Cognition switcher
+
+A dropdown above the HUD lets you live-swap the agent's reasoner. The
+module establishes the repo's pattern for async peer-dep probing at
+mount time — each mode's `probe()` is a try/catch dynamic `import()`
+of its peer. A post-mount epoch guard discards stale probe results if
+the user flips modes before the in-flight probe resolves.
+
+```ts
+import { mountCognitionSwitcher } from './cognitionSwitcher.js';
+
+const handle = mountCognitionSwitcher(pet, document.querySelector('#cognition-switcher'));
+
+// On teardown:
+handle.dispose();
+```
+
+Modes:
+
+- **Heuristic (urgency)** — default. Always available; no peer dep.
+- **Behaviour Tree** — mistreevous-backed. Reactively interrupts on
+  `surpriseTreat` random events, committing to `approach-treat` for
+  up to 3 ticks per treat burst (a second treat during the window
+  resets the counter rather than stacking a new burst).
+- **BDI** — js-son-backed stub. Routes selection through beliefs /
+  desires / plans but yields heuristic-equivalent behaviour.
+- **Learning (brain.js)** — brain.js-backed stub. Loads a pre-built
+  1-layer network; scoring is close to heuristic. Real training +
+  weight persistence is the subject of 0.9.3.
 
 ## localStorage key layout
 
