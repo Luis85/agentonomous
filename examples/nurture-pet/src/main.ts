@@ -16,7 +16,9 @@ import { mountExportImport, mountHud, mountResetButton, mountSpeedPicker } from 
 const STORAGE_KEY = 'whiskers';
 const SPEED_STORAGE_KEY = 'whiskers:speed';
 // Base wall→virtual scale. The speed picker multiplies this; 1× == base.
-const BASE_TIME_SCALE = 60;
+// Tuned alongside catSpecies decay rates so hunger reaches its critical
+// threshold in ~45 s of wall time at 1×, per the Phase A demo spec.
+const BASE_TIME_SCALE = 10;
 
 // --- Random events ------------------------------------------------------------
 // R-11: cadence tuned so a player sees 2–3 events per virtual minute.
