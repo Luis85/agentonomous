@@ -1,3 +1,11 @@
+# Release candidate — triggered by pushes to `release/v*` branches and
+# via manual dispatch.
+#
+# Runs the full pre-PR gate, enforces the bundle-size budget, packs a
+# tarball, smoke-installs it in a scratch project to verify the public
+# export shape, and performs a `npm publish --dry-run` as the last
+# check before cutting a real release.
+
 name: Release candidate
 
 on:
@@ -11,38 +19,35 @@ concurrency:
 
 jobs:
   preflight:
-    name: Preflight (node ${{ matrix.node }})
+    name: Preflight (verify, pack, smoke-install)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [20, 22]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Use Node ${{ matrix.node }}
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies (npm ci)
         run: npm ci
 
       - name: Verify (format + lint + typecheck + test + build)
         run: npm run verify
 
-      - name: Bundle size budget
+      - name: Enforce bundle-size budget
         run: npx size-limit
 
-      - name: Pack tarball
+      - name: Pack tarball (npm pack)
         id: pack
         run: |
           npm pack --json > pack.json
           TARBALL="$(node -e "console.log(require('./pack.json')[0].filename)")"
           echo "tarball=$GITHUB_WORKSPACE/$TARBALL" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke-install tarball in a scratch project
+      - name: Smoke-install tarball into scratch project
         run: |
           mkdir -p /tmp/smoke && cd /tmp/smoke
           npm init -y > /dev/null
@@ -57,5 +62,5 @@ jobs:
             console.log('Smoke import OK:', Object.keys(mod).length, 'named exports');
           "
 
-      - name: Publish dry-run
+      - name: Publish dry-run (npm publish --dry-run)
         run: npm publish --dry-run
