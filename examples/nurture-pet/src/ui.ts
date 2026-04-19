@@ -373,7 +373,8 @@ function renderModifierTray(host: HTMLElement, agent: Agent, paused: boolean): v
   for (const mod of agent.modifiers.list()) {
     const li = document.createElement('li');
     const icon = mod.visual?.hudIcon;
-    const label = icon ? `${icon} ${mod.id}` : mod.id;
+    const name = mod.visual?.label ?? mod.id;
+    const label = icon ? `${icon} ${name}` : name;
     li.textContent = label;
     if (typeof mod.expiresAt === 'number') {
       const time = document.createElement('span');

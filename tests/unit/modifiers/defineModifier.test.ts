@@ -32,6 +32,19 @@ describe('defineModifier', () => {
     expect(mod.expiresAt).toBeUndefined();
   });
 
+  it('preserves the visual.label field through instantiate()', () => {
+    const blueprint = defineModifier({
+      id: 'sick',
+      source: 'event:illness',
+      stack: 'refresh',
+      effects: [],
+      visual: { label: 'Sick', hudIcon: '🤒' },
+    });
+    const mod = blueprint.instantiate(0);
+    expect(mod.visual?.label).toBe('Sick');
+    expect(mod.visual?.hudIcon).toBe('🤒');
+  });
+
   it('accepts per-instance overrides', () => {
     const blueprint = defineModifier({
       id: 'rng',
