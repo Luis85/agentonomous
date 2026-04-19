@@ -33,6 +33,10 @@
       "import": "./dist/cognition/adapters/mistreevous/index.js",
       "types": "./dist/cognition/adapters/mistreevous/index.d.ts"
     },
+    "./cognition/adapters/js-son": {
+      "import": "./dist/cognition/adapters/js-son/index.js",
+      "types": "./dist/cognition/adapters/js-son/index.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -89,6 +93,7 @@
     "eslint-config-prettier": "^10.1.8",
     "excalibur": "^0.32.0",
     "husky": "^9.1.7",
+    "js-son-agent": "^0.0.17",
     "lint-staged": "^16.4.0",
     "mistreevous": "^4.3.1",
     "prettier": "^3.8.3",
@@ -148,6 +153,12 @@
     {
       "name": "dist/cognition/adapters/mistreevous/index.js (gzip)",
       "path": "dist/cognition/adapters/mistreevous/index.js",
+      "gzip": true,
+      "limit": "2 KB"
+    },
+    {
+      "name": "dist/cognition/adapters/js-son/index.js (gzip)",
+      "path": "dist/cognition/adapters/js-son/index.js",
       "gzip": true,
       "limit": "2 KB"
     }

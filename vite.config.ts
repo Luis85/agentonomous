@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 // - excalibur:   src/integrations/excalibur/index.ts → dist/integrations/excalibur/index.js
 // - mistreevous: src/cognition/adapters/mistreevous/index.ts
 //                                                    → dist/cognition/adapters/mistreevous/index.js
+// - js-son:      src/cognition/adapters/js-son/index.ts
+//                                                    → dist/cognition/adapters/js-son/index.js
 //
 // All peer dependencies are marked external so consumers provide them.
 
@@ -34,6 +36,10 @@ export default defineConfig({
         'cognition/adapters/mistreevous/index': resolve(
           __dirname,
           'src/cognition/adapters/mistreevous/index.ts',
+        ),
+        'cognition/adapters/js-son/index': resolve(
+          __dirname,
+          'src/cognition/adapters/js-son/index.ts',
         ),
       },
       formats: ['es'],
