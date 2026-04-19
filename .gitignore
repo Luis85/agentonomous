@@ -11,3 +11,5 @@ docs/api
 !.vscode/settings.json
 examples/**/dist
 examples/**/node_modules
+.claude/settings.local.json
+.claude/.last-run
