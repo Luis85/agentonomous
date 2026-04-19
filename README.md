@@ -7,6 +7,8 @@ zero configuration.
 **Status:** pre-release (`0.1.0`). The Phase A MVP — a virtual-pet nurture demo
 — ships in `examples/nurture-pet`.
 
+**Demo:** https://luis85.github.io/agentonomous/
+
 ## What you get
 
 - **An `Agent` class** with a deterministic tick pipeline: perceive → random
