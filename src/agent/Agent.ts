@@ -170,7 +170,12 @@ export class Agent {
   readonly scripted: ScriptedController | undefined;
   readonly snapshotStore: SnapshotStorePort | undefined;
   readonly autoSaveKey: string;
-  readonly reasoner: Reasoner;
+  /**
+   * Current cognition reasoner. Mutable: consumers live-swap via
+   * `setReasoner(reasoner)`. The tick pipeline reads this field fresh
+   * each tick rather than capturing it at construction.
+   */
+  reasoner: Reasoner;
   readonly behavior: BehaviorRunner;
   readonly learner: Learner;
   readonly skills: SkillRegistry;
@@ -531,6 +536,36 @@ export class Agent {
   /** Current wall-to-virtual time multiplier. */
   getTimeScale(): number {
     return this.timeScale;
+  }
+
+  /**
+   * Replace the cognition reasoner used by the autonomous tick pipeline.
+   *
+   * The tick pipeline reads this field fresh at Stage 4/5, so the new
+   * reasoner takes effect on the next `selectIntention` call. Callers
+   * driving the tick loop from outside the agent (UI handler, framework
+   * `onPreUpdate`) see this as "applies from the next tick"; a swap
+   * issued from a Stage-1 reactive handler is used within the same
+   * tick. Nothing is transferred from the outgoing reasoner — adapters
+   * that want continuity should persist their own state.
+   *
+   * Throws `TypeError` if `reasoner` is null / undefined / lacks
+   * `selectIntention`.
+   */
+  setReasoner(reasoner: Reasoner): void {
+    if (
+      reasoner === null ||
+      reasoner === undefined ||
+      typeof reasoner.selectIntention !== 'function'
+    ) {
+      throw new TypeError('setReasoner: expected a Reasoner with a selectIntention method.');
+    }
+    this.reasoner = reasoner;
+  }
+
+  /** Current cognition reasoner. */
+  getReasoner(): Reasoner {
+    return this.reasoner;
   }
 
   // =========================================================================
