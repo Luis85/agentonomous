@@ -14,6 +14,18 @@ import { isInvokeSkillAction, type AgentAction } from '../AgentAction.js';
 import type { Agent } from '../Agent.js';
 
 /**
+ * Result of `collectActions` — the action list plus the candidate
+ * intentions the reasoner considered this tick. `candidates` is empty for
+ * non-autonomous control modes.
+ *
+ * @internal
+ */
+export type CollectActionsResult = {
+  actions: AgentAction[];
+  candidates: readonly IntentionCandidate[];
+};
+
+/**
  * Stages 3–7 of the tick pipeline: collect actions (control-mode-dispatched),
  * run autonomous cognition, execute resulting actions through the skill
  * registry, and build the `SkillContext` passed to each skill invocation.
@@ -23,22 +35,27 @@ import type { Agent } from '../Agent.js';
 export class CognitionPipeline {
   constructor(private readonly agent: Agent) {}
 
-  /** Collect actions for this tick based on the agent's current `controlMode`. */
+  /**
+   * Collect actions for this tick based on the agent's current `controlMode`,
+   * returning both the resolved action list and — for autonomous cognition —
+   * the candidate intentions considered. Remote and scripted modes report
+   * an empty candidate list (they bypass the reasoner entirely).
+   */
   async collectActions(
     wallNowMs: number,
     perceived: readonly DomainEvent[],
-  ): Promise<AgentAction[]> {
+  ): Promise<CollectActionsResult> {
     const agent = this.agent;
     switch (agent.controlMode) {
       case 'remote': {
-        if (!agent.remote) return [];
+        if (!agent.remote) return { actions: [], candidates: [] };
         const pulled = await agent.remote.pull(agent.identity.id, wallNowMs);
-        return [...pulled];
+        return { actions: [...pulled], candidates: [] };
       }
       case 'scripted': {
-        if (!agent.scripted) return [];
+        if (!agent.scripted) return { actions: [], candidates: [] };
         const next = agent.scripted.next(agent.identity.id, wallNowMs);
-        return next ? [...next] : [];
+        return { actions: next ? [...next] : [], candidates: [] };
       }
       case 'autonomous':
       default:
@@ -47,7 +64,7 @@ export class CognitionPipeline {
   }
 
   /** Autonomous cognition — Stage 4 (candidates) + 5 (select) + 6 (behavior). */
-  runAutonomousCognition(perceived: readonly DomainEvent[]): AgentAction[] {
+  runAutonomousCognition(perceived: readonly DomainEvent[]): CollectActionsResult {
     const agent = this.agent;
     const candidates: IntentionCandidate[] = [];
     if (agent.needs && agent.needsPolicy) {
@@ -62,8 +79,8 @@ export class CognitionPipeline {
       ...(agent.identity.persona !== undefined ? { persona: agent.identity.persona } : {}),
       candidates,
     });
-    if (!intention) return [];
-    return [...agent.behavior.run(intention)];
+    if (!intention) return { actions: [], candidates };
+    return { actions: [...agent.behavior.run(intention)], candidates };
   }
 
   /** Stage 7: dispatch actions — invoke-skill goes through the registry. */

@@ -1,3 +1,10 @@
+# GitHub Pages — deploys the `examples/nurture-pet` demo.
+#
+# Triggered by pushes to the long-lived `demo` branch and via manual
+# dispatch. Builds the library first (the demo consumes `dist/`),
+# then builds the example with `PAGES_BASE` set so asset URLs work
+# under `/<repo>/`, and uploads the result as a Pages artifact.
+
 name: Deploy demo to GitHub Pages
 
 on:
@@ -16,27 +23,29 @@ permissions:
 
 jobs:
   build:
-    name: Build library + example
+    name: Build library + demo example
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
 
-      - name: Install library dependencies
+      - name: Install library dependencies (npm ci)
         run: npm ci
 
-      - name: Build library
+      - name: Build library (vite build)
         run: npm run build
 
-      - name: Install example dependencies
+      - name: Install demo dependencies
         working-directory: examples/nurture-pet
         run: npm install --no-audit --no-fund
 
-      - name: Build example
+      - name: Build demo (vite build, PAGES_BASE=/repo/)
         working-directory: examples/nurture-pet
         env:
           # GitHub Pages serves the repo from /<repo-name>/ by default.
@@ -44,19 +53,19 @@ jobs:
           PAGES_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages artifact (examples/nurture-pet/dist)
+        uses: actions/upload-pages-artifact@v5
         with:
           path: examples/nurture-pet/dist
 
   deploy:
-    name: Deploy
+    name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to Pages
+      - name: Deploy artifact
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

@@ -78,6 +78,6 @@ bindAgentToStore(pet, (state) => store.syncFromAgent(state));
 | ------------------------------------- | ---------------------------------------------- |
 | `agentonomous/whiskers`               | Agent snapshot (auto-save, every 5 s)          |
 | `agentonomous/__agentonomous/index__` | Snapshot store index                           |
-| `whiskers:speed`                      | Speed-picker preference (not part of snapshot) |
+| `agentonomous/speed`                  | Speed-picker preference (not part of snapshot) |
 
 Reset clears the first two and reloads. Speed preference survives.

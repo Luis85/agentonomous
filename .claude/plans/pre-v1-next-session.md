@@ -1,5 +1,12 @@
 # Pre-v1 handoff
 
+> **Status: superseded by [[v1-comprehensive-plan]] (2026-04-19).**
+> Natural successor chain:
+> [[pre-v1-next-session]] → [[mvp-demo-roadmap]] → [[v1-comprehensive-plan]].
+> P1, P2, P3 all shipped (PRs #7, #8, #9); the remaining D-table was
+> folded into the 0.9.0 train of the v1 plan. Keep this file for
+> historical context.
+
 ## Where we are
 
 `agentonomous` is a TypeScript library for autonomous agents in browser /

@@ -1,7 +1,7 @@
 {
   "name": "agentonomous",
   "version": "0.0.0",
-  "description": "Autonomous agent library for TypeScript simulations — nurture-pet demo ready, engine-agnostic.",
+  "description": "Autonomous agent library for TypeScript simulations, engine-agnostic.",
   "type": "module",
   "license": "MIT",
   "author": "luis85",
@@ -15,7 +15,7 @@
   "homepage": "https://github.com/luis85/agentonomous#readme",
   "sideEffects": false,
   "engines": {
-    "node": ">=20.18"
+    "node": ">=22"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -28,6 +28,18 @@
     "./integrations/excalibur": {
       "import": "./dist/integrations/excalibur/index.js",
       "types": "./dist/integrations/excalibur/index.d.ts"
+    },
+    "./cognition/adapters/mistreevous": {
+      "import": "./dist/cognition/adapters/mistreevous/index.js",
+      "types": "./dist/cognition/adapters/mistreevous/index.d.ts"
+    },
+    "./cognition/adapters/js-son": {
+      "import": "./dist/cognition/adapters/js-son/index.js",
+      "types": "./dist/cognition/adapters/js-son/index.d.ts"
+    },
+    "./cognition/adapters/brainjs": {
+      "import": "./dist/cognition/adapters/brainjs/index.js",
+      "types": "./dist/cognition/adapters/brainjs/index.d.ts"
     },
     "./package.json": "./package.json"
   },
@@ -85,7 +97,9 @@
     "eslint-config-prettier": "^10.1.8",
     "excalibur": "^0.32.0",
     "husky": "^9.1.7",
+    "js-son-agent": "^0.0.17",
     "lint-staged": "^16.4.0",
+    "mistreevous": "^4.3.1",
     "prettier": "^3.8.3",
     "size-limit": "^12.1.0",
     "typedoc": "^0.28.19",
@@ -97,7 +111,7 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": "*",
-    "brain.js": "^2.0.0",
+    "brain.js": "^2.0.0-beta.0",
     "excalibur": "*",
     "js-son-agent": "*",
     "mistreevous": "^4.0.0",
@@ -137,6 +151,24 @@
     {
       "name": "dist/integrations/excalibur/index.js (gzip)",
       "path": "dist/integrations/excalibur/index.js",
+      "gzip": true,
+      "limit": "2 KB"
+    },
+    {
+      "name": "dist/cognition/adapters/mistreevous/index.js (gzip)",
+      "path": "dist/cognition/adapters/mistreevous/index.js",
+      "gzip": true,
+      "limit": "2 KB"
+    },
+    {
+      "name": "dist/cognition/adapters/js-son/index.js (gzip)",
+      "path": "dist/cognition/adapters/js-son/index.js",
+      "gzip": true,
+      "limit": "2 KB"
+    },
+    {
+      "name": "dist/cognition/adapters/brainjs/index.js (gzip)",
+      "path": "dist/cognition/adapters/brainjs/index.js",
       "gzip": true,
       "limit": "2 KB"
     }

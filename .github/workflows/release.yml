@@ -1,3 +1,11 @@
+# Release — triggered by pushes to `main`.
+#
+# Runs the full pre-PR gate (format, lint, typecheck, test) as a
+# safety net before building, then hands off to `changesets/action`.
+# When unconsumed changesets are present the action opens/updates a
+# version PR; when the version bump has already landed it publishes
+# to npm with provenance.
+
 name: Release
 
 on:
@@ -15,26 +23,40 @@ permissions:
 
 jobs:
   release:
-    name: Release
+    name: Verify, build, and release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository (full history for changesets)
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js 22 (npm registry)
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
+      - name: Install dependencies (npm ci)
         run: npm ci
 
-      - name: Build
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript compiler
+        run: npm run typecheck
+
+      - name: Run Vitest
+        run: npm test
+
+      - name: Build library (vite build)
         run: npm run build
 
-      - name: Create release PR or publish
+      - name: Version PR or publish to npm (changesets)
         uses: changesets/action@v1
         with:
           publish: npm run release

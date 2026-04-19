@@ -100,6 +100,23 @@
       }
       .bar-fill.critical {
         background: #f43f5e;
+        animation: critical-pulse 1.1s ease-in-out infinite;
+      }
+      @keyframes critical-pulse {
+        0%,
+        100% {
+          opacity: 1;
+          filter: brightness(1);
+        }
+        50% {
+          opacity: 0.75;
+          filter: brightness(1.15);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar-fill.critical {
+          animation: none;
+        }
       }
       .modifiers ul {
         list-style: none;
@@ -147,16 +164,36 @@
         flex-wrap: wrap;
       }
       .speed-buttons button {
-        padding: 6px 10px;
-        font-size: 13px;
-        background: #475569;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 500;
+        background: transparent;
+        color: inherit;
+        border: 1px solid #cbd5e1;
+        opacity: 0.75;
       }
       .speed-buttons button:hover {
-        background: #334155;
+        background: #e2e8f0;
+        opacity: 1;
       }
       .speed-buttons button.active {
-        background: #16a34a;
-        box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+        background: #475569;
+        color: #fff;
+        border-color: #475569;
+        opacity: 1;
+      }
+      @media (prefers-color-scheme: dark) {
+        .speed-buttons button {
+          border-color: #334155;
+        }
+        .speed-buttons button:hover {
+          background: #26304d;
+        }
+        .speed-buttons button.active {
+          background: #cbd5e1;
+          color: #0f172a;
+          border-color: #cbd5e1;
+        }
       }
       .reset-button {
         margin-left: auto;
@@ -173,6 +210,49 @@
         background: #64748b;
       }
       .io-button:hover {
+        background: #475569;
+      }
+      .seed {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 13px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .seed {
+          background: #1b2140;
+        }
+      }
+      .seed-label {
+        font-size: 12px;
+        opacity: 0.7;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .seed-value {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: #e2e8f0;
+        color: #0f172a;
+        user-select: all;
+      }
+      @media (prefers-color-scheme: dark) {
+        .seed-value {
+          background: #26304d;
+          color: #e6e6f0;
+        }
+      }
+      .seed-button {
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #64748b;
+      }
+      .seed-button:hover {
         background: #475569;
       }
       .modifiers li {
@@ -207,6 +287,148 @@
         overflow: auto;
         margin: 0;
       }
+      .decision-trace {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .decision-trace {
+          background: #1b2140;
+        }
+      }
+      .decision-trace-toggle {
+        background: #64748b;
+        font-size: 13px;
+        padding: 6px 10px;
+        align-self: flex-start;
+      }
+      .decision-trace-toggle:hover {
+        background: #475569;
+      }
+      .decision-trace[data-visible='false'] #decision-trace-body {
+        display: none;
+      }
+      #decision-trace-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+      .trace-section h4 {
+        margin: 0 0 6px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        opacity: 0.7;
+      }
+      .trace-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 2px 0;
+      }
+      .trace-k {
+        opacity: 0.8;
+      }
+      .trace-v {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+      }
+      .trace-empty {
+        opacity: 0.6;
+        font-style: italic;
+      }
+      .trace-why {
+        margin-top: 6px;
+        opacity: 0.75;
+        font-style: italic;
+      }
+      .species-config {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .species-config {
+          background: #1b2140;
+        }
+      }
+      .species-config-toggle {
+        background: #64748b;
+        font-size: 13px;
+        padding: 6px 10px;
+        align-self: flex-start;
+      }
+      .species-config-toggle:hover {
+        background: #475569;
+      }
+      .species-config[data-visible='false'] #species-config-body {
+        display: none;
+      }
+      #species-config-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #species-config-textarea {
+        width: 100%;
+        min-height: 180px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 12px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #0f172a;
+        resize: vertical;
+        box-sizing: border-box;
+      }
+      @media (prefers-color-scheme: dark) {
+        #species-config-textarea {
+          background: #0f172a;
+          color: #e6e6f0;
+          border-color: #334155;
+        }
+      }
+      .species-config-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .species-config-actions button {
+        font-size: 13px;
+        padding: 6px 10px;
+      }
+      #species-config-apply {
+        background: #16a34a;
+      }
+      #species-config-apply:hover {
+        background: #15803d;
+      }
+      #species-config-reset {
+        background: #94a3b8;
+      }
+      #species-config-reset:hover {
+        background: #64748b;
+      }
+      #species-config-status {
+        font-size: 12px;
+        min-height: 16px;
+        font-variant-numeric: tabular-nums;
+      }
+      #species-config-status[data-kind='error'] {
+        color: #dc2626;
+      }
+      #species-config-status[data-kind='ok'] {
+        color: #16a34a;
+      }
     </style>
   </head>
   <body>
@@ -215,7 +437,6 @@
       <div class="pet-meta">
         <div><strong id="pet-name">whiskers</strong></div>
         <div id="pet-stage">stage: egg</div>
-        <div id="pet-age">age: 0s</div>
         <div id="pet-mood">mood: —</div>
         <div id="pet-animation">anim: idle</div>
       </div>
@@ -230,6 +451,31 @@
         <input id="import-file" type="file" accept="application/json,.json" hidden />
         <button id="reset-button" class="reset-button" type="button">🔄 Reset</button>
       </div>
+      <div class="seed">
+        <span class="seed-label">Seed</span>
+        <code id="seed-display" class="seed-value" aria-label="Current RNG seed"></code>
+        <button id="seed-copy" class="seed-button" type="button" aria-label="Copy seed">
+          📋 Copy
+        </button>
+        <button
+          id="seed-replay"
+          class="seed-button"
+          type="button"
+          aria-label="Replay this seed"
+          title="Reset the pet, keep the seed — the RNG stream will be byte-identical"
+        >
+          🔁 Replay seed
+        </button>
+        <button
+          id="seed-new"
+          class="seed-button"
+          type="button"
+          aria-label="Reset with a new seed"
+          title="Generate a new seed and reset the pet"
+        >
+          🎲 New seed
+        </button>
+      </div>
       <div class="bars" id="bars"></div>
       <div class="modifiers">
         <strong>Buffs / debuffs</strong>
@@ -239,6 +485,41 @@
       <div class="trace">
         <strong>Recent events</strong>
         <pre id="trace"></pre>
+      </div>
+      <div id="decision-trace" class="decision-trace" data-visible="false">
+        <button
+          id="decision-trace-toggle"
+          class="decision-trace-toggle"
+          type="button"
+          aria-controls="decision-trace-body"
+          aria-expanded="false"
+        >
+          Show decision trace
+        </button>
+        <div id="decision-trace-body"></div>
+      </div>
+      <div id="species-config" class="species-config" data-visible="false">
+        <button
+          id="species-config-toggle"
+          class="species-config-toggle"
+          type="button"
+          aria-controls="species-config-body"
+          aria-expanded="false"
+        >
+          Show species config
+        </button>
+        <div id="species-config-body">
+          <textarea
+            id="species-config-textarea"
+            spellcheck="false"
+            aria-label="Species configuration JSON"
+          ></textarea>
+          <div id="species-config-status" data-kind="ok"></div>
+          <div class="species-config-actions">
+            <button id="species-config-apply" type="button">Apply &amp; reset</button>
+            <button id="species-config-reset" type="button">Reset to defaults</button>
+          </div>
+        </div>
       </div>
     </section>
 

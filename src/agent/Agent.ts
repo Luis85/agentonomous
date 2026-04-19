@@ -57,7 +57,6 @@ import { NullLogger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
 import type { AgentState } from '../persistence/AgentState.js';
 import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.js';
-import type { AgentAction } from './AgentAction.js';
 import type { AgentFacade } from './AgentFacade.js';
 import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
@@ -171,7 +170,12 @@ export class Agent {
   readonly scripted: ScriptedController | undefined;
   readonly snapshotStore: SnapshotStorePort | undefined;
   readonly autoSaveKey: string;
-  readonly reasoner: Reasoner;
+  /**
+   * Current cognition reasoner. Mutable: consumers live-swap via
+   * `setReasoner(reasoner)`. The tick pipeline reads this field fresh
+   * each tick rather than capturing it at construction.
+   */
+  reasoner: Reasoner;
   readonly behavior: BehaviorRunner;
   readonly learner: Learner;
   readonly skills: SkillRegistry;
@@ -378,7 +382,7 @@ export class Agent {
     // remote/scripted). `executeActions` then runs invoke-skill /
     // emit-event / noop actions through the registry, emits
     // SkillCompleted | SkillFailed, and lets the learner score outcomes.
-    const actions: AgentAction[] = await this.cognitionPipeline.collectActions(
+    const { actions, candidates } = await this.cognitionPipeline.collectActions(
       tickStartedAt,
       perceived,
     );
@@ -400,6 +404,7 @@ export class Agent {
     }
     if (moodChange) deltasRecord.mood = moodChange;
     if (animationTransition) deltasRecord.animation = animationTransition;
+    if (candidates.length > 0) deltasRecord.candidates = candidates;
     const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
 
     const stage: LifeStage = this.ageModel?.stage ?? 'alive';
@@ -531,6 +536,36 @@ export class Agent {
   /** Current wall-to-virtual time multiplier. */
   getTimeScale(): number {
     return this.timeScale;
+  }
+
+  /**
+   * Replace the cognition reasoner used by the autonomous tick pipeline.
+   *
+   * The tick pipeline reads this field fresh at Stage 4/5, so the new
+   * reasoner takes effect on the next `selectIntention` call. Callers
+   * driving the tick loop from outside the agent (UI handler, framework
+   * `onPreUpdate`) see this as "applies from the next tick"; a swap
+   * issued from a Stage-1 reactive handler is used within the same
+   * tick. Nothing is transferred from the outgoing reasoner — adapters
+   * that want continuity should persist their own state.
+   *
+   * Throws `TypeError` if `reasoner` is null / undefined / lacks
+   * `selectIntention`.
+   */
+  setReasoner(reasoner: Reasoner): void {
+    if (
+      reasoner === null ||
+      reasoner === undefined ||
+      typeof reasoner.selectIntention !== 'function'
+    ) {
+      throw new TypeError('setReasoner: expected a Reasoner with a selectIntention method.');
+    }
+    this.reasoner = reasoner;
+  }
+
+  /** Current cognition reasoner. */
+  getReasoner(): Reasoner {
+    return this.reasoner;
   }
 
   // =========================================================================
@@ -812,6 +847,7 @@ export class Agent {
           this.clock.now(),
         );
       },
+      getTimeScale: () => this.timeScale,
     };
   }
 

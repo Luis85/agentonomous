@@ -38,8 +38,14 @@ export interface Modifier {
   stack: ModifierStackPolicy;
   /** The numerical effects this modifier contributes. */
   effects: readonly ModifierEffect[];
-  /** Optional visual hints for renderers. */
+  /**
+   * Optional visual hints for renderers. `label` is a human-readable
+   * display name — renderers should prefer it over the raw `id` when
+   * present. The other fields are opaque hints consumed by whichever
+   * rendering layer the host app wires up.
+   */
   visual?: {
+    label?: string;
     hudIcon?: string;
     overlay?: string;
     fxHint?: string;

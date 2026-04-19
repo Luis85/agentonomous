@@ -4,6 +4,7 @@ import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
 import { Needs } from '../../../src/needs/Needs.js';
 import { DEFAULT_URGENCY_CURVE } from '../../../src/needs/Need.js';
+import type { IntentionCandidate } from '../../../src/cognition/IntentionCandidate.js';
 
 describe('createAgent (M2 builder)', () => {
   it('builds a running agent with only id + species', async () => {
@@ -63,6 +64,28 @@ describe('createAgent (M2 builder)', () => {
     const trace = await agent.tick(1);
 
     expect(trace.actions.length + trace.emitted.length).toBeGreaterThan(0);
+  });
+
+  it('surfaces intention candidates on trace.deltas.candidates for autonomous ticks', async () => {
+    const needs = new Needs([
+      {
+        id: 'hunger',
+        level: 0.05,
+        decayPerSec: 0,
+        urgencyCurve: DEFAULT_URGENCY_CURVE,
+        criticalThreshold: 0.2,
+      },
+    ]);
+
+    const agent = createAgent({ id: 'hungry', species: 'cat', needs });
+    const trace = await agent.tick(1);
+    const candidates = trace.deltas?.candidates as readonly IntentionCandidate[] | undefined;
+    expect(candidates).toBeDefined();
+    expect(candidates!.length).toBeGreaterThan(0);
+    for (const c of candidates!) {
+      expect(typeof c.score).toBe('number');
+      expect(typeof c.intention.type).toBe('string');
+    }
   });
 
   it('honors role, persona, name, version overrides', () => {

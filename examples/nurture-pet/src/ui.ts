@@ -1,12 +1,5 @@
 import type { Agent, AgentState } from 'agentonomous';
-
-const NEEDS: { id: string; label: string }[] = [
-  { id: 'hunger', label: 'Hunger' },
-  { id: 'cleanliness', label: 'Cleanliness' },
-  { id: 'happiness', label: 'Happiness' },
-  { id: 'energy', label: 'Energy' },
-  { id: 'health', label: 'Health' },
-];
+import { NEEDS } from './constants.js';
 
 const INTERACTION_BUTTONS: { verb: string; label: string }[] = [
   { verb: 'feed', label: '🍖 Feed' },
@@ -35,7 +28,10 @@ type LifetimeCounters = {
   petCount: number;
 };
 
-export function mountHud(agent: Agent): { update: (state: AgentState) => void } {
+export function mountHud(agent: Agent): {
+  update: (state: AgentState) => void;
+  dispose: () => void;
+} {
   const bars = document.getElementById('bars') as HTMLElement;
   const modifiersEl = document.getElementById('modifier-list') as HTMLElement;
   const buttonsEl = document.getElementById('buttons') as HTMLElement;
@@ -43,11 +39,12 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
   const petEl = document.getElementById('pet') as HTMLElement;
   const nameEl = document.getElementById('pet-name') as HTMLElement;
   const stageEl = document.getElementById('pet-stage') as HTMLElement;
-  const ageEl = document.getElementById('pet-age') as HTMLElement;
   const moodEl = document.getElementById('pet-mood') as HTMLElement;
   const animEl = document.getElementById('pet-animation') as HTMLElement;
 
-  // Build need bars
+  // Build need bars and cache refs so the per-frame `update` loop never hits
+  // `document.querySelector` — which was ~10 DOM traversals per RAF.
+  const needRefs = new Map<string, { fill: HTMLElement; value: HTMLElement }>();
   for (const need of NEEDS) {
     const row = document.createElement('div');
     row.className = 'bar';
@@ -57,6 +54,9 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
       <span class="bar-value" data-need-value="${need.id}">1.00</span>
     `;
     bars.appendChild(row);
+    const fill = row.querySelector<HTMLElement>(`[data-need="${need.id}"]`);
+    const value = row.querySelector<HTMLElement>(`[data-need-value="${need.id}"]`);
+    if (fill && value) needRefs.set(need.id, { fill, value });
   }
 
   // Build interaction buttons
@@ -69,7 +69,7 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
     buttonsEl.appendChild(btn);
   }
 
-  // Recent-event log (trimmed tail) + R-26 lifetime counters.
+  // Recent-event log (newest on top, trimmed tail) + R-26 lifetime counters.
   const traceLines: string[] = [];
   const counters: LifetimeCounters = {
     ateCount: 0,
@@ -77,14 +77,13 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
     illnessCount: 0,
     petCount: 0,
   };
-  agent.subscribe((event) => {
-    traceLines.push(
-      `${new Date(event.at).toISOString().slice(11, 19)}  ${event.type}${
-        typeof event.agentId === 'string' ? ` (${event.agentId})` : ''
-      }`,
-    );
-    if (traceLines.length > 40) traceLines.shift();
-    trace.textContent = traceLines.join('\n');
+  const unsubscribe = agent.subscribe((event) => {
+    const line = formatEventLine(event);
+    if (line) {
+      traceLines.unshift(line);
+      if (traceLines.length > 40) traceLines.pop();
+      trace.textContent = traceLines.join('\n');
+    }
 
     // Tally the events we care about for the life-summary modal.
     if (event.type === 'SkillCompleted') {
@@ -106,26 +105,26 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 
   nameEl.textContent = agent.identity.name;
 
+  const modifierTray = createModifierTrayRenderer(modifiersEl);
+
   return {
     update(state: AgentState): void {
       const stageLabel = STAGE_LABELS[state.stage] ?? state.stage;
       stageEl.textContent = `${stageLabel} — ${formatAge(state.ageSeconds)} old`;
-      ageEl.textContent = '';
       moodEl.textContent = `mood: ${state.mood?.category ?? '—'}`;
       animEl.textContent = `anim: ${state.animation}`;
 
       for (const need of NEEDS) {
         const level = state.needs[need.id] ?? 0;
-        const fill = document.querySelector<HTMLElement>(`[data-need="${need.id}"]`);
-        const value = document.querySelector<HTMLElement>(`[data-need-value="${need.id}"]`);
-        if (fill) {
-          fill.style.width = `${Math.max(0, Math.min(100, level * 100))}%`;
-          fill.classList.toggle('critical', level < 0.25);
+        const refs = needRefs.get(need.id);
+        if (refs) {
+          refs.fill.style.width = `${Math.max(0, Math.min(100, level * 100))}%`;
+          refs.fill.classList.toggle('critical', level < 0.25);
+          refs.value.textContent = level.toFixed(2);
         }
-        if (value) value.textContent = level.toFixed(2);
       }
 
-      renderModifierTray(modifiersEl, agent, agent.getTimeScale() === 0);
+      modifierTray.update(agent, agent.getTimeScale() === 0);
 
       // Halt / animation visual cue.
       if (state.halted) {
@@ -154,12 +153,15 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
         petEl.style.background = '#fde68a';
       }
     },
+    dispose(): void {
+      unsubscribe();
+    },
   };
 }
 
 /**
  * Discrete simulation-speed picker. The base scale is `baseScale` virtual
- * seconds per real second (60 in the nurture-pet demo). Multipliers map
+ * seconds per real second (10 in the nurture-pet demo). Multipliers map
  * to `baseScale * mult`; the Pause button maps to scale 0.
  *
  * Persists the last selection to `localStorage` under `<storageKey>` so
@@ -270,19 +272,21 @@ export function mountExportImport(agent: Agent): void {
   );
 
   exportBtn.addEventListener('click', () => {
+    let url: string | null = null;
     try {
       const snap = agent.snapshot();
       const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = `${agent.identity.id}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
     } catch (err) {
       globalThis.alert?.(`Export failed: ${(err as Error).message}`);
+    } finally {
+      if (url !== null) URL.revokeObjectURL(url);
     }
   });
 
@@ -359,37 +363,98 @@ function writeSavedMult(key: string, mult: number | 'pause'): void {
 }
 
 /**
- * Render active modifiers as a chip list with the modifier's HUD icon (if
- * declared on `Modifier.visual.hudIcon`) and a live remaining-time
- * countdown for time-bound modifiers.
+ * Diffing renderer for the active-modifier chip list. Keeps `<li>` nodes
+ * alive across frames so the per-frame HUD update only touches the
+ * countdown text (the only thing that actually changes most ticks).
  *
- * When `paused` is true, the countdown is rendered as `paused` instead of
- * a wall-clock-derived figure. Modifier expiry is itself wall-clock-bound
- * (a documented quirk — see `setTimeScale` JSDoc), so during pause the
- * actual countdown still elapses; this label keeps the UI honest about
- * the user's intent without misrepresenting the underlying state.
+ * Chips are keyed by `id` + occurrence index within the current
+ * `agent.modifiers.list()` so `stack: 'stack'` entries (which share an
+ * `id`) each get their own row. Reusing positional keys across frames
+ * preserves diffing in the common case; when a middle entry expires the
+ * remaining chips shift up, which rewrites their text but not the DOM
+ * node count.
+ *
+ * When `paused` is true the countdown reads `paused` rather than a wall
+ * clock figure. Modifier expiry is itself wall-clock-bound (see
+ * `setTimeScale` JSDoc), so the countdown still elapses during pause;
+ * this label keeps the UI honest about the user's intent without
+ * misrepresenting the underlying state.
  */
-function renderModifierTray(host: HTMLElement, agent: Agent, paused: boolean): void {
-  host.innerHTML = '';
-  const now = agent.clock.now();
-  for (const mod of agent.modifiers.list()) {
-    const li = document.createElement('li');
-    const icon = mod.visual?.hudIcon;
-    const label = icon ? `${icon} ${mod.id}` : mod.id;
-    li.textContent = label;
-    if (typeof mod.expiresAt === 'number') {
-      const time = document.createElement('span');
-      time.className = 'mod-time';
-      if (paused) {
-        time.textContent = ' paused';
-      } else {
-        const remainingMs = Math.max(0, mod.expiresAt - now);
-        time.textContent = ` ${formatRemaining(remainingMs)}`;
+type ModifierChip = { li: HTMLLIElement; time: HTMLSpanElement | null; label: string };
+
+function createModifierTrayRenderer(host: HTMLElement): {
+  update: (agent: Agent, paused: boolean) => void;
+} {
+  const chips = new Map<string, ModifierChip>();
+  return {
+    update(agent, paused) {
+      const now = agent.clock.now();
+      const list = agent.modifiers.list();
+      const seen = new Set<string>();
+      const nthById = new Map<string, number>();
+
+      for (const mod of list) {
+        const nth = nthById.get(mod.id) ?? 0;
+        nthById.set(mod.id, nth + 1);
+        const key = `${mod.id}#${nth}`;
+        seen.add(key);
+
+        const icon = mod.visual?.hudIcon;
+        const name = mod.visual?.label ?? mod.id;
+        const label = icon ? `${icon} ${name}` : name;
+        const hasTime = typeof mod.expiresAt === 'number';
+
+        let chip = chips.get(key);
+        if (!chip) {
+          const li = document.createElement('li');
+          li.textContent = label;
+          let time: HTMLSpanElement | null = null;
+          if (hasTime) {
+            time = document.createElement('span');
+            time.className = 'mod-time';
+            li.appendChild(time);
+          }
+          chip = { li, time, label };
+          chips.set(key, chip);
+          host.appendChild(li);
+        } else {
+          if (chip.label !== label) {
+            // Positional slot now holds a different modifier (middle entry
+            // expired and later ones shifted up) or the visual changed —
+            // rewrite the label text while preserving the time span.
+            chip.li.textContent = label;
+            if (chip.time) chip.li.appendChild(chip.time);
+            chip.label = label;
+          }
+          // Time span presence can flip if a chip slot is reused for a
+          // modifier with/without `expiresAt`. Reconcile both directions.
+          if (hasTime && !chip.time) {
+            const time = document.createElement('span');
+            time.className = 'mod-time';
+            chip.li.appendChild(time);
+            chip.time = time;
+          } else if (!hasTime && chip.time) {
+            chip.time.remove();
+            chip.time = null;
+          }
+        }
+
+        if (chip.time) {
+          const nextText = paused
+            ? ' paused'
+            : ` ${formatRemaining(Math.max(0, (mod.expiresAt ?? now) - now))}`;
+          if (chip.time.textContent !== nextText) chip.time.textContent = nextText;
+        }
       }
-      li.appendChild(time);
-    }
-    host.appendChild(li);
-  }
+
+      for (const [key, chip] of chips) {
+        if (!seen.has(key)) {
+          chip.li.remove();
+          chips.delete(key);
+        }
+      }
+    },
+  };
 }
 
 function formatAge(seconds: number): string {
@@ -409,7 +474,7 @@ function formatRemaining(ms: number): string {
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
   const rem = s % 60;
-  return rem === 0 ? `${m}m` : `${m}m${rem}s`;
+  return rem === 0 ? `${m}m` : `${m}m ${rem}s`;
 }
 
 /**
@@ -484,4 +549,141 @@ function escapeHtml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+const INTERACTION_VERB_LABELS: Record<string, string> = {
+  feed: '🍖 Feed',
+  clean: '🫧 Clean',
+  play: '🎾 Play',
+  rest: '💤 Rest',
+  pet: '❤️ Pet',
+  medicate: '💊 Medicate',
+  scold: '😠 Scold',
+};
+
+const SKILL_LABELS: Record<string, string> = {
+  feed: '🍖 Fed',
+  clean: '🫧 Cleaned',
+  play: '🎾 Played',
+  rest: '💤 Rested',
+  pet: '❤️ Petted',
+  medicate: '💊 Medicated',
+  scold: '😠 Scolded',
+  'express-meow': '😺 Meowed',
+  'express-sad': '😢 Cried',
+  'express-sleepy': '😴 Yawned',
+};
+
+const RANDOM_EVENT_LABELS: Record<string, string> = {
+  mildIllness: '🤒 Fell ill',
+  surpriseTreat: '🎁 Surprise treat',
+  messyPlay: '🧹 Made a mess',
+};
+
+const NEED_LABELS: Record<string, string> = {
+  hunger: 'hunger',
+  cleanliness: 'cleanliness',
+  happiness: 'happiness',
+  energy: 'energy',
+  health: 'health',
+};
+
+function formatTimestamp(at: number): string {
+  return new Date(at).toISOString().slice(11, 19);
+}
+
+function needLabel(id: string): string {
+  return NEED_LABELS[id] ?? id;
+}
+
+/**
+ * Turn a domain event into a single-line, human-friendly log entry. Returns
+ * `null` for events we intentionally skip (e.g. the synthetic `__init__`
+ * emitted by `bindAgentToStore`) so the log stays focused on simulation
+ * activity.
+ */
+function formatEventLine(
+  event: { type: string; at: number } & Record<string, unknown>,
+): string | null {
+  const ts = formatTimestamp(event.at);
+  const t = event.type;
+
+  if (t === '__init__') return null;
+
+  if (t === 'InteractionRequested') {
+    const verb = typeof event['verb'] === 'string' ? (event['verb'] as string) : 'unknown';
+    const label = INTERACTION_VERB_LABELS[verb] ?? verb;
+    return `${ts}  → ${label} requested`;
+  }
+  if (t === 'SkillCompleted') {
+    const skillId = typeof event['skillId'] === 'string' ? (event['skillId'] as string) : 'skill';
+    const eff = typeof event['effectiveness'] === 'number' ? (event['effectiveness'] as number) : 1;
+    const label = SKILL_LABELS[skillId] ?? skillId;
+    const pct = Math.round(eff * 100);
+    return `${ts}  ✓ ${label}${pct === 100 ? '' : ` (${pct}% effective)`}`;
+  }
+  if (t === 'SkillFailed') {
+    const skillId = typeof event['skillId'] === 'string' ? (event['skillId'] as string) : 'skill';
+    const code = typeof event['code'] === 'string' ? (event['code'] as string) : 'failed';
+    const msg = typeof event['message'] === 'string' ? (event['message'] as string) : '';
+    const label = SKILL_LABELS[skillId] ?? skillId;
+    return `${ts}  ✗ ${label} failed — ${code}${msg ? `: ${msg}` : ''}`;
+  }
+  if (t === 'RandomEvent') {
+    const subtype = typeof event['subtype'] === 'string' ? (event['subtype'] as string) : '';
+    const label = RANDOM_EVENT_LABELS[subtype] ?? `random: ${subtype || 'unknown'}`;
+    return `${ts}  ⚡ ${label}`;
+  }
+  if (t === 'NeedCritical') {
+    const needId = typeof event['needId'] === 'string' ? (event['needId'] as string) : '?';
+    const level = typeof event['level'] === 'number' ? (event['level'] as number) : NaN;
+    return `${ts}  ⚠ ${needLabel(needId)} critical (${level.toFixed(2)})`;
+  }
+  if (t === 'NeedSafe') {
+    const needId = typeof event['needId'] === 'string' ? (event['needId'] as string) : '?';
+    const level = typeof event['level'] === 'number' ? (event['level'] as number) : NaN;
+    return `${ts}  ✓ ${needLabel(needId)} recovered (${level.toFixed(2)})`;
+  }
+  if (t === 'NeedSatisfied') {
+    const needId = typeof event['needId'] === 'string' ? (event['needId'] as string) : '?';
+    const before = typeof event['before'] === 'number' ? (event['before'] as number) : NaN;
+    const after = typeof event['after'] === 'number' ? (event['after'] as number) : NaN;
+    return `${ts}  + ${needLabel(needId)} ${before.toFixed(2)} → ${after.toFixed(2)}`;
+  }
+  if (t === 'ModifierApplied') {
+    const mod = event['modifier'] as
+      | { id?: string; visual?: { label?: string }; source?: string }
+      | undefined;
+    const id = mod?.visual?.label ?? mod?.id ?? 'modifier';
+    const source = mod?.source ? ` (${mod.source})` : '';
+    return `${ts}  + ${id}${source}`;
+  }
+  if (t === 'ModifierExpired') {
+    const id =
+      typeof event['modifierId'] === 'string' ? (event['modifierId'] as string) : 'modifier';
+    return `${ts}  − ${id} expired`;
+  }
+  if (t === 'ModifierRemoved') {
+    const id =
+      typeof event['modifierId'] === 'string' ? (event['modifierId'] as string) : 'modifier';
+    const reason = typeof event['reason'] === 'string' ? (event['reason'] as string) : 'removed';
+    return `${ts}  − ${id} ${reason}`;
+  }
+  if (t === 'MoodChanged') {
+    const from = typeof event['from'] === 'string' ? (event['from'] as string) : '—';
+    const to = typeof event['to'] === 'string' ? (event['to'] as string) : '?';
+    return `${ts}  mood ${from} → ${to}`;
+  }
+  if (t === 'LifeStageChanged') {
+    const from = typeof event['from'] === 'string' ? (event['from'] as string) : '?';
+    const to = typeof event['to'] === 'string' ? (event['to'] as string) : '?';
+    return `${ts}  🎂 ${from} → ${to}`;
+  }
+  if (t === 'AgentDied') {
+    const cause = typeof event['cause'] === 'string' ? (event['cause'] as string) : 'unknown';
+    const reason = typeof event['reason'] === 'string' ? ` — ${event['reason'] as string}` : '';
+    return `${ts}  🪦 died: ${cause}${reason}`;
+  }
+
+  return `${ts}  ${t}`;
 }

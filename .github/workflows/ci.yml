@@ -1,3 +1,10 @@
+# CI — runs on every push and PR to main, develop, and demo.
+#
+# Static checks (format, lint, typecheck, workflow lint) run in
+# parallel for fast feedback. Tests depend on all four passing. Build +
+# bundle-size budget runs last. Mirrors the `npm run verify` pre-PR
+# gate.
+
 name: CI
 
 on:
@@ -11,39 +18,98 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: test (node ${{ matrix.node }})
+  format-check:
+    name: Format (Prettier)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [20, 22]
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node ${{ matrix.node }}
-        uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: npm
-
-      - name: Install dependencies
+      - name: Install dependencies (npm ci)
         run: npm ci
-
-      - name: Format check
+      - name: Check formatting
         run: npm run format:check
 
-      - name: Lint
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      - name: Run ESLint
         run: npm run lint
 
-      - name: Typecheck
+  typecheck:
+    name: Typecheck (tsc --noEmit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      - name: Run TypeScript compiler
         run: npm run typecheck
 
-      - name: Test with coverage
+  actionlint:
+    name: Lint workflows (actionlint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@v1
+        with:
+          fail_level: error
+          reporter: github-check
+
+  test:
+    name: Test (Vitest + coverage)
+    runs-on: ubuntu-latest
+    needs: [format-check, lint, typecheck, actionlint]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      - name: Run Vitest with coverage
         run: npm run test:coverage
 
-      - name: Build
+  build:
+    name: Build & size budget
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      - name: Build library (vite build)
         run: npm run build
-
-      - name: Bundle size budget
+      - name: Enforce bundle-size budget
         run: npx size-limit
