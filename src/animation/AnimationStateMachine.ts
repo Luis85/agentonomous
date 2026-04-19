@@ -74,15 +74,22 @@ export class AnimationStateMachine {
   }
 
   /**
-   * Force an explicit transition. Skips reconciliation. Returns the
-   * transition (or null if we're already in `next`).
+   * Force an explicit transition. Skips reconciliation. `at` is the wall
+   * ms at which the transition occurred; callers MUST pass it rather than
+   * patching post-hoc. Returns the transition, or `null` if we're already
+   * in `next`.
    */
-  transition(next: AnimationState, reason?: string, fxHint?: string): AnimationTransition | null {
+  transition(
+    next: AnimationState,
+    at: number,
+    reason?: string,
+    fxHint?: string,
+  ): AnimationTransition | null {
     if (next === this.currentState) return null;
     const t: AnimationTransition = {
       from: this.currentState,
       to: next,
-      at: 0, // caller patches in wall ms — the Agent fills it in.
+      at,
       ...(reason !== undefined ? { reason } : {}),
       ...(fxHint !== undefined ? { fxHint } : {}),
     };

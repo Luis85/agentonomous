@@ -723,7 +723,7 @@ export class Agent {
     // Force the animation into its 'dead' state so renderers update
     // immediately; reconciliation is inert from now on since halted=true
     // short-circuits future ticks.
-    const animationT = this.animation.transition('dead', 'deceased');
+    const animationT = this.animation.transition('dead', at, 'deceased');
     if (animationT) {
       const animEvent: AnimationTransitionEvent = {
         type: ANIMATION_TRANSITION,
