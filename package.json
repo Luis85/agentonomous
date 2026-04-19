@@ -15,7 +15,7 @@
   "homepage": "https://github.com/luis85/agentonomous#readme",
   "sideEffects": false,
   "engines": {
-    "node": ">=20.18"
+    "node": ">=22"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
