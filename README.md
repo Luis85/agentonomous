@@ -22,6 +22,10 @@ zero configuration.
   categorical mood derived from needs + modifiers + persona; `agent.kill(reason)`
   for narrative deaths; `agent.getState()` surfaces everything for reactive
   stores.
+- **Runtime time control** — `agent.setTimeScale(scale)` changes the
+  wall→virtual time multiplier mid-run; new scale takes effect from the
+  next tick (determinism preserved). `setTimeScale(0)` freezes virtual-time
+  progress without killing the agent. `getTimeScale()` reads the current value.
 - **Cognition** — `UrgencyReasoner` default picks the highest-scored intention;
   `DirectBehaviorRunner` maps intentions to skill invocations;
   `Expressive` / `Active` / `Composed` needs policies.
@@ -72,6 +76,11 @@ const whiskers = createAgent({ id: 'whiskers', species: cat, timeScale: 60 });
 
 // Player interactions flow through the bus → default skill module.
 whiskers.interact('feed');
+
+// Adjust simulation speed at any time (new scale applies next tick).
+whiskers.setTimeScale(0); // pause
+whiskers.setTimeScale(60); // resume at 1× (60 virtual-s per real-s)
+whiskers.setTimeScale(480); // 8× fast-forward
 
 // Game loop.
 let last = performance.now();
@@ -183,8 +192,10 @@ npm run dev
 ```
 
 Open the printed `http://localhost:5173/` URL. Feed, pet, clean, and watch
-the pet grow up, get hungry, and eventually die (with a life-summary
-modal). LocalStorage persists the pet across reloads.
+the pet grow up, get hungry, and eventually die (with a life-summary modal
+and a "New pet" button). LocalStorage persists the pet across reloads. The
+HUD includes a **speed picker** (Pause / 0.5× / 1× / 2× / 4× / 8× — also
+persisted) and a **Reset** button (confirm-gated) for a fresh start.
 
 ## Determinism
 

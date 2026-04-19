@@ -1,32 +1,34 @@
 # Pre-v1 handoff — next session prompt
 
 Paste the body below (between the `--8<--` markers) into a fresh Claude
-Code session to pick up where we left off. The version-controlled copy of
-this file lives at `.claude/plans/pre-v1-next-session.md` so the session
-can re-read it directly with `Read`.
+Code session to pick up where we left off. The version-controlled copy
+lives at `.claude/plans/pre-v1-next-session.md` so the session can
+re-read it directly with `Read`.
 
 --8<-- COPY FROM HERE --8<--
 
 ## Where we are
 
 `agentonomous` is a TypeScript library for autonomous agents in browser /
-Node simulations. Phase A MVP is done and merged to `develop`:
+Node simulations. Phase A MVP is complete and all work so far has landed on
+`claude/phase-a-mvp-complete-A9wr3` (pending PR to `develop`).
 
-- M0–M15 feature set complete (agent + tick pipeline + needs + modifiers +
-  mood + lifecycle + cognition + skills + animation + control modes +
-  persistence + random events + reactive store binding + Excalibur
-  integration).
-- R-01..R-27 remediation landed on `develop` (R-08 — per-subsystem
-  snapshot versioning — was deferred).
-- 288 vitest tests, strict TypeScript
-  (`exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`), determinism
-  enforced via ESLint.
-- Dependencies freshly updated (ESLint 10, Vite 8, Vitest 4).
-- Demo at `examples/nurture-pet` builds on Vite 8, persists to
-  localStorage, has a life-summary modal.
-- Claude Code environment set up: `CLAUDE.md`,
-  `.claude/skills/{verify,scaffold-agent-skill,new-changeset}`,
-  pre-allowlisted permissions.
+**What shipped this session (on the branch above):**
+
+- `Agent.setTimeScale(scale)` / `Agent.getTimeScale()` — runtime-mutable
+  wall→virtual multiplier. Typed `InvalidTimeScaleError` (code
+  `E_INVALID_TIME_SCALE`). 5 new vitest cases. Changeset (minor bump).
+- Demo speed picker: Pause / 0.5× / 1× / 2× / 4× / 8×. localStorage-
+  persisted. Pause uses `setTimeScale(0)`; `kill(reason)` is still the
+  terminal death gate.
+- Demo modifier tray with `Modifier.visual.hudIcon` + remaining-time
+  countdown. Pause-aware ("paused" badge instead of wall-clock countdown).
+- Humanized age/stage display (`STAGE_LABELS` + `formatAge`).
+- Reset flow: confirm-gated HUD button + "🔄 New pet" in death modal.
+  Clears snapshot from `localStorage`, reloads; speed preference survives.
+- 293 vitest tests pass (`npm run verify` green). Demo builds clean.
+
+**Known deferred items from the review (see improvement plan below).**
 
 Branch model: `main` (tagged releases) → `develop` (integration) →
 short-lived topic branches. **Always PR against `develop`.** `main` and
@@ -38,132 +40,138 @@ Read first:
 2. `STYLE_GUIDE.md` — code style rules.
 3. `CONTRIBUTING.md` — branch flow + commit conventions.
 
-## Goal
+---
 
-Ship `v1.0.0`. Before the cut, land: richer features, a demo-speed
-control, and a materially better demo UX.
+## Goal for this session
 
-## Priorities for this session (in order)
+Merge the existing branch (`claude/phase-a-mvp-complete-A9wr3`) to
+`develop`, then land the highest-priority deferred items below before
+cutting v1.0.0.
 
-### P1 — Simulation speed control in the demo
+---
 
-The demo currently hard-codes `timeScale: 60` in
-`examples/nurture-pet/src/main.ts`. Make it runtime-configurable:
+## Priority 1 — Fix snapshot × setTimeScale interaction (blocker for v1)
 
-1. Survey whether `Agent` already exposes a setter for `timeScale`. If
-   not, add one (`agent.setTimeScale(scale: number): void`) on a topic
-   branch — small, reversible. Audit `createAgent.ts` and the tick
-   pipeline for where `timeScale` is consumed; it must be mutable without
-   breaking determinism (i.e. the new scale applies from the NEXT tick
-   onward, not retroactively).
-2. Add a speed picker to the demo HUD with discrete buttons: **Pause**,
-   **0.5×**, **1×**, **2×**, **4×**, **8×** (base = 60 virtual-s per
-   real-s). Pause = timeScale 0 OR call `agent.halt()` — pick one and
-   document why.
-3. Persist the last-chosen speed in localStorage so it survives reload.
-4. Unit test: `agent.setTimeScale(N)` then `tick(1)` → next tick uses
-   new scale (seeded clock + rng).
+**Why first:** `restore({ catchUp: true })` silently uses the _current_
+agent's `timeScale` (not the snapshotted one). A consumer who snapshots at
+scale 60 and rehydrates with a fresh agent at scale 1 gets divergent
+catch-up. Snapshot schema doesn't persist `timeScale` at all.
 
-Deliverables: one feature branch (`feat/timescale-control`),
-library-side commit + demo-side commit, changeset (minor bump), PR to
-`develop`.
+**Steps:**
 
-### P2 — Demo UX improvements
+1. Read `src/agent/Agent.ts` lines 622–640 (restore catch-up) and
+   `src/persistence/AgentSnapshot.ts` (schema).
+2. Add `timeScale?: number` to `AgentSnapshot`. Bump `schemaVersion`.
+   Add a migration entry that sets `timeScale` to `undefined` (meaning:
+   use constructor value) for old snapshots — this preserves backward
+   compat without mandating a value.
+3. In `restore()`, apply `snapshot.timeScale` (if present) before the
+   catch-up block, so the catch-up uses the original scale.
+4. Add test: snapshot agent at scale 4, restore into agent at scale 1
+   with `catchUp: true`, assert the catch-up virtual advance is scaled by
+   4 (not 1).
+5. Add test: `setTimeScale(0)` then `restore({ catchUp: true })` →
+   no error, no NaN in trace (runCatchUp already guards this, but make
+   the contract explicit).
+6. Changeset (minor bump — snapshot schema change).
 
-The demo is functional but spartan. Pick 2–3 of these based on what you
-can confidently land in scope:
+**Related:** this is the groundwork for **R-08 per-subsystem snapshot
+versioning** (each slice in `{ version, state }`). R-08 is still
+invasive; treat it as a separate PR that builds on this one.
 
-- **Need meters** — color-coded bars with numeric overlays, not just
-  text. Critical-threshold flash.
-- **Modifier tray** — visible list of active modifiers with remaining
-  time and a small icon. Use the existing `visual.hudIcon` field
-  already on default modifiers.
-- **Mood indicator** — categorical mood shown as label + emoji + subtle
-  background tint. Current mood already exposed via `agent.getState()`.
-- **Age / lifecycle stage** — human-readable ("Kitten — 23s old")
-  instead of raw seconds.
-- **Interaction feedback** — micro-animation on successful skill
-  invoke (pulse / shake / tween). `SkillCompletedEvent.fxHint` already
-  carries a hint string.
-- **New Pet / Reset** button — gated behind a confirm dialog.
-- **Export / Import snapshot** — JSON download + file-input upload.
-  Uses existing `agent.snapshot()` + `agent.restore()`.
+---
 
-Do NOT try to do all of these in one PR. One or two well-landed
-improvements beats six half-wired ones. Each goes on its own branch
-(`feat/demo-need-meters`, `feat/demo-export-snapshot`, …).
+## Priority 2 — Resolve "freeze" semantics of setTimeScale(0)
 
-### P3 — Pick one library depth item
+**Why:** when paused, modifier expiry, mood reconciliation, and animation
+transitions still advance on wall-clock time. The demo works around this
+with the "paused" badge label, but the underlying asymmetry is a design
+debt. This also affects Phase B use cases (scripted playback, UI-paused
+cutscenes).
 
-Choose based on what unblocks downstream Phase B or what the demo will
-expose first:
+**Design choice to make first** (propose a short design note as first
+commit):
 
-- **R-08 — per-subsystem snapshot versioning.** Deferred from Phase A.1.
-  Wrap each subsystem slice in `{ version, state }` and plumb a
-  migration registry. Biggest unlock: lets subsystems evolve
-  independently without rewriting the monolithic `migrations/` entries.
-  Scope it carefully — it's invasive. A design doc as the first commit
-  would help.
-- **Richer persona traits.** Currently `persona.traits` is a shallow
-  `Record<string, number>` nudged by `PERSONA_TRAIT_WEIGHTS`. Concrete
-  gap: traits should be able to modify need decay, not only intention
-  scoring. Additive, low risk.
-- **In-memory memory adapter.** Phase B originally flagged
-  Markdown-based memory. A simple ring-buffer `MemoryPort` with a
-  default in-memory adapter unlocks consumers without needing the file
-  adapter yet. Self-contained.
-- **Bundle-size trim.** Core is currently ~100 KB unminified (target
-  ~80 KB). Run `npm run analyze`, identify the top offenders, split or
-  lazy-load. Concrete, measurable, but can grow hair.
+- **Option A:** Special-case `scale === 0` in `tick()` to skip Stage 2
+  (`ModifiersTicker`), Stage 2.7 (`MoodReconciler`), and Stage 2.8
+  (`AnimationReconciler`). Clean from a user perspective; slight
+  added complexity in the tick pipeline.
+- **Option B:** Re-base modifier expiry on virtual time (`virtualNowSeconds`)
+  rather than wall-clock `tickStartedAt`. More consistent long-term;
+  breaking change for consumers who relied on wall-clock expiry.
 
-Pick ONE. Document the choice in the PR body.
+Recommendation: implement Option A for now (it's additive, no breaking
+change). File a CLAUDE.md note explaining the Option B path for Phase B.
 
-## Hard constraints
+---
 
-- **Every PR runs `npm run verify` green before merge.** The skill
-  `.claude/skills/verify/SKILL.md` wraps it.
-- **Determinism contract is non-negotiable.** No `Date.now()` /
-  `Math.random()` / `setTimeout` in `src/`. Use `WallClock`, `Rng`,
-  ports.
-- **No scope creep.** A demo-UX PR doesn't touch core library files. A
-  library PR doesn't redesign the demo. Separate PRs, separate reviews.
-- **Scaffolding a new skill?** Use `.claude/skills/scaffold-agent-skill`.
-- **Adding a changeset?** Use `.claude/skills/new-changeset`. Minor bump
-  for new API, patch for fixes, major only with migration notes.
-- **Branch naming.** `feat/<slug>` / `fix/<slug>` / `refactor/<slug>` /
-  `docs/<slug>` / `chore/<slug>`. PR against `develop`.
-- **Do not push to `main` or `develop` directly.** The settings file
-  denies those pushes, but don't even try.
+## Priority 3 — Demo UX: snapshot Export / Import
+
+**Why:** closes the last meaningful P2 item from the original session
+brief. Lets users save / share pet state as JSON files.
+
+**Steps:**
+
+1. In `ui.ts`, add `mountExportImport(agent)` — two HUD buttons:
+   - "💾 Export" — calls `agent.snapshot()`, serializes to JSON, triggers
+     `<a download="whiskers.json">` click. Pure DOM, no fetch.
+   - "📂 Import" — hidden `<input type="file" accept=".json">`, on change
+     reads file as text, parses JSON, calls
+     `agent.restore(snapshot, { catchUp: false })`. Errors surfaced as an
+     `alert()` for now.
+2. Wire in `main.ts`. Add a DOM anchor point in `index.html`.
+3. No library changes needed — `snapshot()` and `restore()` already exist.
+4. Demo-only PR, no changeset.
+
+---
+
+## Remaining deferred items (descending priority)
+
+These did not make it into the implementation plan above; address them in
+subsequent sessions or as small follow-up PRs:
+
+| ID  | Description                                                                                        | Severity |
+| --- | -------------------------------------------------------------------------------------------------- | -------- |
+| D1  | Expose `getTimeScale()` on `AgentFacade` (`src/agent/AgentFacade.ts`)                              | 🟡       |
+| D2  | Determinism proof: parallel-agent test asserting byte-identical traces across `setTimeScale` calls | 🟡       |
+| D3  | Modifier chips show dev-facing IDs; add a `Modifier.visual.label?` field or a demo label map       | 🟡       |
+| D4  | `localStorage` key prefix: `whiskers:speed` vs library `agentonomous/` convention                  | 🟢       |
+| D5  | Speed-picker visual hierarchy competes with critical-need flash; move below bars                   | 🟢       |
+| D6  | Dead `#pet-age` div (now empty) — remove from `index.html`                                         | 🟢       |
+| D7  | `formatRemaining` vs `formatAge` spacing inconsistency (`1m30s` vs `1m 30s`)                       | 🟢       |
+| D8  | R-08 per-subsystem snapshot versioning (invasive; design doc first)                                | post-v1  |
+| D9  | Bundle-size trim — `dist/index.js` is 102 KB unminified (target ~80 KB)                            | post-v1  |
+| D10 | Richer persona traits that modify need decay rates, not only intention scoring                     | post-v1  |
+
+---
+
+## Hard constraints (unchanged)
+
+- **Every PR runs `npm run verify` green before merge.**
+- **Determinism contract:** no `Date.now()` / `Math.random()` / `setTimeout`
+  in `src/`. Use `WallClock`, `Rng`, ports.
+- **No scope creep:** library PRs don't touch demo; demo PRs don't touch lib.
+- **Branch naming:** `feat/…`, `fix/…`, `refactor/…`, `docs/…`, `chore/…`.
+  PRs target `develop`.
+- **No push to `main` or `develop` directly.**
 
 ## Out of scope for v1
 
-- sim-ecs adapter
-- LLM tool / OpenAI / Anthropic SDK integration
-- Mistreevous BT adapter
-- JS-son BDI adapter
-- brain.js learning adapter
-- Social / dialogue between multiple agents
-- Markdown-backed memory file adapter
-
-These are Phase B. If a task drifts toward any of them, stop and flag it
-to the user.
-
-## When you're done with this session
-
-1. Summarize what landed in one paragraph + the open PR URLs.
-2. Call out any items from P1–P3 that weren't addressed (with reason).
-3. Suggest the next logical session's priorities. Keep it to three bullet
-   points.
+sim-ecs adapter, LLM / OpenAI / Anthropic SDK integration, Mistreevous BTs,
+JS-son BDI, brain.js learning, social/multi-agent dialogue,
+Markdown-backed memory file adapter. These are Phase B.
 
 --8<-- COPY TO HERE --8<--
 
+---
+
 ## Notes on using this prompt
 
-- The session will be fresh — no memory of our conversation. This brief
-  plus `CLAUDE.md` is the entire context it has. That's the point: if
-  something critical isn't in here or in tracked files, it's invisible.
-- If priorities shift (e.g., you decide to cut v1 sooner, or a bug
-  report lands), edit this file before starting the next session. A
-  stale handoff brief is worse than none.
-- The `.claude/skills/*` are discoverable by name — the new session
-  will see them listed and can invoke directly.
+- This brief plus `CLAUDE.md` is the entire context the next session has.
+  If priorities shift, edit this file before starting. A stale brief is
+  worse than none.
+- The branch `claude/phase-a-mvp-complete-A9wr3` may already be merged
+  to `develop` by the time you start. Run `git fetch origin develop` and
+  check `git log --oneline develop -10` to confirm.
+- The `.claude/skills/*` are discoverable by name and can be invoked
+  directly (e.g., `/verify`, `/new-changeset`, `/scaffold-agent-skill`).

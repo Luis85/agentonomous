@@ -18,17 +18,28 @@ and watch it react and act autonomously between your inputs.
 - Zero-config persistence via `LocalStorageSnapshotStore` — close the tab
   and the pet remembers.
 - Reactive state binding via `bindAgentToStore` + a minimal DOM HUD.
-- Compressed `timeScale: 60` (1 real minute ≈ 1 virtual hour).
+- **Runtime speed control** via `agent.setTimeScale(scale)` — HUD exposes
+  Pause / 0.5× / 1× / 2× / 4× / 8× buttons. The chosen speed persists to
+  `localStorage` across reloads (separate from the agent snapshot).
+- **Live modifier tray** — active buffs/debuffs shown with their
+  `Modifier.visual.hudIcon` and a remaining-time countdown. Reads "paused"
+  when timeScale is 0 to avoid leaking wall-clock countdown during a pause.
+- **Humanized age + stage** — "Kitten — 23s old" instead of raw seconds.
+- **Reset / New pet flow** — a confirm-gated "🔄 Reset" button in the HUD
+  speed bar, and a "🔄 New pet" button in the death modal. Both wipe the
+  snapshot from `localStorage` and reload; speed preference is preserved.
 
 ## Running locally
 
-Make sure that the core library is build
+Build the core library first (the demo workspace-links against `dist/`):
 
 ```bash
 # in the project root
 npm install
 npm run build
 ```
+
+Then start the demo:
 
 ```bash
 cd examples/nurture-pet
@@ -60,3 +71,13 @@ export const usePetStore = defineStore('pet', {
 const store = usePetStore();
 bindAgentToStore(pet, (state) => store.syncFromAgent(state));
 ```
+
+## localStorage key layout
+
+| Key                                   | Purpose                                        |
+| ------------------------------------- | ---------------------------------------------- |
+| `agentonomous/whiskers`               | Agent snapshot (auto-save, every 5 s)          |
+| `agentonomous/__agentonomous/index__` | Snapshot store index                           |
+| `whiskers:speed`                      | Speed-picker preference (not part of snapshot) |
+
+Reset clears the first two and reloads. Speed preference survives.
