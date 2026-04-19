@@ -18,13 +18,22 @@ const INTERACTION_BUTTONS: { verb: string; label: string }[] = [
   { verb: 'scold', label: '😠 Scold' },
 ];
 
+const STAGE_LABELS: Record<string, string> = {
+  alive: 'Alive',
+  egg: 'Egg',
+  kitten: 'Kitten',
+  adult: 'Cat',
+  elder: 'Elder Cat',
+  deceased: 'Deceased',
+};
+
 /** R-26: tracked lifetime counters for the death modal. */
-interface LifetimeCounters {
+type LifetimeCounters = {
   ateCount: number;
   scoldedCount: number;
   illnessCount: number;
   petCount: number;
-}
+};
 
 export function mountHud(agent: Agent): { update: (state: AgentState) => void } {
   const bars = document.getElementById('bars') as HTMLElement;
@@ -88,7 +97,10 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
         counters.illnessCount += 1;
       }
     } else if (event.type === 'AgentDied') {
-      showLifeSummary(agent.identity.name ?? agent.identity.id, counters, event.at);
+      const id = agent.identity.id;
+      showLifeSummary(agent.identity.name ?? id, counters, event.at, () => {
+        resetSimulation(id);
+      });
     }
   });
 
@@ -96,8 +108,9 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 
   return {
     update(state: AgentState): void {
-      stageEl.textContent = `stage: ${state.stage}`;
-      ageEl.textContent = `age: ${state.ageSeconds.toFixed(1)}s`;
+      const stageLabel = STAGE_LABELS[state.stage] ?? state.stage;
+      stageEl.textContent = `${stageLabel} — ${formatAge(state.ageSeconds)} old`;
+      ageEl.textContent = '';
       moodEl.textContent = `mood: ${state.mood?.category ?? '—'}`;
       animEl.textContent = `anim: ${state.animation}`;
 
@@ -112,12 +125,7 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
         if (value) value.textContent = level.toFixed(2);
       }
 
-      modifiersEl.innerHTML = '';
-      for (const mod of state.modifiers) {
-        const li = document.createElement('li');
-        li.textContent = mod.id;
-        modifiersEl.appendChild(li);
-      }
+      renderModifierTray(modifiersEl, agent, agent.getTimeScale() === 0);
 
       // Halt / animation visual cue.
       if (state.halted) {
@@ -150,10 +158,195 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 }
 
 /**
- * R-26: render a modal summarizing the pet's life when `AgentDied` fires.
- * Counters are aggregated from observed events during the session.
+ * Discrete simulation-speed picker. The base scale is `baseScale` virtual
+ * seconds per real second (60 in the nurture-pet demo). Multipliers map
+ * to `baseScale * mult`; the Pause button maps to scale 0.
+ *
+ * Persists the last selection to `localStorage` under `<storageKey>` so
+ * reloads keep the player's preferred speed. Pause uses
+ * `setTimeScale(0)` rather than `agent.kill(reason)` — `kill` is the
+ * terminal death gate; `setTimeScale(0)` is the reversible pause.
+ *
+ * The picker is rendered as an ARIA `radiogroup`; the active button
+ * carries `aria-pressed="true"` and a visual `.active` class. Saved
+ * values that no longer match the available `choices` are discarded and
+ * replaced with the default `1×`.
  */
-function showLifeSummary(name: string, counters: LifetimeCounters, diedAtMs: number): void {
+export function mountSpeedPicker(
+  agent: Agent,
+  opts: { baseScale: number; storageKey: string },
+): void {
+  const container = document.getElementById('speed-picker');
+  if (!container) return;
+  container.setAttribute('role', 'radiogroup');
+  container.setAttribute('aria-label', 'Simulation speed');
+  const choices: { label: string; ariaLabel: string; mult: number | 'pause' }[] = [
+    { label: '⏸ Pause', ariaLabel: 'Pause', mult: 'pause' },
+    { label: '0.5×', ariaLabel: '0.5x speed', mult: 0.5 },
+    { label: '1×', ariaLabel: '1x speed', mult: 1 },
+    { label: '2×', ariaLabel: '2x speed', mult: 2 },
+    { label: '4×', ariaLabel: '4x speed', mult: 4 },
+    { label: '8×', ariaLabel: '8x speed', mult: 8 },
+  ];
+  const validMults = new Set<number | 'pause'>(choices.map((c) => c.mult));
+
+  const saved = readSavedMult(opts.storageKey);
+  const initialMult: number | 'pause' = saved !== null && validMults.has(saved) ? saved : 1;
+  if (saved !== null && !validMults.has(saved)) writeSavedMult(opts.storageKey, 1);
+  applyMult(agent, opts.baseScale, initialMult);
+
+  const buttons: HTMLButtonElement[] = [];
+  for (const [idx, choice] of choices.entries()) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = choice.label;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-label', choice.ariaLabel);
+    const isActive = choice.mult === initialMult;
+    btn.setAttribute('aria-pressed', String(isActive));
+    if (isActive) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      applyMult(agent, opts.baseScale, choice.mult);
+      writeSavedMult(opts.storageKey, choice.mult);
+      for (const [i, b] of buttons.entries()) {
+        const active = i === idx;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', String(active));
+      }
+    });
+    buttons.push(btn);
+    container.appendChild(btn);
+  }
+}
+
+function applyMult(agent: Agent, baseScale: number, mult: number | 'pause'): void {
+  agent.setTimeScale(mult === 'pause' ? 0 : baseScale * mult);
+}
+
+const SNAPSHOT_PREFIX = 'agentonomous/';
+const SNAPSHOT_INDEX_KEY = `${SNAPSHOT_PREFIX}__agentonomous/index__`;
+
+/**
+ * Wipe the persisted snapshot for `agentId` from `localStorage` and reload
+ * the page so a fresh agent is constructed from defaults. The user's
+ * speed-picker preference is intentionally preserved.
+ *
+ * Mirrors the `LocalStorageSnapshotStore` key layout
+ * (`agentonomous/<id>` + the shared `agentonomous/__agentonomous/index__`).
+ */
+export function resetSimulation(agentId: string): void {
+  try {
+    globalThis.localStorage?.removeItem(`${SNAPSHOT_PREFIX}${agentId}`);
+    globalThis.localStorage?.removeItem(SNAPSHOT_INDEX_KEY);
+  } catch {
+    // localStorage unavailable — nothing to clean up; reload still resets in-memory state.
+  }
+  globalThis.location?.reload();
+}
+
+/**
+ * Mount the persistent "Reset" button. Clicking it confirms the action,
+ * then calls `resetSimulation(agentId)`. The confirm dialog guards against
+ * accidental clicks since reset is destructive (lifetime stats lost).
+ */
+export function mountResetButton(agent: Agent): void {
+  const btn = document.getElementById('reset-button');
+  if (!btn) return;
+  btn.setAttribute('aria-label', `Reset ${agent.identity.name ?? agent.identity.id}`);
+  btn.addEventListener('click', () => {
+    const name = agent.identity.name ?? agent.identity.id;
+    if (globalThis.confirm?.(`Reset ${name}? Lifetime stats and current state will be lost.`)) {
+      resetSimulation(agent.identity.id);
+    }
+  });
+}
+
+function readSavedMult(key: string): number | 'pause' | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    if (raw === null || raw === undefined) return null;
+    if (raw === 'pause') return 'pause';
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedMult(key: string, mult: number | 'pause'): void {
+  try {
+    globalThis.localStorage?.setItem(key, mult === 'pause' ? 'pause' : String(mult));
+  } catch {
+    // localStorage unavailable (private mode, quota); silently skip.
+  }
+}
+
+/**
+ * Render active modifiers as a chip list with the modifier's HUD icon (if
+ * declared on `Modifier.visual.hudIcon`) and a live remaining-time
+ * countdown for time-bound modifiers.
+ *
+ * When `paused` is true, the countdown is rendered as `paused` instead of
+ * a wall-clock-derived figure. Modifier expiry is itself wall-clock-bound
+ * (a documented quirk — see `setTimeScale` JSDoc), so during pause the
+ * actual countdown still elapses; this label keeps the UI honest about
+ * the user's intent without misrepresenting the underlying state.
+ */
+function renderModifierTray(host: HTMLElement, agent: Agent, paused: boolean): void {
+  host.innerHTML = '';
+  const now = agent.clock.now();
+  for (const mod of agent.modifiers.list()) {
+    const li = document.createElement('li');
+    const icon = mod.visual?.hudIcon;
+    const label = icon ? `${icon} ${mod.id}` : mod.id;
+    li.textContent = label;
+    if (typeof mod.expiresAt === 'number') {
+      const time = document.createElement('span');
+      time.className = 'mod-time';
+      if (paused) {
+        time.textContent = ' paused';
+      } else {
+        const remainingMs = Math.max(0, mod.expiresAt - now);
+        time.textContent = ` ${formatRemaining(remainingMs)}`;
+      }
+      li.appendChild(time);
+    }
+    host.appendChild(li);
+  }
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function formatRemaining(ms: number): string {
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m}m` : `${m}m${rem}s`;
+}
+
+/**
+ * R-26: render a modal summarizing the pet's life when `AgentDied` fires.
+ * Counters are aggregated from observed events during the session. The
+ * "New pet" button calls `onNewPet` which typically wipes persisted state
+ * and reloads the page.
+ */
+function showLifeSummary(
+  name: string,
+  counters: LifetimeCounters,
+  diedAtMs: number,
+  onNewPet: () => void,
+): void {
   if (document.getElementById('life-summary')) return;
   const overlay = document.createElement('div');
   overlay.id = 'life-summary';
@@ -191,13 +384,19 @@ function showLifeSummary(name: string, counters: LifetimeCounters, diedAtMs: num
       <li>😠 Scolded <strong>${counters.scoldedCount}</strong> times</li>
       <li>🤒 Caught <strong>${counters.illnessCount}</strong> illnesses</li>
     </ul>
-    <button id="life-summary-close" style="padding:8px 16px;border-radius:6px;border:none;background:#2563eb;color:white;cursor:pointer;font-size:14px;">Close</button>
+    <div style="display:flex;gap:8px;justify-content:center;">
+      <button id="life-summary-close" style="padding:8px 16px;border-radius:6px;border:none;background:#cbd5e1;color:#0f172a;cursor:pointer;font-size:14px;">Close</button>
+      <button id="life-summary-new" style="padding:8px 16px;border-radius:6px;border:none;background:#2563eb;color:white;cursor:pointer;font-size:14px;">🔄 New pet</button>
+    </div>
   `;
 
   overlay.appendChild(card);
   document.body.appendChild(overlay);
   document.getElementById('life-summary-close')?.addEventListener('click', () => {
     overlay.remove();
+  });
+  document.getElementById('life-summary-new')?.addEventListener('click', () => {
+    onNewPet();
   });
 }
 

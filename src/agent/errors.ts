@@ -70,3 +70,11 @@ export class BudgetExceededError extends AgentError {
     this.name = 'BudgetExceededError';
   }
 }
+
+/** A `setTimeScale(scale)` call received a non-finite or negative value. */
+export class InvalidTimeScaleError extends AgentError {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super('E_INVALID_TIME_SCALE', message, options);
+    this.name = 'InvalidTimeScaleError';
+  }
+}

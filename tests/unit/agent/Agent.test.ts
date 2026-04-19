@@ -5,7 +5,7 @@ import type { AgentModule } from '../../../src/agent/AgentModule.js';
 import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
-import { MissingDependencyError } from '../../../src/agent/errors.js';
+import { InvalidTimeScaleError, MissingDependencyError } from '../../../src/agent/errors.js';
 
 function baseDeps(overrides: Partial<AgentDependencies> = {}): AgentDependencies {
   const identity: AgentIdentity = {
@@ -236,5 +236,48 @@ describe('Agent (M2 shell)', () => {
     const facade = onInstall.mock.calls[0]?.[0] as { identity: { id: string } } | undefined;
     expect(facade?.identity.id).toBe('whiskers');
     expect(agent).toBeInstanceOf(Agent);
+  });
+
+  describe('setTimeScale()', () => {
+    it('applies the new scale starting on the next tick', async () => {
+      const agent = new Agent(baseDeps({ timeScale: 2 }));
+      const first = await agent.tick(0.5);
+      expect(first.virtualDtSeconds).toBeCloseTo(1.0); // 0.5 * 2
+
+      agent.setTimeScale(4);
+      expect(agent.getTimeScale()).toBe(4);
+
+      const second = await agent.tick(0.5);
+      expect(second.virtualDtSeconds).toBeCloseTo(2.0); // 0.5 * 4
+    });
+
+    it('treats scale 0 as a freeze: virtual time stops advancing', async () => {
+      const agent = new Agent(baseDeps({ timeScale: 60 }));
+      agent.setTimeScale(0);
+      const trace = await agent.tick(0.25);
+      expect(trace.virtualDtSeconds).toBe(0);
+      expect(trace.halted).toBe(false);
+    });
+
+    it('rejects negative, NaN, and infinite scales', () => {
+      const agent = new Agent(baseDeps());
+      expect(() => agent.setTimeScale(-1)).toThrow(InvalidTimeScaleError);
+      expect(() => agent.setTimeScale(Number.NaN)).toThrow(InvalidTimeScaleError);
+      expect(() => agent.setTimeScale(Number.POSITIVE_INFINITY)).toThrow(InvalidTimeScaleError);
+      expect(agent.getTimeScale()).toBe(1); // unchanged after rejection
+    });
+
+    it('getTimeScale() reflects the constructor value before any setter call', () => {
+      expect(new Agent(baseDeps({ timeScale: 7 })).getTimeScale()).toBe(7);
+      expect(new Agent(baseDeps()).getTimeScale()).toBe(1);
+    });
+
+    it('preserves sub-unit positive scales without underflow', async () => {
+      const agent = new Agent(baseDeps());
+      agent.setTimeScale(1e-6);
+      const trace = await agent.tick(0.001);
+      expect(trace.virtualDtSeconds).toBeCloseTo(1e-9, 12);
+      expect(trace.virtualDtSeconds).toBeGreaterThan(0);
+    });
   });
 });

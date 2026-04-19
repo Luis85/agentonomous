@@ -11,9 +11,12 @@ import {
   bindAgentToStore,
 } from 'agentonomous';
 import { catSpecies } from './species.js';
-import { mountHud } from './ui.js';
+import { mountHud, mountResetButton, mountSpeedPicker } from './ui.js';
 
 const STORAGE_KEY = 'whiskers';
+const SPEED_STORAGE_KEY = 'whiskers:speed';
+// Base wall→virtual scale. The speed picker multiplies this; 1× == base.
+const BASE_TIME_SCALE = 60;
 
 // --- Random events ------------------------------------------------------------
 // R-11: cadence tuned so a player sees 2–3 events per virtual minute.
@@ -53,7 +56,7 @@ const pet = createAgent({
   id: STORAGE_KEY,
   name: 'Whiskers',
   species: catSpecies,
-  timeScale: 60,
+  timeScale: BASE_TIME_SCALE,
   rng: STORAGE_KEY,
   memory: new InMemoryMemoryAdapter(),
   modules: [defaultPetInteractionModule],
@@ -63,6 +66,8 @@ const pet = createAgent({
 
 // --- Mount UI + reactive binding ----------------------------------------------
 const hud = mountHud(pet);
+mountSpeedPicker(pet, { baseScale: BASE_TIME_SCALE, storageKey: SPEED_STORAGE_KEY });
+mountResetButton(pet);
 bindAgentToStore(pet, (state) => {
   hud.update(state);
 });

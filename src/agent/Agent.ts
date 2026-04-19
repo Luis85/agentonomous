@@ -63,7 +63,7 @@ import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
 import type { ControlMode } from './ControlMode.js';
 import type { DecisionTrace } from './DecisionTrace.js';
-import { MissingDependencyError } from './errors.js';
+import { InvalidTimeScaleError, MissingDependencyError } from './errors.js';
 import { LifecycleTicker } from './internal/LifecycleTicker.js';
 import { ModifiersTicker } from './internal/ModifiersTicker.js';
 import { NeedsTicker } from './internal/NeedsTicker.js';
@@ -189,7 +189,7 @@ export class Agent {
   /** Cumulative virtual seconds tracked for random-event cooldown bookkeeping. */
   protected virtualNowSeconds = 0;
 
-  protected readonly timeScale: number;
+  protected timeScale: number;
   /** Current control mode — `autonomous` / `scripted` / `remote`. Mutable to support switching mid-run. */
   controlMode: ControlMode;
   /** `true` once the agent has died — ticks become no-ops. Public for helper access. */
@@ -485,6 +485,34 @@ export class Agent {
   /** Public death trigger for narrative / event-driven deaths. */
   kill(reason: string): void {
     this.die('explicit', reason, this.clock.now());
+  }
+
+  /**
+   * Replace the wall-to-virtual time multiplier for subsequent ticks.
+   *
+   * Applies from the NEXT `tick()` onward — the in-flight tick (if any)
+   * keeps its original scale, so determinism under a fixed clock + rng is
+   * preserved. Pass `0` to freeze virtual-time-driven progress (needs
+   * decay, aging, random events) without killing the agent. Note that
+   * modifier expiry, mood reconciliation, and animation transitions are
+   * keyed off wall-clock time and therefore continue to advance even at
+   * scale `0`. Use `kill(reason)` for terminal halts.
+   *
+   * Throws `InvalidTimeScaleError` if `scale` is not finite or is
+   * negative.
+   */
+  setTimeScale(scale: number): void {
+    if (!Number.isFinite(scale) || scale < 0) {
+      throw new InvalidTimeScaleError(
+        `setTimeScale: expected a finite, non-negative number, got ${String(scale)}`,
+      );
+    }
+    this.timeScale = scale;
+  }
+
+  /** Current wall-to-virtual time multiplier. */
+  getTimeScale(): number {
+    return this.timeScale;
   }
 
   // =========================================================================

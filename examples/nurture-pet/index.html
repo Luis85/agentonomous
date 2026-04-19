@@ -121,6 +121,62 @@
         flex-wrap: wrap;
         gap: 8px;
       }
+      .speed {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      @media (prefers-color-scheme: dark) {
+        .speed {
+          background: #1b2140;
+        }
+      }
+      .speed-label {
+        font-size: 12px;
+        opacity: 0.7;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .speed-buttons {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .speed-buttons button {
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #475569;
+      }
+      .speed-buttons button:hover {
+        background: #334155;
+      }
+      .speed-buttons button.active {
+        background: #16a34a;
+        box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+      }
+      .reset-button {
+        margin-left: auto;
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #94a3b8;
+      }
+      .reset-button:hover {
+        background: #64748b;
+      }
+      .modifiers li {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .modifiers .mod-time {
+        font-variant-numeric: tabular-nums;
+        opacity: 0.7;
+        font-size: 11px;
+      }
       button {
         padding: 8px 14px;
         border-radius: 8px;
@@ -158,6 +214,11 @@
     </section>
 
     <section class="hud">
+      <div class="speed">
+        <span class="speed-label">Speed</span>
+        <div class="speed-buttons" id="speed-picker"></div>
+        <button id="reset-button" class="reset-button" type="button">🔄 Reset</button>
+      </div>
       <div class="bars" id="bars"></div>
       <div class="modifiers">
         <strong>Buffs / debuffs</strong>
