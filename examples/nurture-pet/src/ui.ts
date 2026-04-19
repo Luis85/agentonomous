@@ -159,7 +159,7 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 
 /**
  * Discrete simulation-speed picker. The base scale is `baseScale` virtual
- * seconds per real second (60 in the nurture-pet demo). Multipliers map
+ * seconds per real second (10 in the nurture-pet demo). Multipliers map
  * to `baseScale * mult`; the Pause button maps to scale 0.
  *
  * Persists the last selection to `localStorage` under `<storageKey>` so
