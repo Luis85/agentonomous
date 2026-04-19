@@ -1,4 +1,5 @@
 import type { AgentIdentity } from '../agent/AgentIdentity.js';
+import type { AnimationState } from '../animation/AnimationState.js';
 import type { DomainEvent } from '../events/DomainEvent.js';
 import type { LifeStage } from '../lifecycle/LifeStage.js';
 import type { MemoryRecord } from '../memory/MemoryRecord.js';
@@ -14,6 +15,7 @@ export type SnapshotPart =
   | 'needs'
   | 'modifiers'
   | 'mood'
+  | 'animation'
   | 'memory'
   | 'beliefs'
   | 'custom';
@@ -45,6 +47,17 @@ export interface AgentSnapshot {
   modifiers?: readonly Modifier[];
 
   mood?: Mood;
+
+  /**
+   * Animation state machine slice + the id of the skill (if any) currently
+   * driving the animation. Persisted so a fresh agent rehydrated from a
+   * snapshot mid-skill doesn't emit a spurious `AnimationTransition` on
+   * the first post-restore tick.
+   */
+  animation?: {
+    state: AnimationState;
+    activeSkillId: string | undefined;
+  };
 
   memory?: readonly MemoryRecord[];
 

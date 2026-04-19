@@ -519,6 +519,12 @@ export class Agent {
     if (this.currentMood && wanted('mood')) {
       snap.mood = { ...this.currentMood };
     }
+    if (wanted('animation')) {
+      snap.animation = {
+        state: this.animation.current(),
+        activeSkillId: this.currentActiveSkillId,
+      };
+    }
     if (this.memory && wanted('memory') && isInMemoryMemoryAdapter(this.memory)) {
       const records = this.memory.snapshot();
       if (records.length > 0) snap.memory = [...records];
@@ -561,6 +567,10 @@ export class Agent {
     }
     if (snapshot.mood) {
       this.currentMood = { ...snapshot.mood };
+    }
+    if (snapshot.animation) {
+      this.animation.restore({ state: snapshot.animation.state });
+      this.currentActiveSkillId = snapshot.animation.activeSkillId;
     }
     if (snapshot.memory && this.memory && isInMemoryMemoryAdapter(this.memory)) {
       this.memory.restore(snapshot.memory);
