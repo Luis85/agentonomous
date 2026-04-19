@@ -363,12 +363,16 @@ function writeSavedMult(key: string, mult: number | 'pause'): void {
 }
 
 /**
- * Diffing renderer for the active-modifier chip list. Keeps per-id `<li>`
- * nodes alive across frames so the per-frame HUD update only touches the
+ * Diffing renderer for the active-modifier chip list. Keeps `<li>` nodes
+ * alive across frames so the per-frame HUD update only touches the
  * countdown text (the only thing that actually changes most ticks).
- * Chips are added when a modifier appears, removed when it expires, and
- * re-ordered via `appendChild` (which moves an existing node) to match
- * `agent.modifiers.list()`.
+ *
+ * Chips are keyed by `id` + occurrence index within the current
+ * `agent.modifiers.list()` so `stack: 'stack'` entries (which share an
+ * `id`) each get their own row. Reusing positional keys across frames
+ * preserves diffing in the common case; when a middle entry expires the
+ * remaining chips shift up, which rewrites their text but not the DOM
+ * node count.
  *
  * When `paused` is true the countdown reads `paused` rather than a wall
  * clock figure. Modifier expiry is itself wall-clock-bound (see
@@ -387,31 +391,52 @@ function createModifierTrayRenderer(host: HTMLElement): {
       const now = agent.clock.now();
       const list = agent.modifiers.list();
       const seen = new Set<string>();
+      const nthById = new Map<string, number>();
 
       for (const mod of list) {
-        seen.add(mod.id);
+        const nth = nthById.get(mod.id) ?? 0;
+        nthById.set(mod.id, nth + 1);
+        const key = `${mod.id}#${nth}`;
+        seen.add(key);
+
         const icon = mod.visual?.hudIcon;
         const name = mod.visual?.label ?? mod.id;
         const label = icon ? `${icon} ${name}` : name;
+        const hasTime = typeof mod.expiresAt === 'number';
 
-        let chip = chips.get(mod.id);
+        let chip = chips.get(key);
         if (!chip) {
           const li = document.createElement('li');
           li.textContent = label;
           let time: HTMLSpanElement | null = null;
-          if (typeof mod.expiresAt === 'number') {
+          if (hasTime) {
             time = document.createElement('span');
             time.className = 'mod-time';
             li.appendChild(time);
           }
           chip = { li, time, label };
-          chips.set(mod.id, chip);
+          chips.set(key, chip);
           host.appendChild(li);
-        } else if (chip.label !== label) {
-          // Label changed (e.g. visual swap) — rewrite text, preserve time span.
-          chip.li.textContent = label;
-          if (chip.time) chip.li.appendChild(chip.time);
-          chip.label = label;
+        } else {
+          if (chip.label !== label) {
+            // Positional slot now holds a different modifier (middle entry
+            // expired and later ones shifted up) or the visual changed —
+            // rewrite the label text while preserving the time span.
+            chip.li.textContent = label;
+            if (chip.time) chip.li.appendChild(chip.time);
+            chip.label = label;
+          }
+          // Time span presence can flip if a chip slot is reused for a
+          // modifier with/without `expiresAt`. Reconcile both directions.
+          if (hasTime && !chip.time) {
+            const time = document.createElement('span');
+            time.className = 'mod-time';
+            chip.li.appendChild(time);
+            chip.time = time;
+          } else if (!hasTime && chip.time) {
+            chip.time.remove();
+            chip.time = null;
+          }
         }
 
         if (chip.time) {
@@ -422,10 +447,10 @@ function createModifierTrayRenderer(host: HTMLElement): {
         }
       }
 
-      for (const [id, chip] of chips) {
-        if (!seen.has(id)) {
+      for (const [key, chip] of chips) {
+        if (!seen.has(key)) {
           chip.li.remove();
-          chips.delete(id);
+          chips.delete(key);
         }
       }
     },
