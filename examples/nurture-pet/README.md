@@ -108,8 +108,9 @@ Pair this with a `requestAnimationFrame` loop that calls
 A dropdown above the HUD lets you live-swap the agent's reasoner. The
 module establishes the repo's pattern for async peer-dep probing at
 mount time — each mode's `probe()` is a try/catch dynamic `import()`
-of its peer. A post-mount epoch guard discards stale probe results if
-the user flips modes before the in-flight probe resolves.
+of its peer. An epoch guard on the `change` handler discards stale
+`construct()` results if the user flips modes before the in-flight
+construction resolves.
 
 ```ts
 import { mountCognitionSwitcher } from './cognitionSwitcher.js';
