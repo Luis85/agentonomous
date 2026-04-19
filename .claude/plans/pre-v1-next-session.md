@@ -1,19 +1,12 @@
-# Pre-v1 handoff — next session prompt
-
-Paste the body below (between the `--8<--` markers) into a fresh Claude
-Code session to pick up where we left off. The version-controlled copy
-lives at `.claude/plans/pre-v1-next-session.md` so the session can
-re-read it directly with `Read`.
-
---8<-- COPY FROM HERE --8<--
+# Pre-v1 handoff
 
 ## Where we are
 
 `agentonomous` is a TypeScript library for autonomous agents in browser /
 Node simulations. Phase A MVP is complete and all work so far has landed on
-`claude/phase-a-mvp-complete-A9wr3` (pending PR to `develop`).
+`develop` but we want to further polish what we have as this is not polished enough for a well received demo.
 
-**What shipped this session (on the branch above):**
+**What shipped last session (on the branch above):**
 
 - `Agent.setTimeScale(scale)` / `Agent.getTimeScale()` — runtime-mutable
   wall→virtual multiplier. Typed `InvalidTimeScaleError` (code
@@ -39,14 +32,6 @@ Read first:
 1. `CLAUDE.md` — non-negotiables, architecture map, common pitfalls.
 2. `STYLE_GUIDE.md` — code style rules.
 3. `CONTRIBUTING.md` — branch flow + commit conventions.
-
----
-
-## Goal for this session
-
-Merge the existing branch (`claude/phase-a-mvp-complete-A9wr3`) to
-`develop`, then land the highest-priority deferred items below before
-cutting v1.0.0.
 
 ---
 
@@ -155,23 +140,11 @@ subsequent sessions or as small follow-up PRs:
   PRs target `develop`.
 - **No push to `main` or `develop` directly.**
 
+## In-Scope for the MVP Demo
+
+Mistreevous BTs, JS-son BDI, brain.js learning
+
 ## Out of scope for v1
 
-sim-ecs adapter, LLM / OpenAI / Anthropic SDK integration, Mistreevous BTs,
-JS-son BDI, brain.js learning, social/multi-agent dialogue,
+sim-ecs adapter, LLM / OpenAI / Anthropic SDK integration, social/multi-agent dialogue,
 Markdown-backed memory file adapter. These are Phase B.
-
---8<-- COPY TO HERE --8<--
-
----
-
-## Notes on using this prompt
-
-- This brief plus `CLAUDE.md` is the entire context the next session has.
-  If priorities shift, edit this file before starting. A stale brief is
-  worse than none.
-- The branch `claude/phase-a-mvp-complete-A9wr3` may already be merged
-  to `develop` by the time you start. Run `git fetch origin develop` and
-  check `git log --oneline develop -10` to confirm.
-- The `.claude/skills/*` are discoverable by name and can be invoked
-  directly (e.g., `/verify`, `/new-changeset`, `/scaffold-agent-skill`).
