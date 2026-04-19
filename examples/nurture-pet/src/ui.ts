@@ -43,7 +43,6 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
   const petEl = document.getElementById('pet') as HTMLElement;
   const nameEl = document.getElementById('pet-name') as HTMLElement;
   const stageEl = document.getElementById('pet-stage') as HTMLElement;
-  const ageEl = document.getElementById('pet-age') as HTMLElement;
   const moodEl = document.getElementById('pet-mood') as HTMLElement;
   const animEl = document.getElementById('pet-animation') as HTMLElement;
 
@@ -110,7 +109,6 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
     update(state: AgentState): void {
       const stageLabel = STAGE_LABELS[state.stage] ?? state.stage;
       stageEl.textContent = `${stageLabel} — ${formatAge(state.ageSeconds)} old`;
-      ageEl.textContent = '';
       moodEl.textContent = `mood: ${state.mood?.category ?? '—'}`;
       animEl.textContent = `anim: ${state.animation}`;
 
