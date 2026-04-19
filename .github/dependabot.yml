@@ -1,0 +1,69 @@
+# Dependabot — automated dependency updates.
+#
+# Keeps npm + GitHub Actions deps fresh so the next runtime/runner
+# deprecation doesn't catch CI cold. PRs target `develop`; review
+# follows the same rules as any topic branch.
+
+version: 2
+updates:
+  # Library package + devDependencies.
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  # Demo example (workspace-local, consumes the built library).
+  - package-ecosystem: npm
+    directory: /examples/nurture-pet
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - demo
+    commit-message:
+      prefix: chore(demo-deps)
+      include: scope
+
+  # GitHub Actions — batched so a runner-deprecation sweep (e.g. Node 20
+  # → 24) lands as one PR, not one-per-workflow.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: chore(ci)
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - '*'
