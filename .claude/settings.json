@@ -126,5 +126,8 @@
       "Bash(rm -rf tests*)",
       "Bash(rm -rf .git*)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true
   }
 }
