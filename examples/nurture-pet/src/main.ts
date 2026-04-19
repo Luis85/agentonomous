@@ -12,6 +12,7 @@ import {
 } from 'agentonomous';
 import { catSpecies } from './species.js';
 import { mountExportImport, mountHud, mountResetButton, mountSpeedPicker } from './ui.js';
+import { mountTraceView } from './traceView.js';
 
 const STORAGE_KEY = 'whiskers';
 const SPEED_STORAGE_KEY = 'agentonomous/speed';
@@ -85,6 +86,7 @@ const pet = createAgent({
 
 // --- Mount UI + reactive binding ----------------------------------------------
 const hud = mountHud(pet);
+const traceView = mountTraceView(pet);
 mountSpeedPicker(pet, { baseScale: BASE_TIME_SCALE, storageKey: SPEED_STORAGE_KEY });
 mountExportImport(pet);
 mountResetButton(pet);
@@ -146,7 +148,8 @@ let last = performance.now();
 async function loop(now: number): Promise<void> {
   const dt = Math.min((now - last) / 1000, 0.25);
   last = now;
-  await pet.tick(dt);
+  const trace = await pet.tick(dt);
+  traceView.render(trace, pet.getState());
   requestAnimationFrame((t) => {
     void loop(t);
   });
