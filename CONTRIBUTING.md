@@ -20,7 +20,20 @@ topic branches cut from `develop`:
 - `fix/<slug>` — bug fixes (`fix/snapshot-roundtrip-mood`).
 - `refactor/<slug>` — internal reshaping with no behavior change.
 - `docs/<slug>` — documentation-only.
-- `phase-<n>/<theme>` — large multi-item work (`phase-a1/persistence`).
+- `chore/<slug>` — tooling, config, CI, build — no library behavior.
+- `test/<slug>` — test-only additions or restructuring.
+
+### One PR, one branch
+
+Every logically independent change gets its own topic branch cut from
+`develop`. Do **not** stack unrelated work on a single branch and split
+it into PRs afterwards — that forces cherry-picking, duplicate review
+rounds, and redundant `npm run verify` passes. The only time a shared
+branch is acceptable is when a later task genuinely depends on an
+earlier, still-unmerged task.
+
+If a session covers three independent items, cut three branches up
+front and open three PRs in parallel.
 
 ### Lifecycle of a change
 
@@ -33,11 +46,41 @@ develop ────────────────────────
                                                   PR + review
 ```
 
-1. Branch from `develop`: `git switch develop && git pull && git switch -c feat/foo`.
-2. Commit locally. Follow the commit-message convention below.
-3. Push. Open a pull request targeting `develop`.
-4. CI gates + reviewer approve. Squash-or-rebase merge. Delete the topic branch.
-5. `develop` accumulates merged work until we're ready to release.
+1. Refresh `develop`: `git switch develop && git pull origin develop`.
+2. Branch: `git switch -c feat/foo`.
+3. Commit locally. Follow the commit-message convention below. Keep
+   commits small and reversible; no merge commits on the topic branch
+   while it's in review.
+4. Run `npm run verify` until it's green.
+5. Push: `git push -u origin feat/foo`. Open a PR targeting `develop`.
+6. CI + reviewer must approve. **Squash-merge** via the GitHub UI so
+   `develop` keeps a linear, one-commit-per-PR history.
+7. **Cleanup.** Immediately after merge:
+   ```bash
+   git switch develop
+   git pull origin develop
+   git branch -d feat/foo            # local
+   # Remote: click "Delete branch" in the merged-PR UI, or:
+   # git push origin --delete feat/foo
+   git fetch --prune origin          # drop stale tracking refs
+   ```
+
+### Keeping a long-running topic branch current
+
+If `develop` moves while your PR is in review and you need the new
+commits:
+
+```bash
+git switch develop && git pull origin develop
+git switch feat/foo
+git rebase develop                   # linear history, preferred
+# or: git merge develop              # only if rebase is impractical
+git push --force-with-lease origin feat/foo
+```
+
+Rebase over merge — it keeps the PR diff clean and squash-friendly.
+Only use `--force-with-lease` (never `--force`) when pushing a rebased
+topic branch.
 
 ### Releases
 
@@ -86,9 +129,13 @@ carried one, leaving stale state on partial restores. …
 - Title: short, imperative, no period. "Add markdown memory adapter".
 - Body: summary + test plan. Link to relevant R-XX or issue numbers.
 - Required gates before merge: `npm run verify` (= format:check + lint +
-  typecheck + test + build), GitHub Actions CI green.
+  typecheck + test + build), GitHub Actions CI green. CI runs on every
+  push to and PR against `develop` or `main` (see
+  `.github/workflows/ci.yml`).
 - Reviews: at least one approving review for anything beyond a
   one-line docs tweak.
+- Merge strategy: **squash-merge**. Keeps `develop` linear with one
+  commit per PR and keeps the PR's granular history in the PR timeline.
 
 ## Local setup
 
@@ -104,9 +151,11 @@ npm run build         # vite library mode
 
 ### Husky + lint-staged
 
-Pre-commit hooks run `eslint --fix` and `prettier --write` on staged files.
-To bypass in emergencies: `git commit --no-verify` (discouraged — it means
-CI will reject the PR).
+Pre-commit hooks run `eslint --fix` and `prettier --write` on staged
+files. **Do not bypass hooks.** `--no-verify` / `-n` on `git commit` is
+prohibited: if a hook fails, fix the underlying cause. CI re-runs the
+same checks and will reject any commit that skipped them locally. The
+Claude Code harness denies the flag at the permission layer as well.
 
 ### Changesets
 

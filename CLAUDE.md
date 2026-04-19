@@ -20,6 +20,17 @@ MVP is a virtual-pet nurture demo (`examples/nurture-pet`).
   `develop` (`feat/…`, `fix/…`, `refactor/…`, `docs/…`, `chore/…`).
   **Never push directly to `main` or `develop`.** PRs target `develop`
   (except hotfixes, which target `main`).
+- **One PR, one branch, from the start.** If a session covers multiple
+  independent tasks, cut a fresh topic branch from `develop` for each
+  one — never stack them on a shared branch and split later. Splitting
+  after the fact means cherry-picking, three parallel review rounds, and
+  three verify cycles. Only share a branch when a later task genuinely
+  depends on an earlier unmerged one (rare).
+- **Post-merge cleanup.** After a PR merges: `git switch develop && git
+pull origin develop && git branch -d <topic>`. Delete the remote topic
+  branch via the merged-PR UI (or `git push origin --delete <topic>` if
+  permissions allow). Prune stale tracking refs with `git fetch --prune
+origin` when switching contexts.
 - **Pre-PR gate.** `npm run verify` must be green before opening a PR.
   Equivalent to `format:check && lint && typecheck && test && build`.
 - **No `--no-verify`.** If a pre-commit hook fails, fix the cause — don't
@@ -28,7 +39,7 @@ MVP is a virtual-pet nurture demo (`examples/nurture-pet`).
 ## Key commands
 
 ```bash
-npm test              # vitest run (288 tests)
+npm test              # vitest run (~300 tests)
 npm run typecheck     # tsc --noEmit (strict + exactOptionalPropertyTypes)
 npm run lint          # eslint flat config
 npm run format        # prettier --write .

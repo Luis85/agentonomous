@@ -14,7 +14,7 @@ sequentially; if any fails, later stages are skipped.
 1. `npm run format:check` — Prettier
 2. `npm run lint` — ESLint flat config
 3. `npm run typecheck` — `tsc --noEmit` (strict + exactOptionalPropertyTypes)
-4. `npm test` — Vitest (288 tests as of last commit)
+4. `npm test` — Vitest (~300 tests; don't hard-code the count in reports)
 5. `npm run build` — Vite library mode → `dist/`
 
 ## How to use
@@ -41,7 +41,8 @@ npm run build          # if the build is the issue
 After `verify` completes, report:
 
 - **Pass:** one-line confirmation (`All 5 stages green — ready to
-PR.`). Include the test count if it changed from the expected 288.
+PR.`). Include the current test count so regressions in coverage are
+  visible at a glance.
 - **Fail:** name the failing stage, quote the first error, and suggest
   the single command to reproduce. Don't dump full stack traces unless
   the user asks.
