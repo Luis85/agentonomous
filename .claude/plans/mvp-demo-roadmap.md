@@ -194,8 +194,28 @@ Week 3 — **P2** (seed controls + D2 integration test), **D3**.
 Week 4 — **P3** (JSON config).
 Week 5+ — **P4** (cognition adapters, one PR each).
 
-v1.0.0 ships when P0 + P1 + P2 are live (definition-of-done items 1,
-2, 5 from the spec). P3 + P4 can land as 1.1 / 1.2 minor bumps.
+**MVP demo is complete** only when all five spec DoD items pass —
+which requires P0 + P1 + P2 + P3 + P4 all live on `demo`. Don't
+declare the rescoped demo done before Chapter C (cognition
+switcher) and Chapter D (JSON config) are behaviorally visible.
+
+**v1.0.0 npm release** is a separate call from MVP-demo-complete.
+Two reasonable paths:
+
+- **Release with the demo.** Cut v1.0.0 once P0–P4 are live on
+  `demo` and the full 3-minute narrative works end-to-end. Cleanest
+  marketing story; the public demo delivers the full spec promise
+  on day one.
+- **Release earlier.** Cut v1.0.0 once the library API surface is
+  stable (realistically after P2, when the `DecisionTrace` contract
+  and seed exposure are in public use). Demo continues iterating on
+  `demo` branch under v1.0.x patch / v1.1 minor bumps. Picks up
+  npm install traffic sooner at the cost of shipping the public
+  demo without Chapters C and D.
+
+Pick deliberately. The first path is the default unless there's a
+specific reason (inbound interest, ecosystem pressure) to cut
+sooner.
 
 ## Out of scope for this iteration
 
