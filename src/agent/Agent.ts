@@ -189,7 +189,7 @@ export class Agent {
   /** Cumulative virtual seconds tracked for random-event cooldown bookkeeping. */
   protected virtualNowSeconds = 0;
 
-  protected readonly timeScale: number;
+  protected timeScale: number;
   /** Current control mode — `autonomous` / `scripted` / `remote`. Mutable to support switching mid-run. */
   controlMode: ControlMode;
   /** `true` once the agent has died — ticks become no-ops. Public for helper access. */
@@ -485,6 +485,30 @@ export class Agent {
   /** Public death trigger for narrative / event-driven deaths. */
   kill(reason: string): void {
     this.die('explicit', reason, this.clock.now());
+  }
+
+  /**
+   * Replace the wall-to-virtual time multiplier for subsequent ticks.
+   *
+   * Applies from the NEXT `tick()` onward — the in-flight tick (if any)
+   * keeps its original scale, so determinism under a fixed clock + rng is
+   * preserved. Pass `0` to freeze simulated time (events still drain;
+   * needs / age / random events advance by zero virtual seconds).
+   *
+   * Throws if `scale` is not a finite, non-negative number.
+   */
+  setTimeScale(scale: number): void {
+    if (!Number.isFinite(scale) || scale < 0) {
+      throw new RangeError(
+        `setTimeScale: expected a finite, non-negative number, got ${String(scale)}`,
+      );
+    }
+    this.timeScale = scale;
+  }
+
+  /** Current wall-to-virtual time multiplier. */
+  getTimeScale(): number {
+    return this.timeScale;
   }
 
   // =========================================================================

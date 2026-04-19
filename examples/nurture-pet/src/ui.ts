@@ -18,6 +18,14 @@ const INTERACTION_BUTTONS: { verb: string; label: string }[] = [
   { verb: 'scold', label: '😠 Scold' },
 ];
 
+const STAGE_LABELS: Record<string, string> = {
+  egg: 'Egg',
+  kitten: 'Kitten',
+  adult: 'Cat',
+  elder: 'Elder Cat',
+  deceased: 'Deceased',
+};
+
 /** R-26: tracked lifetime counters for the death modal. */
 interface LifetimeCounters {
   ateCount: number;
@@ -96,8 +104,9 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
 
   return {
     update(state: AgentState): void {
-      stageEl.textContent = `stage: ${state.stage}`;
-      ageEl.textContent = `age: ${state.ageSeconds.toFixed(1)}s`;
+      const stageLabel = STAGE_LABELS[state.stage] ?? state.stage;
+      stageEl.textContent = `${stageLabel} — ${formatAge(state.ageSeconds)} old`;
+      ageEl.textContent = '';
       moodEl.textContent = `mood: ${state.mood?.category ?? '—'}`;
       animEl.textContent = `anim: ${state.animation}`;
 
@@ -112,12 +121,7 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
         if (value) value.textContent = level.toFixed(2);
       }
 
-      modifiersEl.innerHTML = '';
-      for (const mod of state.modifiers) {
-        const li = document.createElement('li');
-        li.textContent = mod.id;
-        modifiersEl.appendChild(li);
-      }
+      renderModifierTray(modifiersEl, agent);
 
       // Halt / animation visual cue.
       if (state.halted) {
@@ -147,6 +151,119 @@ export function mountHud(agent: Agent): { update: (state: AgentState) => void } 
       }
     },
   };
+}
+
+/**
+ * Discrete simulation-speed picker. The base scale is `baseScale` virtual
+ * seconds per real second (60 in the nurture-pet demo). Multipliers map
+ * to `baseScale * mult`; the Pause button maps to scale 0.
+ *
+ * Persists the last selection to `localStorage` under `<storageKey>` so
+ * reloads keep the player's preferred speed. Pause is intentionally NOT
+ * `agent.halt()` — `halt()` is the death gate, terminal and one-way.
+ * `setTimeScale(0)` is the reversible pause.
+ */
+export function mountSpeedPicker(
+  agent: Agent,
+  opts: { baseScale: number; storageKey: string },
+): void {
+  const container = document.getElementById('speed-picker');
+  if (!container) return;
+  const choices: { label: string; mult: number | 'pause' }[] = [
+    { label: '⏸︎ Pause', mult: 'pause' },
+    { label: '0.5×', mult: 0.5 },
+    { label: '1×', mult: 1 },
+    { label: '2×', mult: 2 },
+    { label: '4×', mult: 4 },
+    { label: '8×', mult: 8 },
+  ];
+
+  const saved = readSavedMult(opts.storageKey);
+  const initialMult: number | 'pause' = saved ?? 1;
+  applyMult(agent, opts.baseScale, initialMult);
+
+  const buttons: HTMLButtonElement[] = [];
+  choices.forEach((choice, idx) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = choice.label;
+    btn.addEventListener('click', () => {
+      applyMult(agent, opts.baseScale, choice.mult);
+      writeSavedMult(opts.storageKey, choice.mult);
+      buttons.forEach((b, i) => b.classList.toggle('active', i === idx));
+    });
+    if (choice.mult === initialMult) btn.classList.add('active');
+    buttons.push(btn);
+    container.appendChild(btn);
+  });
+}
+
+function applyMult(agent: Agent, baseScale: number, mult: number | 'pause'): void {
+  agent.setTimeScale(mult === 'pause' ? 0 : baseScale * mult);
+}
+
+function readSavedMult(key: string): number | 'pause' | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    if (raw === null || raw === undefined) return null;
+    if (raw === 'pause') return 'pause';
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedMult(key: string, mult: number | 'pause'): void {
+  try {
+    globalThis.localStorage?.setItem(key, mult === 'pause' ? 'pause' : String(mult));
+  } catch {
+    // localStorage unavailable (private mode, quota); silently skip.
+  }
+}
+
+/**
+ * Render active modifiers as a chip list with the modifier's HUD icon (if
+ * declared on `Modifier.visual.hudIcon`) and a live remaining-time
+ * countdown for time-bound modifiers.
+ */
+function renderModifierTray(host: HTMLElement, agent: Agent): void {
+  host.innerHTML = '';
+  const now = agent.clock.now();
+  for (const mod of agent.modifiers.list()) {
+    const li = document.createElement('li');
+    const icon = mod.visual?.hudIcon;
+    const label = icon ? `${icon} ${mod.id}` : mod.id;
+    li.textContent = label;
+    if (typeof mod.expiresAt === 'number') {
+      const remainingMs = Math.max(0, mod.expiresAt - now);
+      const time = document.createElement('span');
+      time.className = 'mod-time';
+      time.textContent = ` ${formatRemaining(remainingMs)}`;
+      li.appendChild(time);
+    }
+    host.appendChild(li);
+  }
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return s === 0 ? `${m}m` : `${m}m ${s}s`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function formatRemaining(ms: number): string {
+  const s = Math.ceil(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem === 0 ? `${m}m` : `${m}m${rem}s`;
 }
 
 /**
