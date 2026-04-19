@@ -269,8 +269,8 @@ describe('Agent snapshot/restore — timeScale round-trip', () => {
   it('pre-v2 snapshots without timeScale keep the restoring agent’s constructor value', async () => {
     // Simulate a legacy snapshot: no timeScale field.
     const a = new Agent(baseDeps({ timeScale: 4 }));
-    const snap = a.snapshot();
-    const legacy = { ...snap, timeScale: undefined };
+    const { timeScale: _dropped, ...legacy } = a.snapshot();
+    void _dropped;
 
     const b = new Agent(baseDeps({ timeScale: 2 }));
     await b.restore(legacy);
