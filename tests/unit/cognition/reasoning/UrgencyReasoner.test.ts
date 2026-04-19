@@ -7,6 +7,7 @@ import { Modifiers } from '../../../../src/modifiers/Modifiers.js';
 function ctx(candidates: readonly IntentionCandidate[]): ReasonerContext {
   return {
     perceived: [],
+    needs: undefined,
     modifiers: new Modifiers(),
     candidates,
   };
@@ -21,7 +22,7 @@ describe('UrgencyReasoner.selectIntention — R-28 coverage', () => {
   it('returns null when the only candidate scores below the threshold', () => {
     const r = new UrgencyReasoner({ threshold: 1 });
     const pick = r.selectIntention(
-      ctx([{ intention: { kind: 'satisfy', type: 'eat' }, score: 0.5 }]),
+      ctx([{ intention: { kind: 'satisfy', type: 'eat' }, score: 0.5, source: 'needs' }]),
     );
     expect(pick).toBeNull();
   });
@@ -30,9 +31,9 @@ describe('UrgencyReasoner.selectIntention — R-28 coverage', () => {
     const r = new UrgencyReasoner();
     const pick = r.selectIntention(
       ctx([
-        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.3 },
-        { intention: { kind: 'satisfy', type: 'sleep' }, score: 0.9 },
-        { intention: { kind: 'express', type: 'meow' }, score: 0.1 },
+        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.3, source: 'needs' },
+        { intention: { kind: 'satisfy', type: 'sleep' }, score: 0.9, source: 'needs' },
+        { intention: { kind: 'express', type: 'meow' }, score: 0.1, source: 'needs' },
       ]),
     );
     expect(pick?.type).toBe('sleep');
@@ -42,8 +43,8 @@ describe('UrgencyReasoner.selectIntention — R-28 coverage', () => {
     const r = new UrgencyReasoner();
     const pick = r.selectIntention(
       ctx([
-        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.5 },
-        { intention: { kind: 'satisfy', type: 'sleep' }, score: 0.5 },
+        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.5, source: 'needs' },
+        { intention: { kind: 'satisfy', type: 'sleep' }, score: 0.5, source: 'needs' },
       ]),
     );
     expect(pick?.type).toBe('eat');
@@ -63,10 +64,11 @@ describe('UrgencyReasoner.selectIntention — R-28 coverage', () => {
     });
     const pick = r.selectIntention({
       perceived: [],
+      needs: undefined,
       modifiers: mods,
       candidates: [
-        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.6 },
-        { intention: { kind: 'satisfy', type: 'sleep' }, score: 0.3 },
+        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.6, source: 'needs' },
+        { intention: { kind: 'satisfy', type: 'sleep' }, score: 0.3, source: 'needs' },
       ],
     });
     // Without the modifier, 'eat' (0.6) wins. With +1 on 'sleep' (0.3+1=1.3), sleep wins.
@@ -79,11 +81,12 @@ describe('UrgencyReasoner.selectIntention — R-28 coverage', () => {
     });
     const pick = r.selectIntention({
       perceived: [],
+      needs: undefined,
       modifiers: new Modifiers(),
       persona: { traits: { playfulness: 1 } },
       candidates: [
-        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.5 },
-        { intention: { kind: 'satisfy', type: 'play' }, score: 0.3 },
+        { intention: { kind: 'satisfy', type: 'eat' }, score: 0.5, source: 'needs' },
+        { intention: { kind: 'satisfy', type: 'play' }, score: 0.3, source: 'needs' },
       ],
     });
     // eat: 0.5 * (1+0) = 0.5. play: 0.3 * (1+1) = 0.6. play wins.
@@ -94,8 +97,8 @@ describe('UrgencyReasoner.selectIntention — R-28 coverage', () => {
     const r = new UrgencyReasoner({ threshold: 0.5 });
     const pick = r.selectIntention(
       ctx([
-        { intention: { kind: 'satisfy', type: 'a' }, score: 0.4 },
-        { intention: { kind: 'satisfy', type: 'b' }, score: 0.6 },
+        { intention: { kind: 'satisfy', type: 'a' }, score: 0.4, source: 'needs' },
+        { intention: { kind: 'satisfy', type: 'b' }, score: 0.6, source: 'needs' },
       ]),
     );
     expect(pick?.type).toBe('b');
