@@ -100,6 +100,23 @@
       }
       .bar-fill.critical {
         background: #f43f5e;
+        animation: critical-pulse 1.1s ease-in-out infinite;
+      }
+      @keyframes critical-pulse {
+        0%,
+        100% {
+          opacity: 1;
+          filter: brightness(1);
+        }
+        50% {
+          opacity: 0.75;
+          filter: brightness(1.15);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar-fill.critical {
+          animation: none;
+        }
       }
       .modifiers ul {
         list-style: none;
@@ -147,16 +164,36 @@
         flex-wrap: wrap;
       }
       .speed-buttons button {
-        padding: 6px 10px;
-        font-size: 13px;
-        background: #475569;
+        padding: 4px 8px;
+        font-size: 12px;
+        font-weight: 500;
+        background: transparent;
+        color: inherit;
+        border: 1px solid #cbd5e1;
+        opacity: 0.75;
       }
       .speed-buttons button:hover {
-        background: #334155;
+        background: #e2e8f0;
+        opacity: 1;
       }
       .speed-buttons button.active {
-        background: #16a34a;
-        box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.35);
+        background: #475569;
+        color: #fff;
+        border-color: #475569;
+        opacity: 1;
+      }
+      @media (prefers-color-scheme: dark) {
+        .speed-buttons button {
+          border-color: #334155;
+        }
+        .speed-buttons button:hover {
+          background: #26304d;
+        }
+        .speed-buttons button.active {
+          background: #cbd5e1;
+          color: #0f172a;
+          border-color: #cbd5e1;
+        }
       }
       .reset-button {
         margin-left: auto;
