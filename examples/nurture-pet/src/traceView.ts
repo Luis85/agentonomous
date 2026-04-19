@@ -1,12 +1,6 @@
+import { isEmitEventAction, isInvokeSkillAction } from 'agentonomous';
 import type { Agent, AgentState, DecisionTrace, IntentionCandidate } from 'agentonomous';
-
-const NEEDS: { id: string; label: string }[] = [
-  { id: 'hunger', label: 'Hunger' },
-  { id: 'cleanliness', label: 'Cleanliness' },
-  { id: 'happiness', label: 'Happiness' },
-  { id: 'energy', label: 'Energy' },
-  { id: 'health', label: 'Health' },
-];
+import { NEEDS } from './constants.js';
 
 const VISIBILITY_STORAGE_KEY = 'agentonomous/trace-visible';
 const TOP_CANDIDATES = 5;
@@ -136,11 +130,11 @@ function renderSelection(trace: DecisionTrace): HTMLElement {
   }
   const rows = trace.actions
     .map((a) => {
-      if (a.type === 'invoke-skill') {
+      if (isInvokeSkillAction(a)) {
         const params = a.params ? ` · ${escapeHtml(JSON.stringify(a.params))}` : '';
         return `<div class="trace-row"><span class="trace-k">invoke-skill</span><span class="trace-v">${escapeHtml(a.skillId)}${params}</span></div>`;
       }
-      if (a.type === 'emit-event') {
+      if (isEmitEventAction(a)) {
         return `<div class="trace-row"><span class="trace-k">emit-event</span><span class="trace-v">${escapeHtml(a.event.type)}</span></div>`;
       }
       return `<div class="trace-row"><span class="trace-k">${escapeHtml(a.type)}</span><span class="trace-v">—</span></div>`;
