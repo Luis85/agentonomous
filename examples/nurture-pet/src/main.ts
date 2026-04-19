@@ -13,6 +13,7 @@ import {
 import { catSpecies } from './species.js';
 import { mountExportImport, mountHud, mountResetButton, mountSpeedPicker } from './ui.js';
 import { mountTraceView } from './traceView.js';
+import { loadSeed, mountSeedPanel } from './seed.js';
 
 const STORAGE_KEY = 'whiskers';
 const SPEED_STORAGE_KEY = 'agentonomous/speed';
@@ -72,12 +73,13 @@ skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
 
 // --- Agent --------------------------------------------------------------------
+const seed = loadSeed();
 const pet = createAgent({
   id: STORAGE_KEY,
   name: 'Whiskers',
   species: catSpecies,
   timeScale: BASE_TIME_SCALE,
-  rng: STORAGE_KEY,
+  rng: seed,
   memory: new InMemoryMemoryAdapter(),
   modules: [defaultPetInteractionModule],
   skills,
@@ -88,6 +90,7 @@ const pet = createAgent({
 const hud = mountHud(pet);
 const traceView = mountTraceView(pet);
 mountSpeedPicker(pet, { baseScale: BASE_TIME_SCALE, storageKey: SPEED_STORAGE_KEY });
+mountSeedPanel(pet, seed);
 mountExportImport(pet);
 mountResetButton(pet);
 bindAgentToStore(pet, (state) => {
