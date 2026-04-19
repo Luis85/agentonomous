@@ -85,7 +85,7 @@ skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
 
 // --- Species (base + optional user JSON override) -----------------------------
-const speciesOverride = loadConfigOverride();
+const speciesOverride = loadConfigOverride(catSpecies);
 const effectiveSpecies = speciesOverride ? applyOverride(catSpecies, speciesOverride) : catSpecies;
 
 // --- Agent --------------------------------------------------------------------
