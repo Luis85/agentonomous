@@ -122,33 +122,39 @@ examples/nurture-pet && npm install && npm run build`), then uploads
 
 ### Promoting `develop` → `demo`
 
-When you want a new demo live, promote `develop` onto `demo`. Fast-forward
-is the common case:
+When you want a new demo live, promote `develop` onto `demo` via a PR.
+Branch protection on `demo` (see first-time setup below) blocks direct
+pushes, so this is the required path:
+
+1. Open a PR with base `demo`, head `develop`. Title: `demo: promote
+develop @ <short-sha>`.
+2. Wait for CI green. Reviews follow the same bar as `main`.
+3. **Squash-merge** via the GitHub UI. That's the deploy trigger —
+   `pages.yml` runs on the resulting push.
+
+If protection is temporarily lifted and the histories haven't diverged,
+a fast-forward also works:
 
 ```bash
-git switch demo
-git pull origin demo
+git switch demo && git pull origin demo
 git merge --ff-only develop
 git push origin demo
 ```
 
-If `demo` has diverged (hotfix landed there, or the demo got a
-demo-specific tweak), open a PR `develop` → `demo` instead and
-squash-merge via the GitHub UI. Same review bar as `main`.
-
 Triggering a rebuild **without** advancing the branch (e.g. Pages
 cleared its artifact, or you want to re-deploy the current tip): use
 **Actions → Deploy demo to GitHub Pages → Run workflow** against the
-`demo` branch.
+`demo` branch. No push, no merge, no protection bypass needed.
 
 First-time setup (one-off):
 
 1. Repo → Settings → Pages → Source = **GitHub Actions**.
 2. Create the `demo` branch from `develop` (`git switch -c demo develop &&
-git push -u origin demo`).
+git push -u origin demo`) **before** enabling protection, so the
+   initial push isn't blocked.
 3. Add branch protection for `demo`: require PR, require CI green, disallow
-   force-push.
-4. Push to `demo` (or dispatch the workflow) and watch the
+   force-push. From this point on, promotions use the PR path above.
+4. Open the first promotion PR (or dispatch the workflow) and watch the
    `Deploy demo to GitHub Pages` workflow.
 
 ## Rolling back
