@@ -7,6 +7,10 @@ see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 - `main` — tracks what's on npm. Each release is a tagged commit here.
 - `develop` — integration branch; all work lands here first.
+- `demo` — long-lived branch powering the public GitHub Pages demo. Promoted
+  from `develop` on demand (see [Demo deployment](#demo-deployment)) and
+  deliberately decoupled from `main` so docs/demo updates can ship without
+  cutting a release.
 - Releases flow `develop` → `main`, then a tag triggers the publish workflow.
 
 ## Prerequisites
@@ -105,8 +109,9 @@ After a release lands:
 
 ## Demo deployment
 
-Separate from npm publishing, the browser demo auto-deploys to GitHub Pages
-via `.github/workflows/pages.yml` on every push to `main`:
+The browser demo is decoupled from npm releases. It auto-deploys to GitHub
+Pages via `.github/workflows/pages.yml` on every push to the long-lived
+`demo` branch (plus manual `workflow_dispatch` runs):
 
 - URL: `https://<owner>.github.io/agentonomous/`
 - Builds the library (`npm run build`), then the example (`cd
@@ -115,10 +120,42 @@ examples/nurture-pet && npm install && npm run build`), then uploads
 - The example's `vite.config.ts` reads `PAGES_BASE` at build time so assets
   resolve under the `/agentonomous/` subpath.
 
+### Promoting `develop` → `demo`
+
+When you want a new demo live, promote `develop` onto `demo` via a PR.
+Branch protection on `demo` (see first-time setup below) blocks direct
+pushes, so this is the required path:
+
+1. Open a PR with base `demo`, head `develop`. Title: `demo: promote
+develop @ <short-sha>`.
+2. Wait for CI green. Reviews follow the same bar as `main`.
+3. **Squash-merge** via the GitHub UI. That's the deploy trigger —
+   `pages.yml` runs on the resulting push.
+
+If protection is temporarily lifted and the histories haven't diverged,
+a fast-forward also works:
+
+```bash
+git switch demo && git pull origin demo
+git merge --ff-only develop
+git push origin demo
+```
+
+Triggering a rebuild **without** advancing the branch (e.g. Pages
+cleared its artifact, or you want to re-deploy the current tip): use
+**Actions → Deploy demo to GitHub Pages → Run workflow** against the
+`demo` branch. No push, no merge, no protection bypass needed.
+
 First-time setup (one-off):
 
 1. Repo → Settings → Pages → Source = **GitHub Actions**.
-2. Push to `main` and watch the `Deploy demo to GitHub Pages` workflow.
+2. Create the `demo` branch from `develop` (`git switch -c demo develop &&
+git push -u origin demo`) **before** enabling protection, so the
+   initial push isn't blocked.
+3. Add branch protection for `demo`: require PR, require CI green, disallow
+   force-push. From this point on, promotions use the PR path above.
+4. Open the first promotion PR (or dispatch the workflow) and watch the
+   `Deploy demo to GitHub Pages` workflow.
 
 ## Rolling back
 
