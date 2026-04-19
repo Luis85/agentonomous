@@ -189,15 +189,23 @@ const unsubscribeUiRefresh = pet.subscribe((event) => {
 // --- Game loop ----------------------------------------------------------------
 // rAF drives `pet.tick(dt)` at display refresh rate. UI refresh
 // happens in the AgentTicked subscriber above — no per-frame DOM
-// work here.
+// work here, except a one-shot HUD render on the halt transition
+// (AgentTicked doesn't fire on halted ticks by library spec, so
+// without this fallback the HUD would stay frozen at the
+// pre-death state after the agent dies).
 let last = performance.now();
 let rafHandle = 0;
 let stopped = false;
+let haltRendered = false;
 async function loop(now: number): Promise<void> {
   const dt = Math.min((now - last) / 1000, 0.25);
   last = now;
-  await pet.tick(dt);
+  const trace = await pet.tick(dt);
   if (stopped) return;
+  if (trace.halted && !haltRendered) {
+    haltRendered = true;
+    hud.update(pet.getState());
+  }
   rafHandle = requestAnimationFrame((t) => {
     void loop(t);
   });
