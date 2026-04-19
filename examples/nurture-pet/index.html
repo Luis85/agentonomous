@@ -175,6 +175,49 @@
       .io-button:hover {
         background: #475569;
       }
+      .seed {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        font-size: 13px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .seed {
+          background: #1b2140;
+        }
+      }
+      .seed-label {
+        font-size: 12px;
+        opacity: 0.7;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .seed-value {
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: #e2e8f0;
+        color: #0f172a;
+        user-select: all;
+      }
+      @media (prefers-color-scheme: dark) {
+        .seed-value {
+          background: #26304d;
+          color: #e6e6f0;
+        }
+      }
+      .seed-button {
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #64748b;
+      }
+      .seed-button:hover {
+        background: #475569;
+      }
       .modifiers li {
         display: inline-flex;
         align-items: center;
@@ -288,6 +331,31 @@
         <button id="import-button" class="io-button" type="button">📂 Import</button>
         <input id="import-file" type="file" accept="application/json,.json" hidden />
         <button id="reset-button" class="reset-button" type="button">🔄 Reset</button>
+      </div>
+      <div class="seed">
+        <span class="seed-label">Seed</span>
+        <code id="seed-display" class="seed-value" aria-label="Current RNG seed"></code>
+        <button id="seed-copy" class="seed-button" type="button" aria-label="Copy seed">
+          📋 Copy
+        </button>
+        <button
+          id="seed-replay"
+          class="seed-button"
+          type="button"
+          aria-label="Replay this seed"
+          title="Reset the pet, keep the seed — the RNG stream will be byte-identical"
+        >
+          🔁 Replay seed
+        </button>
+        <button
+          id="seed-new"
+          class="seed-button"
+          type="button"
+          aria-label="Reset with a new seed"
+          title="Generate a new seed and reset the pet"
+        >
+          🎲 New seed
+        </button>
       </div>
       <div class="bars" id="bars"></div>
       <div class="modifiers">
