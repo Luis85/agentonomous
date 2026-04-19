@@ -2,11 +2,13 @@ import type { DomainEvent } from '../events/DomainEvent.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
 import {
   AGENT_DIED,
+  AGENT_TICKED,
   LIFE_STAGE_CHANGED,
   MODIFIER_APPLIED,
   MODIFIER_EXPIRED,
   MODIFIER_REMOVED,
   type AgentDiedEvent,
+  type AgentTickedEvent,
   type LifeStageChangedEvent,
   type ModifierAppliedEvent,
   type ModifierRemovedEvent,
@@ -60,6 +62,7 @@ import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.
 import type { AgentFacade } from './AgentFacade.js';
 import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
+import { isInvokeSkillAction } from './AgentAction.js';
 import type { ControlMode } from './ControlMode.js';
 import type { DecisionTrace } from './DecisionTrace.js';
 import { InvalidTimeScaleError, MissingDependencyError } from './errors.js';
@@ -202,6 +205,8 @@ export class Agent {
   protected readonly modules: AgentModule[] = [];
   /** Events queued for inclusion in the current tick's `emitted` field. */
   protected emittedThisTick: DomainEvent[] = [];
+  /** 1-indexed count of `AgentTicked` events emitted. Resets only on reconstruction. */
+  protected ticksEmitted: number = 0;
 
   // =========================================================================
   // Internal tick helpers (extracted under src/agent/internal/).
@@ -333,7 +338,9 @@ export class Agent {
     const stageTransitions = this.lifecycleTicker.run(virtualDtSeconds, tickStartedAt);
 
     // Stage 1: perceive — drain pending events from the bus.
-    const perceived = this.eventBus.drain();
+    // `AgentTicked` is a meta-event emitted at the end of each completed tick;
+    // it must not re-enter the cognition pipeline as a perceived stimulus.
+    const perceived = this.eventBus.drain().filter((e) => e.type !== AGENT_TICKED);
     await this.dispatchReactiveHandlers(perceived);
 
     // Stage 1.5: random events — publish seeded random events onto the bus.
@@ -368,7 +375,7 @@ export class Agent {
         halted: true,
         perceived,
         actions: [],
-        emitted: this.emittedThisTick,
+        emitted: [...this.emittedThisTick],
       };
     }
 
@@ -417,9 +424,33 @@ export class Agent {
       halted: false,
       perceived,
       actions,
-      emitted: this.emittedThisTick,
+      emitted: [...this.emittedThisTick],
       ...(deltas ? { deltas } : {}),
     };
+
+    // Emit AgentTicked as the final act of a completed tick. Placed
+    // AFTER trace assembly (with its snapshot-copied `emitted`) so the
+    // meta-event does not appear in its own trace.emitted. Publish
+    // flows through `this.publish(...)` so subscribers receive it via
+    // `agent.subscribe` like any other event.
+    this.ticksEmitted += 1;
+    const firstAction = actions[0];
+    const selectedAction =
+      firstAction === undefined
+        ? null
+        : isInvokeSkillAction(firstAction)
+          ? { type: firstAction.type, skillId: firstAction.skillId }
+          : { type: firstAction.type };
+    this.publish({
+      type: AGENT_TICKED,
+      at: tickStartedAt,
+      agentId: this.identity.id,
+      tickNumber: this.ticksEmitted,
+      virtualDtSeconds,
+      wallDtSeconds: Math.max(0, dtSeconds),
+      selectedAction,
+      trace,
+    } satisfies AgentTickedEvent);
 
     await this.maybeAutoSave();
     return trace;
