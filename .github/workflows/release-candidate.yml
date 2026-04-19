@@ -1,0 +1,61 @@
+name: Release candidate
+
+on:
+  push:
+    branches: ['release/v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Preflight (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify (format + lint + typecheck + test + build)
+        run: npm run verify
+
+      - name: Bundle size budget
+        run: npx size-limit
+
+      - name: Pack tarball
+        id: pack
+        run: |
+          npm pack --json > pack.json
+          TARBALL="$(node -e "console.log(require('./pack.json')[0].filename)")"
+          echo "tarball=$GITHUB_WORKSPACE/$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke-install tarball in a scratch project
+        run: |
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          npm init -y > /dev/null
+          npm pkg set type=module
+          npm install --no-audit --no-fund "${{ steps.pack.outputs.tarball }}"
+          node --input-type=module -e "
+            const mod = await import('agentonomous');
+            const { Agent } = mod;
+            if (typeof Agent !== 'function') {
+              throw new Error('Agent export missing from installed tarball');
+            }
+            console.log('Smoke import OK:', Object.keys(mod).length, 'named exports');
+          "
+
+      - name: Publish dry-run
+        run: npm publish --dry-run
