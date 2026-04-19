@@ -310,6 +310,88 @@
         opacity: 0.75;
         font-style: italic;
       }
+      .species-config {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .species-config {
+          background: #1b2140;
+        }
+      }
+      .species-config-toggle {
+        background: #64748b;
+        font-size: 13px;
+        padding: 6px 10px;
+        align-self: flex-start;
+      }
+      .species-config-toggle:hover {
+        background: #475569;
+      }
+      .species-config[data-visible='false'] #species-config-body {
+        display: none;
+      }
+      #species-config-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #species-config-textarea {
+        width: 100%;
+        min-height: 180px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        font-size: 12px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #0f172a;
+        resize: vertical;
+        box-sizing: border-box;
+      }
+      @media (prefers-color-scheme: dark) {
+        #species-config-textarea {
+          background: #0f172a;
+          color: #e6e6f0;
+          border-color: #334155;
+        }
+      }
+      .species-config-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .species-config-actions button {
+        font-size: 13px;
+        padding: 6px 10px;
+      }
+      #species-config-apply {
+        background: #16a34a;
+      }
+      #species-config-apply:hover {
+        background: #15803d;
+      }
+      #species-config-reset {
+        background: #94a3b8;
+      }
+      #species-config-reset:hover {
+        background: #64748b;
+      }
+      #species-config-status {
+        font-size: 12px;
+        min-height: 16px;
+        font-variant-numeric: tabular-nums;
+      }
+      #species-config-status[data-kind='error'] {
+        color: #dc2626;
+      }
+      #species-config-status[data-kind='ok'] {
+        color: #16a34a;
+      }
     </style>
   </head>
   <body>
@@ -378,6 +460,29 @@
           Show decision trace
         </button>
         <div id="decision-trace-body"></div>
+      </div>
+      <div id="species-config" class="species-config" data-visible="false">
+        <button
+          id="species-config-toggle"
+          class="species-config-toggle"
+          type="button"
+          aria-controls="species-config-body"
+          aria-expanded="false"
+        >
+          Show species config
+        </button>
+        <div id="species-config-body">
+          <textarea
+            id="species-config-textarea"
+            spellcheck="false"
+            aria-label="Species configuration JSON"
+          ></textarea>
+          <div id="species-config-status" data-kind="ok"></div>
+          <div class="species-config-actions">
+            <button id="species-config-apply" type="button">Apply &amp; reset</button>
+            <button id="species-config-reset" type="button">Reset to defaults</button>
+          </div>
+        </div>
       </div>
     </section>
 
