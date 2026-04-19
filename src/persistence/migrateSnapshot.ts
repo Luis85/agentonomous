@@ -9,10 +9,15 @@ export type SnapshotMigration = (snapshot: unknown) => unknown;
 
 /**
  * Registry of migrations keyed by the target schema version. Populated as
- * we bump the snapshot shape across library releases. V1 has no predecessors
- * yet, so the registry is empty; the plumbing exists for the first bump.
+ * we bump the snapshot shape across library releases.
+ *
+ * V1 → V2: introduces optional `timeScale`. Old snapshots are forwarded
+ * unchanged; `timeScale` stays undefined, which lets `restore()` fall back
+ * to the constructor value and preserves pre-v2 behaviour.
  */
-export const SNAPSHOT_MIGRATIONS: Readonly<Record<number, SnapshotMigration>> = {};
+export const SNAPSHOT_MIGRATIONS: Readonly<Record<number, SnapshotMigration>> = {
+  2: (raw) => raw,
+};
 
 /**
  * Step a snapshot forward to `target` (or `CURRENT_SNAPSHOT_VERSION`) by

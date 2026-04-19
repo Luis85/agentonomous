@@ -36,6 +36,16 @@ export interface AgentSnapshot {
 
   identity: AgentIdentity;
 
+  /**
+   * Wall-to-virtual time multiplier in effect at save time. Restored onto
+   * the rehydrating agent before offline catch-up runs, so a pet saved at
+   * scale 60 rehydrates into its own virtual-time cadence rather than the
+   * fresh agent's (typically default) scale. Undefined on snapshots taken
+   * before schemaVersion 2 — the restoring agent's constructor value wins
+   * in that case.
+   */
+  timeScale?: number;
+
   lifecycle?: {
     bornAt: number;
     ageSeconds: number;
@@ -74,4 +84,4 @@ export interface AgentSnapshot {
   pendingEvents?: readonly DomainEvent[];
 }
 
-export const CURRENT_SNAPSHOT_VERSION = 1 as const;
+export const CURRENT_SNAPSHOT_VERSION = 2 as const;
