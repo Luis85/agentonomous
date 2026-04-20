@@ -161,6 +161,21 @@ export default defineConfig({
         find: /^agentonomous$/,
         replacement: resolve(__dirname, 'src/index.ts'),
       },
+      // `brain.js` is an optional peer of `agentonomous` and a devDep of
+      // the `nurture-pet` demo workspace — not a root devDep (its
+      // `gpu.js` → `gl` chain needs X11 native build headers that
+      // explode on headless CI). The demo's `learning.ts` guards its
+      // `await import('brain.js')` with try/catch so a missing peer
+      // degrades gracefully, but `vite:import-analysis` resolves the
+      // specifier at transform time before the try/catch can run, so
+      // root `npm ci` CI fails before the first test executes. Alias
+      // to a test-local stub that exports a placeholder `NeuralNetwork`
+      // — the cognitionSwitcher tests never call `learningMode.construct()`,
+      // only check whether the probe resolved, so the stub is enough.
+      {
+        find: /^brain\.js$/,
+        replacement: resolve(__dirname, 'tests/examples/stubs/brain-js.ts'),
+      },
     ],
     coverage: {
       provider: 'v8',
