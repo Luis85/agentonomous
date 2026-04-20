@@ -34,8 +34,13 @@ describe('AgentTicked event vocabulary', () => {
     expect(event.trace).toBe(traceStub);
   });
 
+  // First-load of the `src/index.js` barrel under v8 coverage
+  // instrumentation can exceed the default 5s timeout on cold /
+  // CPU-constrained runners (seen as a flake on GitHub `ubuntu-latest`).
+  // Bumping to 30s keeps the re-export check without the timing
+  // sensitivity.
   it('is re-exported from the public barrel', async () => {
     const barrel = await import('../../../src/index.js');
     expect(barrel.AGENT_TICKED).toBe('AgentTicked');
-  });
+  }, 30000);
 });
