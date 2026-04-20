@@ -80,12 +80,19 @@ export const btMode: CognitionModeSpec = {
           // mapping this intention falls through to the runner's noop
           // fallback and the trace panel shows no selection for the
           // interrupt window.
+          //
+          // Returns SUCCEEDED (not RUNNING) so the sequence completes
+          // each tick and the BT re-evaluates from root next step.
+          // RUNNING would pin the action node and bypass
+          // `IsReactingToTreat` on subsequent ticks — the counter would
+          // never decrement and `approach-treat` would be committed
+          // forever after the first surpriseTreat.
           helpers.commit({
             kind: 'react',
             type: 'approach-treat',
             target: 'treat',
           });
-          return MistreevousState.RUNNING;
+          return MistreevousState.SUCCEEDED;
         },
         PickTopCandidate(_ctx, helpers) {
           const top = helpers.topCandidate();
