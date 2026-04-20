@@ -1,0 +1,28 @@
+{
+  "type": "NeuralNetwork",
+  "sizes": [5, 1],
+  "layers": [
+    {
+      "hunger": {},
+      "cleanliness": {},
+      "happiness": {},
+      "energy": {},
+      "health": {}
+    },
+    {
+      "score": {
+        "bias": 0,
+        "weights": {
+          "hunger": -1,
+          "cleanliness": -0.8,
+          "happiness": -0.6,
+          "energy": -0.7,
+          "health": -0.9
+        }
+      }
+    }
+  ],
+  "outputLookup": true,
+  "inputLookup": true,
+  "trainOpts": {}
+}

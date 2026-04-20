@@ -30,6 +30,6 @@
       "agentonomous/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["dist", "node_modules", "examples"]
+  "include": ["src/**/*", "tests/**/*", "examples/nurture-pet/src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
 }
