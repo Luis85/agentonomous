@@ -7,6 +7,12 @@
 > deferred kernel modularization to post-v1, and again after incorporating
 > the post-P4 implementation review (AgentTicked, Reasoner.reset
 > harmonization, `_internalPublish`/`_internalDie` rename).
+>
+> Revised 2026-04-20: 0.9.1, 0.9.2, and 0.9.6 marked shipped. 0.9.5
+> repurposed from "Excalibur subpath rename" (cancelled — `integrations/
+> <vendor>/` is the intentional convention for engine/rendering peers,
+> distinct from `<category>/adapters/<vendor>/` used for cognition
+> peers) to "Docs polish pass (alignment only)".
 
 ## Shape of the release
 
@@ -32,9 +38,9 @@ Status against the MVP demo spec:
 | -------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | A — Living agent     | Needs decay, HUD, autonomy observable               | ✅ Done. Decay calibrated (`BASE_TIME_SCALE = 10`). HUD renders needs + modifiers + interactions.                                              | —                                             |
 | B — Decision Trace   | Trace panel with needs, candidates, selected action | ✅ Done. `traceView.ts` with progressive disclosure.                                                                                           | Polish only                                   |
-| C — Cognition switch | Dropdown for heuristic / BT / BDI / learning        | ⚠️ Adapters built (`MistreevousReasoner`, `JsSonReasoner`, `BrainJsReasoner`). **`Agent.setReasoner()` not yet shipped. UI dropdown missing.** | Library PR (setReasoner) + demo PR (dropdown) |
+| C — Cognition switch | Dropdown for heuristic / BT / BDI / learning        | ✅ Done. `setReasoner` shipped in P4 (`c58d5f7`); switcher + BT / BDI / brain.js modes shipped in PR #46 + polish #47–#50.                     | —                                             |
 | D — JSON config      | Read/edit/apply species JSON                        | ✅ Done. `speciesConfig.ts` with `applyOverride()`.                                                                                            | Polish only                                   |
-| E — Determinism      | Seed display, replay, new-seed                      | ✅ Done. `seed.ts` panel mounted.                                                                                                              | D2 integration test                           |
+| E — Determinism      | Seed display, replay, new-seed                      | ✅ Done. `seed.ts` panel mounted; D2 parallel-agent determinism integration test shipped (PR #23).                                            | brain.js training persistence (0.9.3)         |
 
 Carried forward from the post-P4 implementation review:
 
@@ -141,50 +147,75 @@ zero per-tick accumulators; preserve trained network weights).
 they're all in-repo). Patch or minor bump depending on whether a
 no-op default implementation is added to the port itself.
 
-### 0.9.5 — Excalibur subpath rename
+### 0.9.5 — Docs polish pass (alignment only)
 
-**What:** Move `src/integrations/excalibur/` →
-`src/rendering/adapters/excalibur/`. Brings Excalibur into the same
-`<category>/adapters/<lib>/` pattern the cognition adapters already use,
-and sets up future Pixi / three.js / Phaser adapters to land cleanly
-without another rename.
+**What:** A standalone, alignment-only sweep of the library's docs so
+that the `0.9.0-demo` tag ships with internally-consistent prose. No
+new documents, no typedoc regeneration, no changelog preview.
 
-**Demo impact:** None in source — verified that
-`examples/nurture-pet/src/**` does not import the Excalibur adapter.
-The only reference is in `examples/nurture-pet/package-lock.json`,
-refreshed on `npm install`.
+**Why in 0.9:** 0.9.0 is the shareable artifact. Two release trains
+plus five shipped increments since the last docs pass have left stale
+lines in the usual suspects (status tables, architecture bullets,
+plans whose scope has shifted). A short pass closes those now, while
+context is fresh, instead of rediscovering drift under 1.0 pressure.
 
-**Scope (exact file touches):**
+**Scope ceiling (alignment only — if it looks like new authoring, it
+is out of scope):**
 
-- Move `src/integrations/excalibur/` → `src/rendering/adapters/excalibur/`.
-- `package.json#exports`: remove `./integrations/excalibur`, add
-  `./rendering/adapters/excalibur`.
-- `typedoc.json`: update entryPoint / entryPointStrategy references.
-- `README.md`: update any import examples.
-- `CLAUDE.md`: update the architecture-map line that references
-  `src/integrations/excalibur/`.
-- `docs/specs/vision.md`: update integration-pattern reference.
-- `.changeset/`: new entry — "breaking: rename `/integrations/excalibur`
-  subpath to `/rendering/adapters/excalibur`."
-- New test: `tests/unit/exports.test.ts` (or similar) asserts
-  `agentonomous/rendering/adapters/excalibur` resolves.
+- `README.md` — import examples, feature list, link targets.
+- `docs/specs/vision.md`, `docs/specs/mvp-demo.md` — sync with shipped
+  state (Chapters A–E done except brain.js persistence).
+- JSDoc sweep of **public exports only** — the barrel (`src/index.ts`)
+  plus the four subpath entrypoints. One-sentence concept on line 1,
+  non-obvious invariants in the body, no redundant `@param` / `@returns`.
+- `CLAUDE.md` architecture map — line count + directory reality check.
+- `CONTRIBUTING.md` — add a short note codifying the two adapter
+  patterns so future plans don't revive the rename proposal:
+  - `src/integrations/<vendor>/` — engine / rendering peers (Excalibur
+    today; Pixi / three.js / Phaser in the same shape tomorrow).
+  - `src/<category>/adapters/<vendor>/` — algorithmic peers within a
+    category (cognition: mistreevous / js-son / brainjs).
+- `.claude/plans/` hygiene — archive superseded roadmaps
+  (`mvp-demo-roadmap.md`, `pre-v1-next-session.md`) under
+  `.claude/plans/archive/` with a one-line banner explaining what
+  replaced them. `v1-comprehensive-plan.md` becomes the single active
+  roadmap.
 
-**Why in 0.9:** 0.9 is the shareable artifact — its import paths need
-to match 1.0's.
+**Explicitly out of scope:**
+
+- Typedoc regeneration / site rebuild.
+- "What's new since 0.9.1" changelog preview (that belongs with the
+  `0.9.0-demo` tag in 0.9.7).
+- Any prose in `STYLE_GUIDE.md` / `PUBLISHING.md` that isn't directly
+  contradicted by shipped code.
+- Refactoring existing JSDoc that is merely verbose but not wrong.
+- New examples, tutorials, or migration guides.
+
+**Scope (exact file touches, refined when the design doc is drafted):**
+
+- `README.md`
+- `docs/specs/vision.md`, `docs/specs/mvp-demo.md`
+- `src/index.ts` + the four subpath entrypoints for JSDoc sweep
+- `CLAUDE.md`
+- `CONTRIBUTING.md` — new short section on the two adapter patterns
+- `.claude/plans/archive/` — two move-and-banner operations
 
 ### 0.9.6 — D-item cleanup
 
-| ID  | Description                                 | Scope             |
-| --- | ------------------------------------------- | ----------------- |
-| D1  | Expose `getTimeScale()` on `AgentFacade`    | Library PR        |
-| D2  | Parallel-agent determinism integration test | Separate small PR |
-| D3  | `Modifier.visual.label?` field              | Demo bundle       |
-| D5  | Speed-picker visual weight (CSS)            | Demo bundle       |
-| D6  | Delete dead `#pet-age` div                  | Demo bundle       |
-| D7  | `formatRemaining` / `formatAge` spacing     | Demo bundle       |
+**Status: shipped.** All six D-items landed in-flight as standalone
+PRs rather than being bundled at the end:
 
-D1 stands alone (library). D2 stands alone (integration test). D3 /
-D5 / D6 / D7 ride together as a single demo cleanup PR — all trivial.
+| ID  | Description                                 | Shipped in |
+| --- | ------------------------------------------- | ---------- |
+| D1  | Expose `getTimeScale()` on `AgentFacade`    | PR #21     |
+| D2  | Parallel-agent determinism integration test | PR #23     |
+| D3  | `Modifier.visual.label?` field              | PR #24     |
+| D5  | Speed-picker visual weight (CSS)            | PR #31     |
+| D6  | Delete dead `#pet-age` div                  | PR #17     |
+| D7  | `formatRemaining` / `formatAge` spacing     | PR #18     |
+
+No remaining work under this slot. Retained in the roadmap so the
+numbering stays stable and the DoD can point at it.
 
 ### 0.9.7 — Soak + DoD verification
 
@@ -313,10 +344,15 @@ config-based input via createAgent where possible.`
 **Subpath export freeze** (add a resolution test so renames break CI):
 
 - `agentonomous`
-- `agentonomous/rendering/adapters/excalibur`
+- `agentonomous/integrations/excalibur`
 - `agentonomous/cognition/adapters/mistreevous`
 - `agentonomous/cognition/adapters/js-son`
 - `agentonomous/cognition/adapters/brainjs`
+
+The two distinct shapes are intentional — see the adapter-pattern
+note in `CONTRIBUTING.md` (landed in 0.9.5). `integrations/<vendor>/`
+is the convention for engine/rendering peers; `<category>/adapters/
+<vendor>/` is for algorithmic peers within a category.
 
 ### 1.0.4 — API / JSDoc audit
 
@@ -372,12 +408,12 @@ Captured so nothing gets lost. Not on the critical path.
 
 | Phase | Step                                           | Depends on    | PR scope                            |
 | ----- | ---------------------------------------------- | ------------- | ----------------------------------- |
-| 0.9.0 | 0.9.1 `AgentTicked` event                      | —             | 1 PR (minor bump)                   |
-| 0.9.0 | 0.9.2 `setReasoner` + dropdown                 | 0.9.1         | 2 PRs (library + demo)              |
-| 0.9.0 | 0.9.3 brain.js persistence                     | 0.9.2         | 1 demo PR                           |
+| 0.9.0 | 0.9.1 `AgentTicked` event                      | —             | 1 PR (minor bump) — shipped         |
+| 0.9.0 | 0.9.2 `setReasoner` + dropdown                 | 0.9.1         | 2 PRs (library + demo) — shipped    |
 | 0.9.0 | 0.9.4 `Reasoner.reset()` harmonization         | 0.9.2         | 1 bundled PR or 4 small             |
-| 0.9.0 | 0.9.5 Excalibur subpath rename                 | —             | 1 PR (breaking)                     |
-| 0.9.0 | 0.9.6 D-items                                  | —             | D1 solo + D2 solo + D3/5/6/7 bundle |
+| 0.9.0 | 0.9.3 brain.js persistence                     | 0.9.4         | 1 demo PR                           |
+| 0.9.0 | 0.9.5 Docs polish pass (alignment only)        | 0.9.3         | 1 docs PR                           |
+| 0.9.0 | 0.9.6 D-items                                  | —             | shipped in-flight (PRs #17–#31)     |
 | 0.9.0 | 0.9.7 Soak + DoD                               | all above     | 1 PR                                |
 | 0.9.0 | Promote + tag                                  | all above     | —                                   |
 | 1.0.0 | 1.0.1 `_internalPublish`/`_internalDie` rename | 0.9.0 shipped | 1 PR (major)                        |
@@ -391,19 +427,11 @@ bundling options noted below). 1.0.0 in **~2 sessions** (5 PRs) after.
 
 **PR-bundling guidance (which can combine without muddying review):**
 
-- 0.9.1 library + 0.9.1 demo → bundle is OK if both are small and
-  the test coverage stays clean; otherwise keep separate.
-- 0.9.2 library (`setReasoner`) + 0.9.2 demo (dropdown) → keep
-  **separate**. Library needs its own test sweep; demo can't land
-  until library is on `develop`.
 - 0.9.4 port update + three adapter updates → bundle into **one PR**
   since all four files are in-repo and the behavior is tightly
   coupled.
-- 0.9.6 D-items → D1 standalone (library surface change), D2
-  standalone (new integration test file), D3 + D5 + D6 + D7 → one
-  demo cleanup PR.
-- 0.9.5 Excalibur rename → standalone. Breaking change deserves its
-  own review.
+- 0.9.5 Docs polish → standalone PR. Alignment-only scope; no code
+  changes expected so review is prose-focused.
 - 0.9.7 soak + DoD → one PR with DoD checklist in the description, no
   separate sub-PRs.
 
@@ -418,7 +446,6 @@ bundling options noted below). 1.0.0 in **~2 sessions** (5 PRs) after.
 | `Reasoner.reset()` as a required method breaks external implementations                      | Low (pre-v1) | Ship as optional in 0.9.4. Decide required-vs-optional during 1.1 kernel modularization.                                                                                                                                                                                                                      |
 | Narrowing the surface breaks the demo import graph                                           | Medium       | Move one cluster at a time; `npm run verify` between each. Demo is in the same repo — compile errors surface immediately.                                                                                                                                                                                     |
 | `LlmProviderPort` shape doesn't survive Phase B streaming / tool-use                         | Medium       | Additions-only discipline in Phase B. Start with completion-only so the minimal surface has the best chance of being stable.                                                                                                                                                                                  |
-| Excalibur subpath rename breaks external consumers                                           | Low          | Pre-v1.0, no public consumers. Changeset flags it as breaking.                                                                                                                                                                                                                                                |
 | `_internalPublish` / `_internalDie` rename gets forgotten under 1.0 pressure                 | Low          | Slotted as the first 1.0 PR; can't be skipped because the changeset locks the rename into the major bump.                                                                                                                                                                                                     |
 | 35 kB bundle budget exceeded once `AgentTicked` + `LlmProviderPort` + `MockLlmProvider` land | Medium       | Re-measure via `npm run analyze` after 0.9.1 and again after 1.0.2. If within 10% of budget, audit imports for tree-shake hazards (re-exports, default instances, side-effect imports). If the budget is blown, raise the ceiling with a deliberate decision + changelog entry rather than gaming the number. |
 
@@ -436,8 +463,9 @@ bundling options noted below). 1.0.0 in **~2 sessions** (5 PRs) after.
    refresh via event subscription, not in-rAF polling. Replay with the
    same seed produces an identical `AgentTicked` sequence.
 7. `Reasoner.reset()` behavior is consistent across all three adapters.
-8. Excalibur imports via the new subpath only; no references to the
-   old path anywhere.
+8. Docs polish pass complete: README / specs / JSDoc on public
+   exports / CLAUDE.md architecture map / CONTRIBUTING adapter-pattern
+   note all aligned with shipped state; superseded plans archived.
 9. `npm run verify` green.
 10. `npm run analyze` shows core bundle within the 35 kB budget (or a
     deliberate budget raise with a changelog entry).
@@ -479,20 +507,20 @@ Plan-document edits may be committed directly to `develop` (see
 memory: `feedback_plan_crafting_on_develop`). Implementation PRs still
 follow the standard topic-branch flow defined in `CLAUDE.md`.
 
-| #   | Step  | Plan file                               | PRs inside                | Status                          |
-| --- | ----- | --------------------------------------- | ------------------------- | ------------------------------- |
-| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo            | Shipped — library #44, demo #45 |
-| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo            | Not drafted                     |
-| 3   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo                      | Not drafted                     |
-| 4   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled                 | Not drafted                     |
-| 5   | 0.9.5 | `0.9.5-excalibur-subpath-rename.md`     | 1 breaking                | Not drafted                     |
-| 6   | 0.9.6 | `0.9.6-d-items-cleanup.md`              | D1 + D2 + D3/5/6/7 bundle | Not drafted                     |
-| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release               | Not drafted                     |
-| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major                   | Not drafted                     |
-| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                         | Not drafted                     |
-| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                         | Not drafted                     |
-| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                         | Not drafted                     |
-| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release               | Not drafted                     |
+| #   | Step  | Plan file                               | PRs inside        | Status                                                         |
+| --- | ----- | --------------------------------------- | ----------------- | -------------------------------------------------------------- |
+| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo    | Shipped — library #44, demo #45                                |
+| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo    | Shipped — library c58d5f7 (in P4), demo #46 + polish #47–#50   |
+| 3   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled library | Not drafted — **next up**                                      |
+| 4   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo              | Not drafted — follows 0.9.4                                    |
+| 5   | 0.9.5 | `0.9.5-docs-polish.md`                  | 1 docs            | Not drafted — follows 0.9.3; alignment-only scope              |
+| 6   | 0.9.6 | —                                       | —                 | Shipped in-flight — D1 #21, D2 #23, D3 #24, D5 #31, D6 #17, D7 #18 |
+| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release       | Not drafted                                                    |
+| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major           | Not drafted                                                    |
+| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                 | Not drafted                                                    |
+| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                 | Not drafted                                                    |
+| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                 | Not drafted                                                    |
+| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release       | Not drafted                                                    |
 
 **Update this table** as plans are drafted (`Drafted`), enter execution
 (`In progress`), or ship (`Shipped — <PR link or tag>`). The table is
@@ -502,7 +530,9 @@ are the source of truth for the work inside each chunk.
 ## Open questions
 
 1. **Which scenario best contrasts BT vs BDI in the cognition switcher?**
-   Decide during 0.9.2 by experimenting once the UI is wired.
+   Resolved in 0.9.2: BT differentiates via reactive `surpriseTreat`
+   interrupt; BDI remains a functional-but-equivalent stub pending a
+   follow-up differentiation plan.
 2. **Smallest brain.js training dataset for a visible effect?** Test
    during 0.9.3. Start with 20–50 samples mapping need states to
    actions.
