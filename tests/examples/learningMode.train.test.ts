@@ -9,10 +9,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
+import { NeuralNetwork as StubNeuralNetwork } from './stubs/brain-js.js';
 
 interface FakeAgent {
   setReasoner: Mock<(r: unknown) => void>;
   identity: { id: string; name: string };
+  rng: {
+    next: () => number;
+    int: (min: number, max: number) => number;
+    chance: (p: number) => boolean;
+    pick: <T>(items: readonly T[]) => T;
+  };
+}
+
+function makeFakeRng(): FakeAgent['rng'] {
+  let i = 0;
+  // Stable, hash-based pseudo-random sequence — tests must not depend
+  // on Math.random.
+  const next = (): number => {
+    i = (i * 1664525 + 1013904223) >>> 0;
+    i = (i + 1) >>> 0;
+    return ((i >>> 0) % 1_000_003) / 1_000_003;
+  };
+  return {
+    next,
+    int: (min, max) => Math.floor(next() * (max - min + 1)) + min,
+    chance: (p) => next() < p,
+    pick: (items) => items[Math.floor(next() * items.length)] as never,
+  };
 }
 
 function renderRoot(): HTMLElement {
@@ -55,23 +79,36 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
   agentId: string;
   selectMode: (id: string) => Promise<void>;
   fakeAgent: FakeAgent;
+  getStubNetwork: () => StubNeuralNetwork<unknown, unknown>;
 }> {
   const agentId = opts.agentId ?? 'test-pet';
   const root = renderRoot();
+  // Reset the stub's static instance pointer so `getStubNetwork()`
+  // cannot see a leftover from a previous test.
+  StubNeuralNetwork.last = null;
   const fakeAgent: FakeAgent = {
     setReasoner: vi.fn(),
     identity: { id: agentId, name: agentId },
+    rng: makeFakeRng(),
   };
   mountCognitionSwitcher(fakeAgent as never, root);
   const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
   await waitForProbes(select);
 
-  let prevCallCount = 0;
   return {
     document,
     agentId,
     fakeAgent,
+    getStubNetwork: () => {
+      if (!StubNeuralNetwork.last) {
+        throw new Error(
+          'getStubNetwork: no NeuralNetwork has been constructed yet (did you await selectMode("learning")?)',
+        );
+      }
+      return StubNeuralNetwork.last;
+    },
     selectMode: async (id) => {
+      const prevCount = fakeAgent.setReasoner.mock.calls.length;
       select.value = id;
       select.dispatchEvent(new Event('change'));
       if (id === 'heuristic') {
@@ -83,11 +120,19 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
         // flush.
         await new Promise((r) => setTimeout(r, 20));
       } else {
-        prevCallCount = fakeAgent.setReasoner.mock.calls.length;
-        await waitForCalls(fakeAgent.setReasoner, prevCallCount + 1);
+        await waitForCalls(fakeAgent.setReasoner, prevCount + 1);
       }
     },
   };
+}
+
+async function waitForTrainingFlush(btn: HTMLButtonElement, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!btn.disabled) return;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  throw new Error('waitForTrainingFlush: train button did not re-enable within timeout');
 }
 
 describe('Train button visibility', () => {
@@ -120,5 +165,65 @@ describe('Train button visibility', () => {
     await selectMode('bt');
     const btn = doc.getElementById('train-network')!;
     expect(btn.hasAttribute('hidden')).toBe(true);
+  });
+});
+
+describe('Train click handler', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  it('invokes NeuralNetwork.train() with 30 synthetic pairs when clicked', async () => {
+    const { document: doc, selectMode, getStubNetwork } = await mountDemo();
+    await selectMode('learning');
+    const btn = doc.getElementById('train-network') as HTMLButtonElement;
+
+    btn.click();
+    await waitForTrainingFlush(btn);
+
+    const pairs = getStubNetwork().lastTrainPairs() as Array<{
+      input: Record<string, number>;
+      output: { score: number };
+    }>;
+    expect(pairs).toHaveLength(30);
+    expect(pairs.every((p) => 'input' in p && 'output' in p)).toBe(true);
+    expect(pairs.every((p) => typeof p.output.score === 'number')).toBe(true);
+  });
+
+  it('writes the trained network to localStorage under the agent-scoped key', async () => {
+    const { document: doc, selectMode, agentId } = await mountDemo();
+    await selectMode('learning');
+    const btn = doc.getElementById('train-network') as HTMLButtonElement;
+
+    btn.click();
+    await waitForTrainingFlush(btn);
+
+    const raw = localStorage.getItem(`agentonomous/${agentId}/brainjs-network`);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!) as { stub?: boolean; trainedFrom?: unknown[] };
+    expect(parsed.stub).toBe(true);
+    expect(parsed.trainedFrom).toHaveLength(30);
+  });
+
+  it('disables the button and changes its text during training, then restores', async () => {
+    const { document: doc, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const btn = doc.getElementById('train-network') as HTMLButtonElement;
+
+    btn.click();
+    // After click() returns, the async handler has run synchronously up
+    // to its first `await` — long enough to have flipped the button
+    // into the training state.
+    expect(btn.disabled).toBe(true);
+    expect(btn.textContent).toBe('Training…');
+    await waitForTrainingFlush(btn);
+
+    expect(btn.disabled).toBe(false);
+    expect(btn.textContent).toBe('Train');
   });
 });

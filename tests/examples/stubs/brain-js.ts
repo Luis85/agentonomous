@@ -24,8 +24,19 @@
  * derived from recorded calls.
  */
 export class NeuralNetwork<In = unknown, Out = unknown> {
+  /**
+   * The most recently constructed instance. Tests inspect this to
+   * verify what `learning.ts` passed into `fromJSON()` / `train()`
+   * without needing to plumb the network through application code.
+   */
+  static last: NeuralNetwork<unknown, unknown> | null = null;
+
   #weights: unknown = null;
   #lastTrain: unknown = null;
+
+  constructor() {
+    NeuralNetwork.last = this as unknown as NeuralNetwork<unknown, unknown>;
+  }
 
   run(_input: In): Out {
     return [0.5] as unknown as Out;
@@ -42,6 +53,14 @@ export class NeuralNetwork<In = unknown, Out = unknown> {
 
   train(pairs: unknown, _opts: unknown): void {
     this.#lastTrain = pairs;
+  }
+
+  lastTrainPairs(): unknown {
+    return this.#lastTrain;
+  }
+
+  lastFromJSON(): unknown {
+    return this.#weights;
   }
 }
 
