@@ -99,7 +99,6 @@ export class TfjsReasoner<In, Out> implements Reasoner {
   constructor(opts: TfjsReasonerOptions<In, Out>);
   selectIntention(ctx: ReasonerContext): Intention | null;
   train(pairs: Array<{ features: In; label: Out }>, opts?: TrainOptions): Promise<TrainResult>;
-  reset(): void;                                  // see below
   toJSON(): TfjsSnapshot;
   static fromJSON<In, Out>(
     snapshot: TfjsSnapshot,
@@ -107,6 +106,7 @@ export class TfjsReasoner<In, Out> implements Reasoner {
   ): Promise<TfjsReasoner<In, Out>>;
   getModel(): tf.Sequential;
   dispose(): void;
+  // Note: Reasoner.reset() is intentionally NOT implemented — see below.
 }
 
 export class TfjsBackendNotRegisteredError extends Error {
@@ -144,16 +144,18 @@ stalls the GPU pipeline until readback completes; this is a documented tick-
 loop cost consumers opt into when they pick `backend: 'webgl'`. WASM behaves
 like CPU.
 
-**`reset()`** restores the model weights to the state captured at construction
-time (or at the last successful `fromJSON` — whichever was more recent). The
-constructor snapshots the initial `model.getWeights()` into an internal
-`Tensor[]` buffer; `reset()` calls `model.setWeights(buffer.map(t => t.clone()))`
-and discards any training history. This matches the `Reasoner.reset()` contract
-followed by `JsSonReasoner` (js-son adapter implements it, brainjs opts out
-because it has no between-tick state; tfjs has trained-model state so it
-implements). `reset()` does not re-initialize weights via the consumer's
-kernelInitializer — the initializer is consumer-owned and only runs at
-`tf.layers.dense` construction.
+**`Reasoner.reset()` is intentionally NOT implemented.** The interface contract
+(`src/cognition/reasoning/Reasoner.ts`) is explicit: `reset()` clears
+*ephemeral between-tick state* (plan/BT scratchpads, per-tick accumulators),
+and trained network weights are called out by name as "long-lived architecture"
+that **MUST be preserved**. `TfjsReasoner` has no ephemeral between-tick state
+— inference is a pure forward pass; training mutations are intentional and
+persistent, persisted by the consumer via `toJSON()` whenever they choose.
+This matches `BrainJsReasoner`'s precedent (it also omits `reset()` for the
+same reason). The kernel's null-safe `reset?.()` call handles the absence
+without requiring a no-op. Consumers who want "revert to the last
+`fromJSON`'d snapshot" reload the snapshot themselves via a fresh
+`TfjsReasoner.fromJSON(snapshot, ...)`.
 
 **Snapshot shape is the hand-rolled split** shown above — the spec commits to
 this shape as the public contract. §10.1's note about tfjs's native
@@ -377,9 +379,9 @@ and the library build resolve everything locally and in CI.
 ### 6.3 Size budget (`size-limit` array)
 
 Rename the brainjs entry to tfjs, budget **3 KB gzip** (up from brainjs's
-2 KB — the tfjs adapter adds `reset()` state + base64 codec helpers, which
-the brainjs adapter didn't have). §6.6's 2–3 KB estimate is aligned to this
-budget.
+2 KB — the tfjs adapter adds `train()` + `toJSON`/`fromJSON` + the base64
+codec helpers, which the brainjs adapter didn't have). §6.6's 2–3 KB
+estimate is aligned to this budget.
 
 ### 6.4 `vite.config.ts` (root)
 
@@ -416,8 +418,8 @@ Remove the vitest alias (lines 164-178) that routed `brain.js` to the stub.
 
 - Library `dist/`: tfjs is external; overall size effectively unchanged. New
   adapter chunk (`dist/cognition/adapters/tfjs/index.js`) budgeted at 3 KB
-  gzipped (§6.3), slightly above the old brainjs chunk because of `reset()`
-  state and base64 codec helpers.
+  gzipped (§6.3), slightly above the old brainjs chunk because of `train()`,
+  `toJSON`/`fromJSON`, and base64 codec helpers.
 - Demo `examples/nurture-pet/dist/`: brain.js's ~540 KB gzipped browser chunk
   is replaced by tfjs-core + tfjs-layers + tfjs-backend-cpu at ~350–450 KB
   gzipped. **Net small bundle decrease.**
@@ -445,9 +447,12 @@ Remove the vitest alias (lines 164-178) that routed `brain.js` to the stub.
   `{hunger: 1, cleanliness: 0, happiness: 0, energy: 0, health: 0}` the output
   matches a hand-calculated sigmoid value (`sigmoid(-1) ≈ 0.2689`) to 4
   decimal places. This catches fat-finger edits to the checked-in baseline.
-- **`reset()`** restores the construct-time weights: train a model for N
-  epochs, call `reset()`, assert `selectIntention` output equals the
-  pre-train baseline on a canonical input.
+- **`reset()` is not implemented.** TypeScript's structural typing means
+  assigning `TfjsReasoner` to `Reasoner` doesn't require a `reset` method
+  (it's optional in the port). The test asserts
+  `typeof reasoner.reset === 'undefined'` so any future accidental addition
+  re-opens this decision loudly. Training state is expected to survive
+  `reset()` per the interface contract.
 - `dispose()` releases tracked tensors — capture
   `tf.memory().numTensors` after first `construct + dispose` cycle as the
   baseline, then run 10 further `construct + dispose` cycles and assert the
