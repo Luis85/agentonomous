@@ -9,9 +9,6 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "dependencies": {
-    "agentonomous": "file:../.."
-  },
   "devDependencies": {
     "brain.js": "^2.0.0-beta.0",
     "js-son-agent": "^0.0.17",

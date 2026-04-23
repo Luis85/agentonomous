@@ -2,27 +2,18 @@
   "type": "NeuralNetwork",
   "sizes": [5, 1],
   "layers": [
-    {
-      "hunger": {},
-      "cleanliness": {},
-      "happiness": {},
-      "energy": {},
-      "health": {}
-    },
-    {
-      "score": {
-        "bias": 0,
-        "weights": {
-          "hunger": -1,
-          "cleanliness": -0.8,
-          "happiness": -0.6,
-          "energy": -0.7,
-          "health": -0.9
-        }
-      }
-    }
+    { "weights": [], "biases": [] },
+    { "weights": [[-1, -0.8, -0.6, -0.7, -0.9]], "biases": [0] }
   ],
-  "outputLookup": true,
-  "inputLookup": true,
-  "trainOpts": {}
+  "inputLookup": {
+    "hunger": 0,
+    "cleanliness": 1,
+    "happiness": 2,
+    "energy": 3,
+    "health": 4
+  },
+  "inputLookupLength": 5,
+  "outputLookup": { "score": 0 },
+  "outputLookupLength": 1,
+  "options": {}
 }

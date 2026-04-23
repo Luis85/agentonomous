@@ -179,8 +179,13 @@ the throw and the next tick, so replay stays deterministic.
 
 ### Running the example
 
-The `examples/nurture-pet` demo consumes the library via a workspace-local
-build. You must build the library before the example resolves it:
+The `examples/nurture-pet` demo resolves `agentonomous` (and its
+`cognition/adapters/*` subpaths) via Vite + tsconfig aliases that point at
+the library's built `dist/` — not via an npm dependency. That keeps the
+demo import shape identical to a real consumer while sidestepping npm's
+self-nested-junction failure on Windows when a `file:../..` dep points at
+its own ancestor. You must build the library before the example resolves
+it:
 
 ```bash
 # From the repo root.

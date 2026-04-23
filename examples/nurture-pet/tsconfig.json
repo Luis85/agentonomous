@@ -10,7 +10,16 @@
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "agentonomous": ["../../src/index.ts"],
+      "agentonomous/cognition/adapters/brainjs": ["../../src/cognition/adapters/brainjs/index.ts"],
+      "agentonomous/cognition/adapters/mistreevous": [
+        "../../src/cognition/adapters/mistreevous/index.ts"
+      ],
+      "agentonomous/cognition/adapters/js-son": ["../../src/cognition/adapters/js-son/index.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

@@ -38,7 +38,8 @@ and watch it react and act autonomously between your inputs.
 
 ## Running locally
 
-Build the core library first (the demo workspace-links against `dist/`):
+Build the core library first — the demo's `vite.config.ts` + `tsconfig.json`
+alias `agentonomous` (and its adapter subpaths) to `../../dist/`:
 
 ```bash
 # in the project root
