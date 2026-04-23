@@ -599,6 +599,12 @@ export class Agent {
     ) {
       throw new TypeError('setReasoner: expected a Reasoner with a selectIntention method.');
     }
+    // `reset` is optional, but when present it MUST be callable. Validating
+    // here fails fast at swap-time rather than mid-restore (where a thrown
+    // TypeError would leave the agent in a partially-restored state).
+    if (reasoner.reset !== undefined && typeof reasoner.reset !== 'function') {
+      throw new TypeError('setReasoner: reasoner.reset must be a function when present.');
+    }
     this.reasoner = reasoner;
     reasoner.reset?.();
   }

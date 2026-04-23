@@ -63,4 +63,18 @@ describe('Agent.setReasoner → Reasoner.reset', () => {
 
     expect(() => agent.setReasoner(resetless)).not.toThrow();
   });
+
+  it('throws TypeError when reset is defined but not callable', () => {
+    // Optional-chain `reset?.()` guards null/undefined but would still throw
+    // at invocation time if `reset` is a truthy non-function. Validating at
+    // set-time localises the failure so mid-restore partial-state bugs
+    // cannot arise from a malformed reasoner installed via setReasoner.
+    const agent = makeAgent();
+    const malformed = {
+      selectIntention: () => null,
+      reset: 'not a function',
+    } as unknown as Reasoner;
+
+    expect(() => agent.setReasoner(malformed)).toThrow(TypeError);
+  });
 });
