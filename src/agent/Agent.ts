@@ -662,6 +662,13 @@ export class Agent {
    *
    * If `opts.catchUp` is set, the agent sub-steps forward from
    * `snapshot.snapshotAt` to `clock.now()` using `runCatchUp`.
+   *
+   * After all subsystem rehydration and catch-up ticks complete,
+   * `this.reasoner.reset?.()` is invoked so the first live post-restore
+   * tick starts from a known-clean baseline. Reset fires _after_
+   * catch-up, not before — catch-up ticks are synthetic and their
+   * residual reasoner state (mid-sequence BT nodes, plan accumulators)
+   * is intentionally discarded.
    */
   async restore(
     snapshot: AgentSnapshot,
@@ -742,6 +749,8 @@ export class Agent {
         chunkOpts,
       );
     }
+
+    this.reasoner.reset?.();
   }
 
   /**
