@@ -191,7 +191,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
         const features: number[] = [];
         let min = 1;
-        for (const _id of NEED_IDS) {
+        for (let i = 0; i < NEED_IDS.length; i++) {
           const level = agent.rng.next();
           features.push(level);
           if (level < min) min = level;

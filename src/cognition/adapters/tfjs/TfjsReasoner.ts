@@ -80,13 +80,12 @@ export type TfjsHelpers = {
  * NOT call `tf.setBackend()` itself because that's async. Use the async
  * `TfjsReasoner.fromJSON()` factory for backends that need registration.
  */
-export interface TfjsReasonerOptions<In, Out> {
+export type TfjsReasonerOptions<In, Out> = {
   model: Sequential;
   featuresOf: (ctx: ReasonerContext, helpers: TfjsHelpers) => In;
   interpret: (output: Out, ctx: ReasonerContext, helpers: TfjsHelpers) => Intention | null;
   backend?: 'cpu' | 'wasm' | 'webgl';
-  seed?: number;
-}
+};
 
 /**
  * Options for `TfjsReasoner.train`.
@@ -264,6 +263,10 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
    * decoded weights in original order, and returns a ready-to-use
    * reasoner. Rejects with `TfjsBackendNotRegisteredError` when the
    * requested backend can't be activated.
+   *
+   * The rebuilt model is **uncompiled** — inference works, but callers
+   * who intend to `train()` must compile the model first (e.g. via
+   * `reasoner.getModel().compile({ optimizer, loss })`).
    */
   static async fromJSON<In = unknown, Out = unknown>(
     snapshot: TfjsSnapshot,
@@ -293,7 +296,7 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
 
     const weightArrays = decodeWeights(snapshot.weights, snapshot.weightsShapes);
     const tensors = weightArrays.map((arr, i) =>
-      tf.tensor(Array.from(arr), snapshot.weightsShapes[i] as number[]),
+      tf.tensor(arr, snapshot.weightsShapes[i] as number[], 'float32'),
     );
     try {
       rebuilt.setWeights(tensors);
