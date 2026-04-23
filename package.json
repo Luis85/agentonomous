@@ -41,6 +41,10 @@
       "import": "./dist/cognition/adapters/brainjs/index.js",
       "types": "./dist/cognition/adapters/brainjs/index.d.ts"
     },
+    "./cognition/adapters/tfjs": {
+      "import": "./dist/cognition/adapters/tfjs/index.js",
+      "types": "./dist/cognition/adapters/tfjs/index.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -183,6 +187,12 @@
       "path": "dist/cognition/adapters/brainjs/index.js",
       "gzip": true,
       "limit": "2 KB"
+    },
+    {
+      "name": "dist/cognition/adapters/tfjs/index.js (gzip)",
+      "path": "dist/cognition/adapters/tfjs/index.js",
+      "gzip": true,
+      "limit": "4 KB"
     }
   ],
   "lint-staged": {

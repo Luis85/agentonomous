@@ -12,6 +12,8 @@ import dts from 'vite-plugin-dts';
 //                                                    → dist/cognition/adapters/js-son/index.js
 // - brain.js:    src/cognition/adapters/brainjs/index.ts
 //                                                    → dist/cognition/adapters/brainjs/index.js
+// - tfjs:        src/cognition/adapters/tfjs/index.ts
+//                                                    → dist/cognition/adapters/tfjs/index.js
 //
 // All peer dependencies are marked external so consumers provide them.
 
@@ -78,6 +80,8 @@ function copyAmbientDts(): Plugin {
 
 const externalPackages = [
   '@anthropic-ai/sdk',
+  '@tensorflow/tfjs-core',
+  '@tensorflow/tfjs-layers',
   'brain.js',
   'excalibur',
   'js-son-agent',
@@ -109,6 +113,7 @@ export default defineConfig({
           __dirname,
           'src/cognition/adapters/brainjs/index.ts',
         ),
+        'cognition/adapters/tfjs/index': resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
       formats: ['es'],
     },
@@ -156,6 +161,10 @@ export default defineConfig({
       {
         find: /^agentonomous\/cognition\/adapters\/brainjs$/,
         replacement: resolve(__dirname, 'src/cognition/adapters/brainjs/index.ts'),
+      },
+      {
+        find: /^agentonomous\/cognition\/adapters\/tfjs$/,
+        replacement: resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
       {
         find: /^agentonomous$/,
