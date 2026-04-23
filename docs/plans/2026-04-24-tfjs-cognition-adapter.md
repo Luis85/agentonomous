@@ -199,15 +199,23 @@ git commit -m "chore(demo): add tfjs deps alongside brain.js (transitional)"
 
 Confirm the existing pre-PR gate is green with the new deps installed and no source changes. This is the baseline — if it's not green here, chase down the issue before writing any adapter code.
 
-- [ ] **Step 1: Run verify**
+- [ ] **Step 1: Capture baseline test count**
+
+```bash
+npm test -- --reporter=verbose 2>&1 | tail -3
+```
+
+Expected: something like `Tests  N passed (N)`. Record `N` as the baseline — later chunks reference "baseline + X" instead of hardcoded totals (the `develop` tip moves between the day this plan is written and the day it runs).
+
+- [ ] **Step 2: Run verify**
 
 ```bash
 npm run verify
 ```
 
-Expected: `format:check` → pass; `lint` → pass; `typecheck` → pass; `test` → 399 tests pass; `build` → success. No new warnings from the added tfjs deps.
+Expected: `format:check` → pass; `lint` → pass; `typecheck` → pass; `test` → baseline count from Step 1 pass; `build` → success. No new warnings from the added tfjs deps.
 
-- [ ] **Step 2: If verify fails, STOP**
+- [ ] **Step 3: If verify fails, STOP**
 
 Do not proceed to Chunk 2 with a red baseline. Common failure modes at this step:
 
@@ -317,6 +325,15 @@ Expected: all 5 tests fail with module-not-found (`Cannot find module '.../TfjsS
  * Plain JSON so consumers can `JSON.stringify` it into localStorage without
  * touching tfjs's `tf.io.IOHandler` surface. `version: 1` is reserved for
  * future migration routing if the shape changes.
+ *
+ * @remarks
+ * Encoded bytes preserve host-endian `Float32Array.buffer` layout. All
+ * mainstream browsers and Node on every currently-shipping CPU run on
+ * little-endian hardware, so round-trips work anywhere in practice; a
+ * `TfjsSnapshot` authored on a big-endian machine would not decode
+ * correctly on an LE consumer. Not a constraint we enforce; documented
+ * here so future migration paths can add an explicit `endianness` field
+ * if needed.
  */
 export type TfjsSnapshot = {
   version: 1;
@@ -396,7 +413,7 @@ Expected: 5 tests pass.
 npm run verify
 ```
 
-Expected: 400 tests pass (399 prior + 5 new — net +5, total 404). Format/lint/typecheck/build all pass.
+Expected: `baseline + 5` tests pass (5 new `TfjsSnapshot` tests). Format/lint/typecheck/build all pass.
 
 Note: if `prettier --check` fails on the new files, run `npx prettier --write src/cognition/adapters/tfjs/TfjsSnapshot.ts tests/unit/cognition/adapters/TfjsSnapshot.test.ts` and re-run verify.
 
@@ -606,11 +623,10 @@ import type { Sequential } from '@tensorflow/tfjs-layers';
 import type { Intention } from '../../Intention.js';
 import type { IntentionCandidate } from '../../IntentionCandidate.js';
 import type { Reasoner, ReasonerContext } from '../../reasoning/Reasoner.js';
-import {
-  type TfjsSnapshot,
-  encodeWeights,
-  decodeWeights,
-} from './TfjsSnapshot.js';
+import type { TfjsSnapshot } from './TfjsSnapshot.js';
+// encodeWeights / decodeWeights are imported in Chunk 5 when toJSON /
+// fromJSON actually use them — importing unused runtime symbols here
+// would trip @typescript-eslint/no-unused-vars.
 
 const BACKEND_PACKAGES: Record<'cpu' | 'wasm' | 'webgl', string> = {
   cpu: '@tensorflow/tfjs-backend-cpu',
@@ -816,12 +832,6 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
     throw new Error('TfjsReasoner.fromJSON not yet implemented (Chunk 5)');
   }
 }
-
-// Temporary re-export so TfjsSnapshot helpers don't generate unused-import
-// warnings under strict lint; removed in Chunk 5 when encodeWeights /
-// decodeWeights are actually used by toJSON / fromJSON.
-void encodeWeights;
-void decodeWeights;
 ```
 
 **Important caveat about `features instanceof tf.Tensor`**: this works for ergonomic array/record features by dispatching through `tf.tensor(...)` when the consumer returns a plain value. Consumers who build their own `tf.Tensor` in `featuresOf` pass through untouched.
@@ -1064,19 +1074,22 @@ Replace the `learningRate?: number;` line in `TrainOptions` with:
 npx vitest run tests/unit/cognition/adapters/TfjsReasoner.test.ts -t training
 ```
 
-Expected: all 3 tests pass. If the "deterministic training" test shows drift beyond `toBeCloseTo(..., 5)`, weaken to `toBeCloseTo(..., 3)` and add a JSDoc note on `train`:
+Expected: all 3 tests pass. The spec's §4.3 authorises a single fallback path if tfjs shows hidden non-determinism — apply it uniformly to BOTH determinism tests in Task 4.1:
+
+1. The "same pairs + same seed → same final loss" test weakens from `toBeCloseTo(result2.finalLoss, 5)` to `toBeCloseTo(..., 3)`.
+2. The "train passes shuffle:false" test weakens from `expect(h1.history.loss).toEqual(h2.history.loss)` to a pairwise loop: `for (let i = 0; i < h1.history.loss.length; i++) expect(h1.history.loss[i]).toBeCloseTo(h2.history.loss[i]!, 3);`.
+
+If EITHER test drifts beyond `toBeCloseTo(..., 5)`, weaken BOTH together (the underlying non-determinism source is the same — tfjs-internal — so they share a fallback). Document once on `train()`:
 
 ```ts
 /**
  * ...
  * @remarks Determinism is best-effort. Verified stable to ~5 decimal
- * places on `@tensorflow/tfjs-layers@^4.22.0` CPU backend; any drift
- * above that is documented here as a tfjs-internal source we don't
- * control.
+ * places on `@tensorflow/tfjs-layers@^4.22.0` CPU backend. If a future
+ * tfjs version introduces non-determinism beyond that tolerance, this
+ * note gets the drift source logged and the tests weaken to 3 decimals.
  */
 ```
-
-(The spec's §4.3 authorised this fallback path.)
 
 - [ ] **Step 3: Full `verify`**
 
@@ -1307,16 +1320,20 @@ static async fromJSON<In = unknown, Out = unknown>(
 - `models.modelFromJSON` accepts either the parsed topology object or an object with a `modelTopology` field. Shape confirmed by the first `toJSON → fromJSON` round-trip test in Task 5.4.
 - The temporary `void encodeWeights; void decodeWeights;` from Task 3.3 can now be deleted — both are live.
 
-- [ ] **Step 2: Delete the temporary `void` suppressions**
+- [ ] **Step 2: Add the codec imports**
 
-Remove the two lines from the bottom of `TfjsReasoner.ts`:
+Near the top of `TfjsReasoner.ts`, expand the `TfjsSnapshot` import:
 
 ```diff
--// Temporary re-export so TfjsSnapshot helpers don't generate unused-import
--// warnings under strict lint; removed in Chunk 5 when encodeWeights /
--// decodeWeights are actually used by toJSON / fromJSON.
--void encodeWeights;
--void decodeWeights;
+-import type { TfjsSnapshot } from './TfjsSnapshot.js';
+-// encodeWeights / decodeWeights are imported in Chunk 5 when toJSON /
+-// fromJSON actually use them — importing unused runtime symbols here
+-// would trip @typescript-eslint/no-unused-vars.
++import {
++  type TfjsSnapshot,
++  encodeWeights,
++  decodeWeights,
++} from './TfjsSnapshot.js';
 ```
 
 - [ ] **Step 3: Run all persistence tests**
@@ -1410,6 +1427,43 @@ head -20 dist/cognition/adapters/tfjs/index.js
 ```
 
 Expected: starts with `import { ... } from "@tensorflow/tfjs-core";` / `from "@tensorflow/tfjs-layers";`. No `gpu.js`, no bundled tfjs internals.
+
+---
+
+### Task 6.1b: Add the vitest subpath alias
+
+**Files:**
+
+- Modify: `vite.config.ts`
+
+`vite.config.ts`'s vitest alias block currently maps `agentonomous/cognition/adapters/{mistreevous,js-son,brainjs}` specifiers to their `src/` paths (so tests importing those subpaths don't depend on a built `dist/`). We need the same for tfjs. The brainjs alias stays in place through Chunks 1–7; Chunk 8 removes it.
+
+- [ ] **Step 1: Add the alias entry**
+
+In the `test.alias` array (right after the existing brainjs entry), add:
+
+```diff
+       {
+         find: /^agentonomous\/cognition\/adapters\/brainjs$/,
+         replacement: resolve(__dirname, 'src/cognition/adapters/brainjs/index.ts'),
+       },
++      {
++        find: /^agentonomous\/cognition\/adapters\/tfjs$/,
++        replacement: resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
++      },
+       {
+         find: /^agentonomous$/,
+         replacement: resolve(__dirname, 'src/index.ts'),
+       },
+```
+
+- [ ] **Step 2: Quick sanity check**
+
+```bash
+npx vitest run tests/unit/cognition/adapters/TfjsReasoner.test.ts
+```
+
+Expected: tests still pass (the alias doesn't change behaviour for tests that already imported via relative paths; it just lets the demo + future tests use the subpath specifier).
 
 ---
 
@@ -1555,21 +1609,53 @@ Write the JSON literal into `examples/nurture-pet/src/cognition/learning.network
 }
 ```
 
-**Verification gate:** the exact `topology` shape above may differ slightly from what tfjs-layers 4.22 serializes. Before committing, write a one-shot verification:
+- [ ] **Step 3: Verify the topology literal matches what tfjs-layers actually emits**
 
-```ts
-// one-shot: node --experimental-vm-modules ...
+The exact `topology` shape above may differ from what tfjs-layers 4.22 serializes (keras_version string, field ordering, optional fields). Confirm by running a one-shot verification script.
+
+Save this as `scripts/verify-topology.mjs` (throwaway — deleted in Step 5 below):
+
+```js
+// scripts/verify-topology.mjs
 import '@tensorflow/tfjs-backend-cpu';
 import * as tf from '@tensorflow/tfjs-core';
 import { layers, sequential } from '@tensorflow/tfjs-layers';
 await tf.ready();
-const m = sequential({ layers: [layers.dense({ units: 1, inputShape: [5], activation: 'sigmoid', useBias: true })] });
+const m = sequential({
+  layers: [
+    layers.dense({
+      units: 1,
+      inputShape: [5],
+      activation: 'sigmoid',
+      useBias: true,
+    }),
+  ],
+});
 const [dense] = m.layers;
-dense.setWeights([tf.tensor2d([[-1], [-0.8], [-0.6], [-0.7], [-0.9]]), tf.tensor1d([0])]);
-console.log(JSON.stringify(m.toJSON(null, false), null, 2));
+dense.setWeights([
+  tf.tensor2d([[-1], [-0.8], [-0.6], [-0.7], [-0.9]]),
+  tf.tensor1d([0]),
+]);
+const topology = m.toJSON(null, false);
+console.log(JSON.stringify(topology, null, 2));
 ```
 
-If the output differs from the topology literal above, REPLACE the literal in `learning.network.json` with whatever tfjs actually emits. The rest of the fields (`version`, `weights`, `weightsShapes`, `inputKeys`, `outputKeys`) are unaffected.
+Run it:
+
+```bash
+node scripts/verify-topology.mjs
+```
+
+- [ ] **Step 4: If the output differs from the literal, update `learning.network.json`**
+
+Diff the printed output against the `topology` field in `learning.network.json`. If they match exactly — great, move on. If they don't, copy the ACTUAL output into the `topology` field, keeping `version`, `weights`, `weightsShapes`, `inputKeys`, `outputKeys` unchanged.
+
+- [ ] **Step 5: Delete the throwaway script**
+
+```bash
+rm scripts/verify-topology.mjs
+# rmdir scripts if the directory is empty and didn't previously exist
+```
 
 ---
 
@@ -1798,11 +1884,7 @@ const seed = (persisted ?? networkJson) as TfjsSnapshot;
 
 - [ ] **Step 1: Read the current file first**
 
-```bash
-cat examples/nurture-pet/src/cognitionSwitcher.ts | head -200
-```
-
-(The specifics of its current shape depend on prior work; adjust the edits below to match the actual file.)
+Open `examples/nurture-pet/src/cognitionSwitcher.ts` in the editor (or use the `Read` tool). Scan for: (a) module-local state near the top, (b) the existing Train-button handler, (c) the `onChange(newMode)` mode-swap hook. The edits below assume the file exists and has these three sections; adjust imports/locations to match what's actually there.
 
 - [ ] **Step 2: Add a module-local `trainRng`**
 
@@ -2064,6 +2146,60 @@ In `vite.config.ts`:
 
 Find and delete the ~15-line block (currently around lines 164–178) that aliases `brain.js` → `tests/examples/stubs/brain-js.ts`. The block starts with a long comment about "`brain.js` is an optional peer…"; delete the whole comment + alias object.
 
+- [ ] **Step 3b: Remove the brainjs subpath vitest alias**
+
+A separate alias entry (lines 157–158 in the pre-swap file) maps `^agentonomous/cognition/adapters/brainjs$` → the brainjs source. Delete it:
+
+```diff
+-      {
+-        find: /^agentonomous\/cognition\/adapters\/brainjs$/,
+-        replacement: resolve(__dirname, 'src/cognition/adapters/brainjs/index.ts'),
+-      },
+       {
+         find: /^agentonomous\/cognition\/adapters\/tfjs$/,
+         replacement: resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
+       },
+```
+
+- [ ] **Step 3c: Remove the brainjs ambient-dts copy entry**
+
+The top-of-file `ambientDtsEntries` array has a brainjs entry (around lines 46–50) that copies `brain.d.ts` into `dist/` and prepends `/// <reference>` lines to brainjs's emitted `.d.ts` files. Delete the whole object entry:
+
+```diff
+   {
+     from: 'src/cognition/adapters/js-son/js-son-agent.d.ts',
+     to: 'dist/cognition/adapters/js-son/js-son-agent.d.ts',
+     referencedBy: [
+       'dist/cognition/adapters/js-son/index.d.ts',
+       'dist/cognition/adapters/js-son/JsSonReasoner.d.ts',
+     ],
+   },
+-  {
+-    from: 'src/cognition/adapters/brainjs/brain.d.ts',
+-    to: 'dist/cognition/adapters/brainjs/brain.d.ts',
+-    referencedBy: [
+-      'dist/cognition/adapters/brainjs/index.d.ts',
+-      'dist/cognition/adapters/brainjs/BrainJsReasoner.d.ts',
+-    ],
+-  },
+ ];
+```
+
+(tfjs doesn't need an ambient shim — `@tensorflow/tfjs-core` + `-layers` ship real types.)
+
+- [ ] **Step 3d: Update the file-header comment block**
+
+Near the top of `vite.config.ts` (around lines 7–15), the comment block enumerating the adapter entry points mentions brain.js. Swap it for tfjs:
+
+```diff
+ // - js-son:      src/cognition/adapters/js-son/index.ts
+ //                                                    → dist/cognition/adapters/js-son/index.js
+-// - brain.js:    src/cognition/adapters/brainjs/index.ts
+-//                                                    → dist/cognition/adapters/brainjs/index.js
++// - tfjs:        src/cognition/adapters/tfjs/index.ts
++//                                                    → dist/cognition/adapters/tfjs/index.js
+```
+
 - [ ] **Step 4: Remove brainjs subpath from package.json exports**
 
 ```diff
@@ -2159,7 +2295,25 @@ Expected: `found 0 vulnerabilities` (the entire 10-CVE chain was brain.js's). If
 
 ---
 
-### Task 8.4: Write the changeset
+### Task 8.4a: Delete the un-consumed old brainjs changeset
+
+**Files:** (deletion)
+
+- Delete: `.changeset/cognition-adapter-brainjs.md`
+
+The old brainjs changeset is still in `.changeset/` (un-consumed — never collapsed into a CHANGELOG because agentonomous hasn't cut a release yet). Since we're removing the feature it documents in the same PR, the changeset describes a surface that will no longer exist. Delete it; the new changeset (Task 8.4b) replaces it.
+
+- [ ] **Step 1: Delete the file**
+
+```bash
+git rm .changeset/cognition-adapter-brainjs.md
+```
+
+Expected: removed from the index.
+
+---
+
+### Task 8.4b: Write the changeset
 
 **Files:**
 
@@ -2313,6 +2467,14 @@ npm audit on the demo now reports 0 vulnerabilities (was 10)."
 ```bash
 git push -u origin feat/tfjs-cognition-adapter
 ```
+
+- [ ] **Step 2b: Confirm gh CLI is authenticated**
+
+```bash
+gh auth status
+```
+
+Expected: `Logged in to github.com account <user>` with `repo` scope. If not authenticated, run `gh auth login` before the next step.
 
 - [ ] **Step 3: Open the PR targeting `develop`**
 
