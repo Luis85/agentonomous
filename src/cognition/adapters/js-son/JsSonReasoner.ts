@@ -175,9 +175,11 @@ export class JsSonReasoner implements Reasoner {
   }
 
   /**
-   * Rebuild the underlying js-son `Agent` from the original options.
-   * Use after major state shifts — js-son agents are stateful (beliefs
-   * accumulate across `next()` calls) so there's no built-in "rewind".
+   * Rebuilds the wrapped js-son agent from the constructor's initial
+   * options: beliefs revert to the initial map; desires and plans are
+   * reinstalled from the saved descriptors. Implements the
+   * `Reasoner.reset` port contract (see
+   * `src/cognition/reasoning/Reasoner.ts`).
    */
   reset(): void {
     this.agent = this.buildAgent();
