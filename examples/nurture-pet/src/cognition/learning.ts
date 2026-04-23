@@ -91,9 +91,19 @@ export const learningMode: CognitionModeSpec = {
         // Corrupt stored value or localStorage unavailable — fall back
         // to the default. The Train button regenerates valid state on
         // its next click.
+        seed = networkJson;
       }
     }
-    network.fromJSON(seed);
+    try {
+      network.fromJSON(seed);
+    } catch {
+      // The stored payload parsed as JSON but brain.js rejected its
+      // shape (manual edit, prior format, partial migration). Recover
+      // with the bundled default so Learning mode stays selectable —
+      // otherwise the switcher would disable the option until the user
+      // clicked Reset.
+      network.fromJSON(networkJson);
+    }
 
     return new BrainJsReasoner({
       network: network as never,

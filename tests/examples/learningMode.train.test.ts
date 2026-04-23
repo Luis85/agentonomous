@@ -282,6 +282,27 @@ describe('learningMode.construct() hydration order', () => {
     const loaded = getStubNetwork().lastFromJSON() as { type?: string; sizes?: number[] };
     expect(loaded.sizes).toEqual([5, 1]);
   });
+
+  it('falls back to the default when fromJSON rejects a schema-invalid payload', async () => {
+    // The stored value parses as JSON (so the JSON.parse guard passes)
+    // but fromJSON rejects it because the shape is wrong — e.g. a
+    // manually-edited key, a prior format, or a partial migration.
+    // construct() must catch that and hydrate from the bundled default
+    // so Learning mode stays selectable.
+    const agentId = 'test-pet';
+    localStorage.setItem(
+      `agentonomous/${agentId}/brainjs-network`,
+      JSON.stringify({ shape: 'nonsense' }),
+    );
+    StubNeuralNetwork.throwOnNextFromJSON = true;
+
+    const { selectMode, getStubNetwork } = await mountDemo({ agentId });
+    await selectMode('learning');
+
+    const loaded = getStubNetwork().lastFromJSON() as { type?: string; sizes?: number[] };
+    expect(loaded.sizes).toEqual([5, 1]);
+    expect(StubNeuralNetwork.throwOnNextFromJSON).toBe(false);
+  });
 });
 
 describe('Reset button clears trained network', () => {

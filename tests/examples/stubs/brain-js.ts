@@ -31,6 +31,14 @@ export class NeuralNetwork<In = unknown, Out = unknown> {
    */
   static last: NeuralNetwork<unknown, unknown> | null = null;
 
+  /**
+   * One-shot flag: if true, the next `fromJSON()` call throws once and
+   * clears the flag. Used by the "fromJSON rejects schema-invalid
+   * stored payload" regression test — real brain.js can throw on a
+   * malformed payload, and we need to verify the demo recovers.
+   */
+  static throwOnNextFromJSON = false;
+
   #weights: unknown = null;
   #lastTrain: unknown = null;
 
@@ -43,6 +51,10 @@ export class NeuralNetwork<In = unknown, Out = unknown> {
   }
 
   fromJSON(json: unknown): this {
+    if (NeuralNetwork.throwOnNextFromJSON) {
+      NeuralNetwork.throwOnNextFromJSON = false;
+      throw new Error('stub: simulated schema-invalid JSON in fromJSON');
+    }
     this.#weights = json;
     return this;
   }
