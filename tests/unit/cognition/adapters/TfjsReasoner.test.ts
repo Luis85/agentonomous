@@ -231,3 +231,73 @@ describe('TfjsReasoner — training', () => {
     r2.dispose();
   });
 });
+
+describe('TfjsReasoner — persistence', () => {
+  it('toJSON → fromJSON round-trip produces identical selectIntention output', async () => {
+    const model1 = makeLinearModel();
+    const [dense1] = model1.layers;
+    dense1!.setWeights([tf.tensor2d([[0.3], [-0.4]]), tf.tensor1d([0.05])]);
+
+    const captureOut =
+      (bag: { v: number | null }) =>
+      (out: number[]): null => {
+        bag.v = out[0] ?? null;
+        return null;
+      };
+    const bag1 = { v: null as number | null };
+    const r1 = new TfjsReasoner<number[], number[]>({
+      model: model1,
+      featuresOf: () => [0.7, 0.9],
+      interpret: captureOut(bag1),
+    });
+    r1.selectIntention(ctx());
+    const snapshot = r1.toJSON();
+    expect(snapshot.version).toBe(1);
+    expect(typeof snapshot.weights).toBe('string');
+    expect(snapshot.weightsShapes.length).toBeGreaterThan(0);
+
+    const bag2 = { v: null as number | null };
+    const r2 = await TfjsReasoner.fromJSON<number[], number[]>(snapshot, {
+      featuresOf: () => [0.7, 0.9],
+      interpret: captureOut(bag2),
+    });
+    r2.selectIntention(ctx());
+
+    expect(bag2.v).toBeCloseTo(bag1.v!, 5);
+    r1.dispose();
+    r2.dispose();
+  });
+
+  it('fromJSON rejects a corrupted snapshot with a clear error', async () => {
+    const bogus = {
+      version: 1 as const,
+      topology: { garbage: true },
+      weights: '',
+      weightsShapes: [[5, 1], [1]] as readonly (readonly number[])[],
+    };
+    await expect(
+      TfjsReasoner.fromJSON(bogus, {
+        featuresOf: () => [0],
+        interpret: () => null,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('fromJSON is tolerant of the currently-active backend (no throw for cpu)', async () => {
+    const model = makeLinearModel();
+    const r = new TfjsReasoner({
+      model,
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    const snapshot = r.toJSON();
+    r.dispose();
+
+    const r2 = await TfjsReasoner.fromJSON(snapshot, {
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    expect(r2.getModel()).toBeDefined();
+    r2.dispose();
+  });
+});

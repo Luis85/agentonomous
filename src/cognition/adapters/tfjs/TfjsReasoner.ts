@@ -1,9 +1,9 @@
 import * as tf from '@tensorflow/tfjs-core';
-import type { Sequential } from '@tensorflow/tfjs-layers';
+import { models, type Sequential } from '@tensorflow/tfjs-layers';
 import type { Intention } from '../../Intention.js';
 import type { IntentionCandidate } from '../../IntentionCandidate.js';
 import type { Reasoner, ReasonerContext } from '../../reasoning/Reasoner.js';
-import type { TfjsSnapshot } from './TfjsSnapshot.js';
+import { decodeWeights, encodeWeights, type TfjsSnapshot } from './TfjsSnapshot.js';
 
 const BACKEND_PACKAGES: Record<'cpu' | 'wasm' | 'webgl', string> = {
   cpu: '@tensorflow/tfjs-backend-cpu',
@@ -130,9 +130,9 @@ export type TrainResult = {
  * handles the absence. Consumers wanting to revert to the last snapshot
  * call `TfjsReasoner.fromJSON(...)` themselves.
  *
- * Training / persistence methods (`train`, `toJSON`, `fromJSON`) land in
- * later chunks of the same PR — stubbed as rejecting promises / throwing
- * here so TypeScript sees the full surface.
+ * Lifecycle: `train(pairs, opts)` updates in-place (weights mutate);
+ * `toJSON()` / `fromJSON(snapshot)` round-trip a full model through a
+ * plain-JSON `TfjsSnapshot`; `dispose()` releases tensor memory.
  */
 export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
   private readonly model: Sequential;
@@ -235,14 +235,72 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
     }
   }
 
+  /**
+   * Serialise the model's topology + weights as a plain-JSON
+   * `TfjsSnapshot`. Consumers can `JSON.stringify` the result and stash it
+   * in localStorage; rehydrate with `TfjsReasoner.fromJSON(...)`.
+   */
   toJSON(): TfjsSnapshot {
-    throw new Error('TfjsReasoner.toJSON not yet implemented (Chunk 5)');
+    const weightTensors = this.model.getWeights();
+    const weightsShapes = weightTensors.map((t) => [...t.shape]);
+    const weightsArrays = weightTensors.map((t) => {
+      const data = t.dataSync();
+      return data instanceof Float32Array ? data : new Float32Array(data);
+    });
+    const topology = (
+      this.model as unknown as { toJSON(unused: unknown, ret: boolean): unknown }
+    ).toJSON(null, false);
+    return {
+      version: 1,
+      topology,
+      weights: encodeWeights(weightsArrays),
+      weightsShapes,
+    };
   }
 
-  static fromJSON<In = unknown, Out = unknown>(
-    _snapshot: TfjsSnapshot,
-    _opts: Omit<TfjsReasonerOptions<In, Out>, 'model'>,
+  /**
+   * Async factory. Registers the requested tfjs backend if needed,
+   * rebuilds the `Sequential` from the stored topology, applies the
+   * decoded weights in original order, and returns a ready-to-use
+   * reasoner. Rejects with `TfjsBackendNotRegisteredError` when the
+   * requested backend can't be activated.
+   */
+  static async fromJSON<In = unknown, Out = unknown>(
+    snapshot: TfjsSnapshot,
+    opts: Omit<TfjsReasonerOptions<In, Out>, 'model'>,
   ): Promise<TfjsReasoner<In, Out>> {
-    return Promise.reject(new Error('TfjsReasoner.fromJSON not yet implemented (Chunk 5)'));
+    if (snapshot.version !== 1) {
+      throw new Error(
+        `TfjsReasoner.fromJSON: unsupported snapshot version ${snapshot.version as number}`,
+      );
+    }
+
+    const requestedBackend = opts.backend ?? 'cpu';
+    if (tf.getBackend() !== requestedBackend) {
+      try {
+        const ok = await tf.setBackend(requestedBackend);
+        if (!ok) throw new TfjsBackendNotRegisteredError(requestedBackend);
+      } catch (err) {
+        if (err instanceof TfjsBackendNotRegisteredError) throw err;
+        throw new TfjsBackendNotRegisteredError(requestedBackend);
+      }
+      await tf.ready();
+    }
+
+    const rebuilt = (await models.modelFromJSON(
+      snapshot.topology as never,
+    )) as unknown as Sequential;
+
+    const weightArrays = decodeWeights(snapshot.weights, snapshot.weightsShapes);
+    const tensors = weightArrays.map((arr, i) =>
+      tf.tensor(Array.from(arr), snapshot.weightsShapes[i] as number[]),
+    );
+    try {
+      rebuilt.setWeights(tensors);
+    } finally {
+      for (const t of tensors) t.dispose();
+    }
+
+    return new TfjsReasoner<In, Out>({ ...opts, model: rebuilt });
   }
 }
