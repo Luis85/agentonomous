@@ -203,13 +203,25 @@ export function createAgent(config: CreateAgentConfig): Agent {
 
   // Auto-install any skills contributed by config-time modules so the
   // SkillRegistry is fully populated by the time the agent starts
-  // ticking. Consumer-pre-registered skills take precedence — a skill
-  // already in the registry is not overridden by a module default, so
-  // an explicit `skills.register(customFeedSkill)` before createAgent()
-  // still wins even when the module also ships a FeedSkill.
+  // ticking.
+  //
+  // Precedence rules:
+  //   1. Consumer-pre-registered skills win — an explicit
+  //      `skills.register(customFeedSkill)` before createAgent() is
+  //      preserved even when a module also ships a FeedSkill. We
+  //      snapshot the consumer's ids up front so the "skip" branch
+  //      matches only those.
+  //   2. Module-vs-module collisions still fail fast. If two modules
+  //      contribute the same id (or one module lists it twice), the
+  //      unguarded `skills.register(skill)` call throws
+  //      DuplicateSkillError — the same error the PR surfaces for
+  //      pairwise conflicts. Silent "first module wins" would hide
+  //      exactly the cross-module bug this PR exists to catch.
+  const consumerSkillIds = new Set(skills.list().map((s) => s.id));
   for (const mod of config.modules ?? []) {
     for (const skill of mod.skills ?? []) {
-      if (!skills.has(skill.id)) skills.register(skill);
+      if (consumerSkillIds.has(skill.id)) continue;
+      skills.register(skill);
     }
   }
 

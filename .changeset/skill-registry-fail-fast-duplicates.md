@@ -7,10 +7,14 @@ a skill with the same id is already registered. A new
 `SkillRegistry.replace(skill)` method is the explicit API for intentional
 overrides — `register()` no longer silently overwrites.
 
-`createAgent`'s module-skill auto-install loop is now guarded with
-`skills.has(id)`, so consumer-pre-registered skills take precedence
-over module defaults (the previously silent-overwrite semantic flips
-to "consumer wins" rather than the inverse).
+`createAgent`'s module-skill auto-install now follows two precedence
+rules: consumer-pre-registered skills take precedence over module
+defaults (silent skip for that id — consumer wins), but a skill
+contributed by two different modules (or listed twice in one module)
+still throws `DuplicateSkillError`. Module-vs-module collisions are
+exactly the "my module X silently clobbers module Y's skill" bugs
+this PR exists to surface; only the consumer override case is
+silenced.
 
 **Migration**
 
