@@ -16,18 +16,32 @@
  * install `brain.js`, so transform fails.
  *
  * This stub exists so the vitest alias in `vite.config.ts` can route
- * `import('brain.js')` to something resolvable. The tests in
- * `tests/examples/cognitionSwitcher.test.ts` never call
- * `learningMode.construct()` — they only care whether the probe
- * resolves — so exporting a placeholder `NeuralNetwork` is enough to
- * keep the module shape plausible without pulling the native chain.
+ * `import('brain.js')` to something resolvable. It covers the shape
+ * `learning.ts` actually uses: `run()` returns a stable `[0.5]` so
+ * `construct()` and urgency-gate logic are testable without the native
+ * peer; `fromJSON()` records its last argument; `train()` records the
+ * last batch it received; `toJSON()` returns a deterministic sentinel
+ * derived from recorded calls.
  */
 export class NeuralNetwork<In = unknown, Out = unknown> {
+  #weights: unknown = null;
+  #lastTrain: unknown = null;
+
   run(_input: In): Out {
-    throw new Error('brain.js stub: NeuralNetwork.run() is not implemented in the test stub.');
+    return [0.5] as unknown as Out;
   }
-  fromJSON(_json: unknown): this {
+
+  fromJSON(json: unknown): this {
+    this.#weights = json;
     return this;
+  }
+
+  toJSON(): unknown {
+    return { stub: true, trainedFrom: this.#lastTrain, seededFrom: this.#weights };
+  }
+
+  train(pairs: unknown, _opts: unknown): void {
+    this.#lastTrain = pairs;
   }
 }
 
