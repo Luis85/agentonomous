@@ -142,4 +142,19 @@ describe('FsSnapshotStore', () => {
     const store = new FsSnapshotStore({ directory: '/var/snaps', fs });
     await expect(store.delete('never-saved')).resolves.toBeUndefined();
   });
+
+  it('list() skips files whose names the encoder would never produce', async () => {
+    // Foreign `.json` files in a shared snapshot directory must not cause
+    // list() to reject — `decodeURIComponent` throws URIError on malformed
+    // `%XX` sequences; the store drops those entries and returns the
+    // decodable subset.
+    const fs = new MemFs();
+    const store = new FsSnapshotStore({ directory: '/var/snaps', fs });
+    await store.save('good-key', snap('good-key'));
+    // Drop a file the encoder would never emit (bare `%ZZ`).
+    fs.files.set('/var/snaps/bad%ZZ.json', '{}');
+
+    const keys = await store.list();
+    expect(keys).toEqual(['good-key']);
+  });
 });

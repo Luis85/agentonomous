@@ -56,7 +56,19 @@ export class FsSnapshotStore implements SnapshotStorePort {
   async list(): Promise<readonly string[]> {
     await this.ensureDir();
     const entries = await this.fs.readdir(this.directory);
-    return entries.filter((e) => e.endsWith('.json')).map((e) => decodeKey(e.slice(0, -5)));
+    const out: string[] = [];
+    for (const e of entries) {
+      if (!e.endsWith('.json')) continue;
+      try {
+        out.push(decodeKey(e.slice(0, -5)));
+      } catch {
+        // Malformed `%XX` sequence — a file the encoder wouldn't have
+        // produced (foreign tooling, manual drop-in). Skip it; the store
+        // can't round-trip it through key-based `load()` anyway, so
+        // surfacing it would just hand callers an unusable key.
+      }
+    }
+    return out;
   }
 
   async delete(key: string): Promise<void> {
