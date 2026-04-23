@@ -83,6 +83,13 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     select.appendChild(option);
   }
 
+  const trainBtn = document.getElementById('train-network') as HTMLButtonElement | null;
+  const setTrainVisibility = (modeId: CognitionModeSpec['id']): void => {
+    if (!trainBtn) return;
+    if (modeId === 'learning') trainBtn.removeAttribute('hidden');
+    else trainBtn.setAttribute('hidden', '');
+  };
+
   let disposed = false;
   let changeEpoch = 0;
   // Tracks the mode id currently wired into the agent, so a failing
@@ -103,6 +110,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       activeModeId = mode.id;
       status.dataset.mode = mode.id;
       status.textContent = 'active';
+      setTrainVisibility(mode.id);
     } catch (err) {
       if (disposed || myEpoch !== changeEpoch) return;
       // eslint-disable-next-line no-console -- user-visible diagnostic.
@@ -118,6 +126,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       select.value = activeModeId;
       status.dataset.mode = activeModeId;
       status.textContent = 'active';
+      setTrainVisibility(activeModeId);
     }
   };
   const onChangeWrapped = (): void => {
