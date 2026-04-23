@@ -6,8 +6,11 @@ import networkJson from './learning.network.json';
  * Urgency floor for the learning-mode `interpret()` gate. The network's
  * scalar output is a [0, 1] urgency estimate — values below this floor
  * cause the pet to idle this tick rather than commit an intention.
+ *
  * Picked empirically so the default hand-authored weights produce a
  * visible idle rate and re-training shifts the observable behavior.
+ * Tune up (toward 0.5) if the post-train idle rate is indistinguishable
+ * from the baseline; tune down (toward 0.2) if the pet rarely acts.
  */
 const URGENCY_THRESHOLD = 0.35;
 
@@ -16,7 +19,7 @@ const URGENCY_THRESHOLD = 0.35;
  * hydrating the trained network. Set once from `main.ts` after the
  * agent is created. Kept module-scoped (rather than widening
  * `CognitionModeSpec.construct(agentId)`) because no other mode needs
- * it — see plan 0.9.3 Task 4 for the rationale.
+ * agent-id scoping.
  */
 let agentIdForHydration: string | null = null;
 
