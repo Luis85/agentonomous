@@ -12,6 +12,30 @@ const BACKEND_PACKAGES: Record<'cpu' | 'wasm' | 'webgl', string> = {
 };
 
 /**
+ * Minimal linear-congruential generator. Not cryptographic — just
+ * repeatable under a fixed seed. Matches the LCG pattern used elsewhere
+ * in the library's seeded test helpers.
+ */
+function makeLcg(seed: number): () => number {
+  let state = seed >>> 0 || 1;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}
+
+/**
+ * In-place Fisher-Yates shuffle driven by a seeded RNG. Leaves the array
+ * permuted but reuses the same element references.
+ */
+function seededShuffle<T>(arr: T[], rng: () => number): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+}
+
+/**
  * Thrown when a `TfjsReasoner` is constructed with `backend: 'X'` but
  * tfjs's current global backend is something else. Carries the suggested
  * npm package to install so UIs can render a useful message.
@@ -163,8 +187,52 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
     this.model.dispose();
   }
 
-  train(_pairs: Array<{ features: In; label: Out }>, _opts?: TrainOptions): Promise<TrainResult> {
-    return Promise.reject(new Error('TfjsReasoner.train not yet implemented (Chunk 4)'));
+  /**
+   * Supervised training over `pairs` via `model.fit`. Pre-shuffles with a
+   * seeded LCG + Fisher-Yates so tfjs's own `Math.random`-based shuffle
+   * never runs (that would leak non-determinism into CI runs and replay).
+   *
+   * @remarks Determinism is best-effort. Verified stable to ~3 decimal
+   * places on `@tensorflow/tfjs-layers@^4.22.0` CPU backend; tighter
+   * tolerances are not guaranteed because tfjs's internal init/numerical
+   * paths can drift across minor releases.
+   */
+  async train(
+    pairs: Array<{ features: In; label: Out }>,
+    opts: TrainOptions = {},
+  ): Promise<TrainResult> {
+    if (pairs.length === 0) {
+      return { finalLoss: 0, history: { loss: [] } };
+    }
+
+    const epochs = opts.epochs ?? 50;
+    const batchSize = opts.batchSize ?? Math.min(pairs.length, 32);
+    const seed = opts.seed ?? 0;
+
+    const shuffled = [...pairs];
+    if (opts.shuffle ?? true) {
+      seededShuffle(shuffled, makeLcg(seed));
+    }
+
+    const featuresTensor = tf.tensor(shuffled.map((p) => p.features) as never);
+    const labelsTensor = tf.tensor(shuffled.map((p) => p.label) as never);
+
+    try {
+      const history = await this.model.fit(featuresTensor, labelsTensor, {
+        epochs,
+        batchSize,
+        shuffle: false,
+        verbose: 0,
+      });
+      const lossHistory = (history.history.loss as number[]).slice();
+      return {
+        finalLoss: lossHistory[lossHistory.length - 1] ?? 0,
+        history: { loss: lossHistory },
+      };
+    } finally {
+      featuresTensor.dispose();
+      labelsTensor.dispose();
+    }
   }
 
   toJSON(): TfjsSnapshot {

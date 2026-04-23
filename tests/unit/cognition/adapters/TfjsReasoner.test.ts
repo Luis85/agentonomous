@@ -161,3 +161,73 @@ describe('TfjsReasoner — inference', () => {
     expect(err.message).toMatch(/tfjs-backend-wasm/);
   });
 });
+
+describe('TfjsReasoner — training', () => {
+  function makeConvergingPairs(): Array<{ features: number[]; label: number[] }> {
+    return [
+      { features: [0, 0], label: [0] },
+      { features: [1, 1], label: [1] },
+      { features: [0, 1], label: [0.5] },
+      { features: [1, 0], label: [0.5] },
+      { features: [0.2, 0.8], label: [0.5] },
+      { features: [0.8, 0.2], label: [0.5] },
+      { features: [0.3, 0.7], label: [0.5] },
+      { features: [0.7, 0.3], label: [0.5] },
+    ];
+  }
+
+  it('train(pairs) reduces loss on a trivially-learnable mapping', async () => {
+    const model = makeLinearModel();
+    const reasoner = new TfjsReasoner<number[], number[]>({
+      model,
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    const result = await reasoner.train(makeConvergingPairs(), {
+      epochs: 100,
+      learningRate: 0.1,
+      seed: 42,
+    });
+    expect(result.history.loss).toHaveLength(100);
+    expect(result.finalLoss).toBeLessThan(0.05);
+    reasoner.dispose();
+  });
+
+  it('same pairs + same seed → same final loss (deterministic training)', async () => {
+    const pairs = makeConvergingPairs();
+    const model1 = makeLinearModel();
+    const r1 = new TfjsReasoner({
+      model: model1,
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    const result1 = await r1.train(pairs, { epochs: 50, learningRate: 0.1, seed: 7 });
+
+    const model2 = makeLinearModel();
+    const r2 = new TfjsReasoner({
+      model: model2,
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    const result2 = await r2.train(pairs, { epochs: 50, learningRate: 0.1, seed: 7 });
+
+    expect(result1.finalLoss).toBeCloseTo(result2.finalLoss, 3);
+    r1.dispose();
+    r2.dispose();
+  });
+
+  it('train with fixed seed yields reproducible per-epoch loss trajectories', async () => {
+    const pairs = makeConvergingPairs();
+    const m1 = makeLinearModel();
+    const r1 = new TfjsReasoner({ model: m1, featuresOf: () => [0, 0], interpret: () => null });
+    const h1 = await r1.train(pairs, { epochs: 20, learningRate: 0.1, seed: 1 });
+    const m2 = makeLinearModel();
+    const r2 = new TfjsReasoner({ model: m2, featuresOf: () => [0, 0], interpret: () => null });
+    const h2 = await r2.train(pairs, { epochs: 20, learningRate: 0.1, seed: 1 });
+    for (let i = 0; i < h1.history.loss.length; i++) {
+      expect(h1.history.loss[i]!).toBeCloseTo(h2.history.loss[i]!, 3);
+    }
+    r1.dispose();
+    r2.dispose();
+  });
+});
