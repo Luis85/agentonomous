@@ -202,10 +202,14 @@ export function createAgent(config: CreateAgentConfig): Agent {
   const skills = resolveSkills(config.skills);
 
   // Auto-install any skills contributed by config-time modules so the
-  // SkillRegistry is fully populated by the time the agent starts ticking.
+  // SkillRegistry is fully populated by the time the agent starts
+  // ticking. Consumer-pre-registered skills take precedence — a skill
+  // already in the registry is not overridden by a module default, so
+  // an explicit `skills.register(customFeedSkill)` before createAgent()
+  // still wins even when the module also ships a FeedSkill.
   for (const mod of config.modules ?? []) {
     for (const skill of mod.skills ?? []) {
-      skills.register(skill);
+      if (!skills.has(skill.id)) skills.register(skill);
     }
   }
 
