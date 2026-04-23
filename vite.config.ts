@@ -10,8 +10,6 @@ import dts from 'vite-plugin-dts';
 //                                                    → dist/cognition/adapters/mistreevous/index.js
 // - js-son:      src/cognition/adapters/js-son/index.ts
 //                                                    → dist/cognition/adapters/js-son/index.js
-// - brain.js:    src/cognition/adapters/brainjs/index.ts
-//                                                    → dist/cognition/adapters/brainjs/index.js
 // - tfjs:        src/cognition/adapters/tfjs/index.ts
 //                                                    → dist/cognition/adapters/tfjs/index.js
 //
@@ -44,14 +42,6 @@ const ambientDtsEntries: AmbientDtsEntry[] = [
       'dist/cognition/adapters/js-son/JsSonReasoner.d.ts',
     ],
   },
-  {
-    from: 'src/cognition/adapters/brainjs/brain.d.ts',
-    to: 'dist/cognition/adapters/brainjs/brain.d.ts',
-    referencedBy: [
-      'dist/cognition/adapters/brainjs/index.d.ts',
-      'dist/cognition/adapters/brainjs/BrainJsReasoner.d.ts',
-    ],
-  },
 ];
 
 function copyAmbientDts(): Plugin {
@@ -82,7 +72,6 @@ const externalPackages = [
   '@anthropic-ai/sdk',
   '@tensorflow/tfjs-core',
   '@tensorflow/tfjs-layers',
-  'brain.js',
   'excalibur',
   'js-son-agent',
   'mistreevous',
@@ -108,10 +97,6 @@ export default defineConfig({
         'cognition/adapters/js-son/index': resolve(
           __dirname,
           'src/cognition/adapters/js-son/index.ts',
-        ),
-        'cognition/adapters/brainjs/index': resolve(
-          __dirname,
-          'src/cognition/adapters/brainjs/index.ts',
         ),
         'cognition/adapters/tfjs/index': resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
@@ -159,31 +144,12 @@ export default defineConfig({
         replacement: resolve(__dirname, 'src/cognition/adapters/js-son/index.ts'),
       },
       {
-        find: /^agentonomous\/cognition\/adapters\/brainjs$/,
-        replacement: resolve(__dirname, 'src/cognition/adapters/brainjs/index.ts'),
-      },
-      {
         find: /^agentonomous\/cognition\/adapters\/tfjs$/,
         replacement: resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
       {
         find: /^agentonomous$/,
         replacement: resolve(__dirname, 'src/index.ts'),
-      },
-      // `brain.js` is an optional peer of `agentonomous` and a devDep of
-      // the `nurture-pet` demo workspace — not a root devDep (its
-      // `gpu.js` → `gl` chain needs X11 native build headers that
-      // explode on headless CI). The demo's `learning.ts` guards its
-      // `await import('brain.js')` with try/catch so a missing peer
-      // degrades gracefully, but `vite:import-analysis` resolves the
-      // specifier at transform time before the try/catch can run, so
-      // root `npm ci` CI fails before the first test executes. Alias
-      // to a test-local stub that exports a placeholder `NeuralNetwork`
-      // — the cognitionSwitcher tests never call `learningMode.construct()`,
-      // only check whether the probe resolved, so the stub is enough.
-      {
-        find: /^brain\.js$/,
-        replacement: resolve(__dirname, 'tests/examples/stubs/brain-js.ts'),
       },
     ],
     coverage: {

@@ -301,7 +301,7 @@ signal to check for accidentally-bundled adapters or heavy deps.
 
 Phase A milestones (M0–M15) are all green. Phase B (sim-ecs adapter, LLM
 tool, Markdown memory, social/dialogue, possession/jobs, Mistreevous BTs,
-JS-son BDI, brain.js learning) lands post-V1.
+JS-son BDI, tfjs learning) lands post-V1.
 
 ## Contributing
 

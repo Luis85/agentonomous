@@ -37,10 +37,6 @@
       "import": "./dist/cognition/adapters/js-son/index.js",
       "types": "./dist/cognition/adapters/js-son/index.d.ts"
     },
-    "./cognition/adapters/brainjs": {
-      "import": "./dist/cognition/adapters/brainjs/index.js",
-      "types": "./dist/cognition/adapters/brainjs/index.d.ts"
-    },
     "./cognition/adapters/tfjs": {
       "import": "./dist/cognition/adapters/tfjs/index.js",
       "types": "./dist/cognition/adapters/tfjs/index.d.ts"
@@ -121,7 +117,6 @@
     "@anthropic-ai/sdk": "*",
     "@tensorflow/tfjs-core": "^4.22.0",
     "@tensorflow/tfjs-layers": "^4.22.0",
-    "brain.js": "^2.0.0-beta.0",
     "excalibur": "*",
     "js-son-agent": "*",
     "mistreevous": "^4.0.0",
@@ -136,9 +131,6 @@
       "optional": true
     },
     "@tensorflow/tfjs-layers": {
-      "optional": true
-    },
-    "brain.js": {
       "optional": true
     },
     "excalibur": {
@@ -179,12 +171,6 @@
     {
       "name": "dist/cognition/adapters/js-son/index.js (gzip)",
       "path": "dist/cognition/adapters/js-son/index.js",
-      "gzip": true,
-      "limit": "2 KB"
-    },
-    {
-      "name": "dist/cognition/adapters/brainjs/index.js (gzip)",
-      "path": "dist/cognition/adapters/brainjs/index.js",
       "gzip": true,
       "limit": "2 KB"
     },
