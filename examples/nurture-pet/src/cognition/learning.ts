@@ -3,14 +3,29 @@ import type { CognitionModeSpec } from './index.js';
 import networkJson from './learning.network.json';
 
 /**
- * Stub learning mode. Loads a pre-built 1-layer brain.js network
- * (`learning.network.json`) with hand-chosen weights that produce
- * urgency-like scoring. The `interpret` function intentionally
- * ignores the network's output and passes through to `topCandidate`
- * — the network's contribution is demonstrating the "inference
- * pipeline routes through brain.js" path, not producing a
- * differentiated score. Real training + weight-driven interpretation
- * lives in 0.9.3.
+ * Module-scoped agent id used as the localStorage key scope when
+ * hydrating the trained network. Set once from `main.ts` after the
+ * agent is created. Kept module-scoped (rather than widening
+ * `CognitionModeSpec.construct(agentId)`) because no other mode needs
+ * it — see plan 0.9.3 Task 4 for the rationale.
+ */
+let agentIdForHydration: string | null = null;
+
+/** Inject the agent id used as the localStorage key scope when hydrating. */
+export function setLearningAgentId(id: string | null): void {
+  agentIdForHydration = id;
+}
+
+/**
+ * Learning mode. On `construct()`, builds a brain.js network and
+ * hydrates it from `agentonomous/<agentId>/brainjs-network` if the
+ * Train button has been clicked previously this browser; otherwise
+ * falls back to the bundled `learning.network.json` default with
+ * hand-chosen weights.
+ *
+ * `interpret()` wires the network's scalar output into intention
+ * selection as an urgency gate — see Task 6's `URGENCY_THRESHOLD`
+ * constant for the threshold and rationale.
  *
  * `construct()` is async so the adapter subpath (which pulls
  * `brain.js` as a side effect) only loads when this mode is
@@ -48,7 +63,23 @@ export const learningMode: CognitionModeSpec = {
       run: (input: unknown) => unknown;
     };
     const network = new Net();
-    network.fromJSON(networkJson);
+
+    let seed: unknown = networkJson;
+    if (agentIdForHydration !== null) {
+      try {
+        const persisted = globalThis.localStorage?.getItem(
+          `agentonomous/${agentIdForHydration}/brainjs-network`,
+        );
+        if (typeof persisted === 'string' && persisted.length > 0) {
+          seed = JSON.parse(persisted);
+        }
+      } catch {
+        // Corrupt stored value or localStorage unavailable — fall back
+        // to the default. The Train button regenerates valid state on
+        // its next click.
+      }
+    }
+    network.fromJSON(seed);
 
     return new BrainJsReasoner({
       network: network as never,

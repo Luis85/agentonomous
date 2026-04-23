@@ -9,6 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
+import { setLearningAgentId } from '../../examples/nurture-pet/src/cognition/learning.js';
 import { NeuralNetwork as StubNeuralNetwork } from './stubs/brain-js.js';
 
 interface FakeAgent {
@@ -86,6 +87,7 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
   // Reset the stub's static instance pointer so `getStubNetwork()`
   // cannot see a leftover from a previous test.
   StubNeuralNetwork.last = null;
+  setLearningAgentId(agentId);
   const fakeAgent: FakeAgent = {
     setReasoner: vi.fn(),
     identity: { id: agentId, name: agentId },
@@ -225,5 +227,49 @@ describe('Train click handler', () => {
 
     expect(btn.disabled).toBe(false);
     expect(btn.textContent).toBe('Train');
+  });
+});
+
+describe('learningMode.construct() hydration order', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  it('loads from localStorage when the brainjs-network key is present', async () => {
+    const agentId = 'test-pet';
+    const savedNet = { stub: true, trainedFrom: 'fake-prior-training' };
+    localStorage.setItem(`agentonomous/${agentId}/brainjs-network`, JSON.stringify(savedNet));
+
+    const { selectMode, getStubNetwork } = await mountDemo({ agentId });
+    await selectMode('learning');
+
+    expect(getStubNetwork().lastFromJSON()).toEqual(savedNet);
+  });
+
+  it('falls back to the default learning.network.json when the key is absent', async () => {
+    const agentId = 'test-pet';
+    localStorage.removeItem(`agentonomous/${agentId}/brainjs-network`);
+
+    const { selectMode, getStubNetwork } = await mountDemo({ agentId });
+    await selectMode('learning');
+
+    const loaded = getStubNetwork().lastFromJSON() as { type?: string; sizes?: number[] };
+    expect(loaded.sizes).toEqual([5, 1]);
+  });
+
+  it('falls back to the default when the stored value is unparseable JSON', async () => {
+    const agentId = 'test-pet';
+    localStorage.setItem(`agentonomous/${agentId}/brainjs-network`, '{not valid json');
+
+    const { selectMode, getStubNetwork } = await mountDemo({ agentId });
+    await selectMode('learning');
+
+    const loaded = getStubNetwork().lastFromJSON() as { type?: string; sizes?: number[] };
+    expect(loaded.sizes).toEqual([5, 1]);
   });
 });
