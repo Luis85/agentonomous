@@ -582,8 +582,11 @@ export class Agent {
    * driving the tick loop from outside the agent (UI handler, framework
    * `onPreUpdate`) see this as "applies from the next tick"; a swap
    * issued from a Stage-1 reactive handler is used within the same
-   * tick. Nothing is transferred from the outgoing reasoner — adapters
-   * that want continuity should persist their own state.
+   * tick. Nothing is transferred from the outgoing reasoner; the
+   * incoming reasoner's `reset?()` fires synchronously after assignment
+   * so the next tick starts from a known-clean baseline. Identity swaps
+   * (re-setting the current reasoner) still fire reset — the kernel
+   * treats every call as a fresh assignment.
    *
    * Throws `TypeError` if `reasoner` is null / undefined / lacks
    * `selectIntention`.
@@ -597,6 +600,7 @@ export class Agent {
       throw new TypeError('setReasoner: expected a Reasoner with a selectIntention method.');
     }
     this.reasoner = reasoner;
+    reasoner.reset?.();
   }
 
   /** Current cognition reasoner. */
