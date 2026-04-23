@@ -1,5 +1,29 @@
-import type { Agent } from 'agentonomous';
+import type { Agent, Reasoner } from 'agentonomous';
 import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
+
+const NEED_IDS = ['hunger', 'cleanliness', 'happiness', 'energy', 'health'] as const;
+const TRAIN_PAIR_COUNT = 30;
+const TRAIN_ITERATIONS = 100;
+const TRAIN_ERROR_THRESH = 0.005;
+const TRAINED_FLASH_MS = 1500;
+
+/**
+ * Duck-typed view of the subset of `brain.js`'s `NeuralNetwork` that the
+ * Train click handler uses. Kept structural so the switcher doesn't
+ * import the brain.js adapter just to type-narrow.
+ */
+type TrainableNetwork = {
+  train: (pairs: unknown, opts: unknown) => void;
+  toJSON: () => unknown;
+};
+
+/**
+ * Duck-typed view of `BrainJsReasoner`'s inspection surface. The
+ * learning mode's `construct()` returns a `BrainJsReasoner`; here we
+ * just need the `getNetwork()` handle without coupling the switcher to
+ * the adapter package.
+ */
+type NetworkHoldingReasoner = { getNetwork: () => TrainableNetwork };
 
 /** Handle returned by `mountCognitionSwitcher` for teardown wiring. */
 export interface CognitionSwitcherHandle {
@@ -83,12 +107,23 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     select.appendChild(option);
   }
 
+  const trainBtn = document.getElementById('train-network') as HTMLButtonElement | null;
+  const setTrainVisibility = (modeId: CognitionModeSpec['id']): void => {
+    if (!trainBtn) return;
+    if (modeId === 'learning') trainBtn.removeAttribute('hidden');
+    else trainBtn.setAttribute('hidden', '');
+  };
+
   let disposed = false;
   let changeEpoch = 0;
   // Tracks the mode id currently wired into the agent, so a failing
   // `construct()` can revert the `<select>` + status to the last-good
   // mode rather than leaving the UI inconsistent with reality.
   let activeModeId: CognitionModeSpec['id'] = 'heuristic';
+  // The reasoner last handed to `agent.setReasoner`. The Train click
+  // handler reads this to reach the underlying network — cheaper than
+  // widening `CognitionModeSpec` with a per-mode "trainable" flag.
+  let activeReasoner: Reasoner | null = null;
 
   const onChange = async (): Promise<void> => {
     if (disposed) return;
@@ -100,9 +135,11 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       // Bail if disposed mid-await OR if a newer change has superseded us.
       if (disposed || myEpoch !== changeEpoch) return;
       agent.setReasoner(reasoner);
+      activeReasoner = reasoner;
       activeModeId = mode.id;
       status.dataset.mode = mode.id;
       status.textContent = 'active';
+      setTrainVisibility(mode.id);
     } catch (err) {
       if (disposed || myEpoch !== changeEpoch) return;
       // eslint-disable-next-line no-console -- user-visible diagnostic.
@@ -118,12 +155,71 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       select.value = activeModeId;
       status.dataset.mode = activeModeId;
       status.textContent = 'active';
+      setTrainVisibility(activeModeId);
     }
   };
   const onChangeWrapped = (): void => {
     void onChange();
   };
   select.addEventListener('change', onChangeWrapped);
+
+  // --- Train button wiring ----------------------------------------------
+  // One-shot click handler attached at mount. Reads `activeReasoner`
+  // from the closure at click time so a fresh `learningMode.construct()`
+  // (triggered by a mode switch or a subsequent remount) is always
+  // trained rather than a stale instance.
+  const onTrainClick = async (): Promise<void> => {
+    if (!trainBtn) return;
+    if (disposed) return;
+    const reasoner = activeReasoner;
+    const holder = reasoner as Partial<NetworkHoldingReasoner> | null;
+    if (!holder || typeof holder.getNetwork !== 'function') return;
+
+    const originalText = trainBtn.textContent ?? 'Train';
+    trainBtn.disabled = true;
+    trainBtn.textContent = 'Training…';
+    // Yield to the event loop so the disabled/"Training…" state paints
+    // before the synchronous training loop pins the main thread. Also
+    // gives the "disables during training" test a moment between
+    // `click()` and the train call to observe the in-flight state.
+    await new Promise<void>((r) => setTimeout(r, 0));
+    try {
+      if (disposed) return;
+      const network = holder.getNetwork();
+      const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
+        const input: Record<string, number> = {};
+        let min = 1;
+        for (const id of NEED_IDS) {
+          const level = agent.rng.next();
+          input[id] = level;
+          if (level < min) min = level;
+        }
+        const urgency = 1 - min;
+        return { input, output: { score: urgency } };
+      });
+      network.train(pairs, {
+        iterations: TRAIN_ITERATIONS,
+        errorThresh: TRAIN_ERROR_THRESH,
+      });
+      try {
+        globalThis.localStorage?.setItem(
+          `agentonomous/${agent.identity.id}/brainjs-network`,
+          JSON.stringify(network.toJSON()),
+        );
+      } catch {
+        // localStorage unavailable (private mode, quota) — training
+        // still succeeds for this session, just won't survive reload.
+      }
+      flashStatus(status, 'Trained ✓', TRAINED_FLASH_MS);
+    } finally {
+      trainBtn.disabled = false;
+      trainBtn.textContent = originalText;
+    }
+  };
+  const onTrainClickWrapped = (): void => {
+    void onTrainClick();
+  };
+  if (trainBtn) trainBtn.addEventListener('click', onTrainClickWrapped);
 
   // Probe each mode in parallel. After each resolves, flip its option
   // enabled/disabled + tooltip. Late-probe guard (see JSDoc invariant
@@ -149,6 +245,21 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       if (disposed) return;
       disposed = true;
       select.removeEventListener('change', onChangeWrapped);
+      if (trainBtn) trainBtn.removeEventListener('click', onTrainClickWrapped);
     },
   };
+}
+
+/**
+ * Temporarily replace the status span's text with `message` for
+ * `durationMs`, then restore the prior text. Used to surface transient
+ * feedback ("Trained ✓") without stacking event listeners or needing a
+ * dedicated toast element.
+ */
+function flashStatus(statusEl: HTMLElement, message: string, durationMs: number): void {
+  const previous = statusEl.textContent ?? '';
+  statusEl.textContent = message;
+  globalThis.setTimeout?.(() => {
+    if (statusEl.textContent === message) statusEl.textContent = previous;
+  }, durationMs);
 }

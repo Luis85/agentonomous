@@ -3,14 +3,43 @@ import type { CognitionModeSpec } from './index.js';
 import networkJson from './learning.network.json';
 
 /**
- * Stub learning mode. Loads a pre-built 1-layer brain.js network
- * (`learning.network.json`) with hand-chosen weights that produce
- * urgency-like scoring. The `interpret` function intentionally
- * ignores the network's output and passes through to `topCandidate`
- * — the network's contribution is demonstrating the "inference
- * pipeline routes through brain.js" path, not producing a
- * differentiated score. Real training + weight-driven interpretation
- * lives in 0.9.3.
+ * Urgency floor for the learning-mode `interpret()` gate. The network's
+ * scalar output is a [0, 1] urgency estimate — values below this floor
+ * cause the pet to idle this tick rather than commit an intention.
+ *
+ * Picked empirically so the default hand-authored weights produce a
+ * visible idle rate and re-training shifts the observable behavior.
+ * Tune up (toward 0.5) if the post-train idle rate is indistinguishable
+ * from the baseline; tune down (toward 0.2) if the pet rarely acts.
+ */
+const URGENCY_THRESHOLD = 0.35;
+
+/**
+ * Module-scoped agent id used as the localStorage key scope when
+ * hydrating the trained network. Set once from `main.ts` after the
+ * agent is created. Kept module-scoped (rather than widening
+ * `CognitionModeSpec.construct(agentId)`) because no other mode needs
+ * agent-id scoping.
+ */
+let agentIdForHydration: string | null = null;
+
+/** Inject the agent id used as the localStorage key scope when hydrating. */
+export function setLearningAgentId(id: string | null): void {
+  agentIdForHydration = id;
+}
+
+/**
+ * Learning mode. On `construct()`, builds a brain.js network and
+ * hydrates it from `agentonomous/<agentId>/brainjs-network` if the
+ * Train button has been clicked previously this browser; otherwise
+ * falls back to the bundled `learning.network.json` default with
+ * hand-chosen weights.
+ *
+ * `interpret()` feeds the network's scalar output through an urgency
+ * gate: the pet idles this tick when the output drops below
+ * `URGENCY_THRESHOLD`; otherwise it commits the top heuristic
+ * candidate. Trained and untrained networks thus produce different
+ * idle rates, making training observable in the trace view.
  *
  * `construct()` is async so the adapter subpath (which pulls
  * `brain.js` as a side effect) only loads when this mode is
@@ -48,12 +77,42 @@ export const learningMode: CognitionModeSpec = {
       run: (input: unknown) => unknown;
     };
     const network = new Net();
-    network.fromJSON(networkJson);
+
+    let seed: unknown = networkJson;
+    if (agentIdForHydration !== null) {
+      try {
+        const persisted = globalThis.localStorage?.getItem(
+          `agentonomous/${agentIdForHydration}/brainjs-network`,
+        );
+        if (typeof persisted === 'string' && persisted.length > 0) {
+          seed = JSON.parse(persisted);
+        }
+      } catch {
+        // Corrupt stored value or localStorage unavailable — fall back
+        // to the default. The Train button regenerates valid state on
+        // its next click.
+        seed = networkJson;
+      }
+    }
+    try {
+      network.fromJSON(seed);
+    } catch {
+      // The stored payload parsed as JSON but brain.js rejected its
+      // shape (manual edit, prior format, partial migration). Recover
+      // with the bundled default so Learning mode stays selectable —
+      // otherwise the switcher would disable the option until the user
+      // clicked Reset.
+      network.fromJSON(networkJson);
+    }
 
     return new BrainJsReasoner({
       network: network as never,
       featuresOf: (_ctx: ReasonerContext, helpers) => helpers.needsLevels() as never,
-      interpret: (_output, _ctx, helpers) => {
+      interpret: (output, _ctx, helpers) => {
+        const urgency = Array.isArray(output)
+          ? ((output as unknown as number[])[0] ?? 0)
+          : ((output as { score?: number }).score ?? 0);
+        if (urgency < URGENCY_THRESHOLD) return null;
         const top = helpers.topCandidate();
         return top ? top.intention : null;
       },

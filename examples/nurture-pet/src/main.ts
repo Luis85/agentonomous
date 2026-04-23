@@ -13,6 +13,7 @@ import {
   type AgentTickedEvent,
 } from 'agentonomous';
 import { ApproachTreatSkill } from './skills/ApproachTreatSkill.js';
+import { setLearningAgentId } from './cognition/learning.js';
 import { mountCognitionSwitcher } from './cognitionSwitcher.js';
 import { catSpecies } from './species.js';
 import {
@@ -115,6 +116,10 @@ const pet = createAgent({
   }),
   randomEvents,
 });
+
+// Inject the agent id so the learning mode's `construct()` can scope
+// its persisted-network localStorage key per-pet.
+setLearningAgentId(pet.identity.id);
 
 // --- Mount UI + reactive binding ----------------------------------------------
 const hud = mountHud(pet);
