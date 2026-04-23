@@ -301,3 +301,32 @@ describe('TfjsReasoner — persistence', () => {
     r2.dispose();
   });
 });
+
+describe('TfjsReasoner — bundled demo baseline', () => {
+  it('learning.network.json loads and produces sigmoid(-1) ≈ 0.2689 for hunger=1', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const path = await import('node:path');
+    const baselinePath = path.resolve(
+      process.cwd(),
+      'examples/nurture-pet/src/cognition/learning.network.json',
+    );
+    const snapshot = JSON.parse(await readFile(baselinePath, 'utf8')) as Parameters<
+      typeof TfjsReasoner.fromJSON
+    >[0];
+
+    const featureVec = [1, 0, 0, 0, 0];
+    let captured: number | null = null;
+    const reasoner = await TfjsReasoner.fromJSON<number[], number[]>(snapshot, {
+      featuresOf: () => featureVec,
+      interpret: (out) => {
+        captured = out[0] ?? null;
+        return null;
+      },
+    });
+    reasoner.selectIntention(ctx());
+
+    expect(captured).not.toBeNull();
+    expect(captured!).toBeCloseTo(0.2689, 4);
+    reasoner.dispose();
+  });
+});

@@ -18,7 +18,8 @@
       "agentonomous/cognition/adapters/mistreevous": [
         "../../src/cognition/adapters/mistreevous/index.ts"
       ],
-      "agentonomous/cognition/adapters/js-son": ["../../src/cognition/adapters/js-son/index.ts"]
+      "agentonomous/cognition/adapters/js-son": ["../../src/cognition/adapters/js-son/index.ts"],
+      "agentonomous/cognition/adapters/tfjs": ["../../src/cognition/adapters/tfjs/index.ts"]
     }
   },
   "include": ["src/**/*"]

@@ -28,12 +28,53 @@ export function setLearningAgentId(id: string | null): void {
   agentIdForHydration = id;
 }
 
+function storageKey(agentId: string): string {
+  return `agentonomous/${agentId}/tfjs-network`;
+}
+
+function loadPersistedSnapshot(agentId: string | null): unknown {
+  if (agentId === null) return null;
+  try {
+    const raw = globalThis.localStorage?.getItem(storageKey(agentId));
+    if (typeof raw !== 'string' || raw.length === 0) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function featuresFromNeeds(
+  _ctx: ReasonerContext,
+  helpers: { needsLevels(): Record<string, number> },
+): number[] {
+  const levels = helpers.needsLevels();
+  return [
+    levels.hunger ?? 0,
+    levels.cleanliness ?? 0,
+    levels.happiness ?? 0,
+    levels.energy ?? 0,
+    levels.health ?? 0,
+  ];
+}
+
+function interpretUrgency(
+  output: number[],
+  _ctx: ReasonerContext,
+  helpers: {
+    topCandidate(): { intention: import('agentonomous').Intention } | null;
+  },
+): import('agentonomous').Intention | null {
+  const urgency = output[0] ?? 0;
+  if (urgency < URGENCY_THRESHOLD) return null;
+  const top = helpers.topCandidate();
+  return top ? top.intention : null;
+}
+
 /**
- * Learning mode. On `construct()`, builds a brain.js network and
- * hydrates it from `agentonomous/<agentId>/brainjs-network` if the
- * Train button has been clicked previously this browser; otherwise
- * falls back to the bundled `learning.network.json` default with
- * hand-chosen weights.
+ * Learning mode. On `construct()`, hydrates the TfjsReasoner from the
+ * browser-local persisted snapshot if present, falling back to the
+ * bundled `learning.network.json` baseline. The Train button in the
+ * switcher calls `reasoner.train(...)` and persists `reasoner.toJSON()`.
  *
  * `interpret()` feeds the network's scalar output through an urgency
  * gate: the pet idles this tick when the output drops below
@@ -41,81 +82,47 @@ export function setLearningAgentId(id: string | null): void {
  * candidate. Trained and untrained networks thus produce different
  * idle rates, making training observable in the trace view.
  *
- * `construct()` is async so the adapter subpath (which pulls
- * `brain.js` as a side effect) only loads when this mode is
- * selected — keeping the peer out of the main chunk.
+ * `construct()` side-effect-imports `@tensorflow/tfjs-backend-cpu` so
+ * the backend is registered lazily — only when the user actually
+ * switches to this mode.
  */
 export const learningMode: CognitionModeSpec = {
   id: 'learning',
-  label: 'Learning (brain.js)',
-  peerName: 'brain.js',
+  label: 'Learning (tfjs)',
+  peerName: '@tensorflow/tfjs-core',
   async probe(): Promise<boolean> {
     try {
-      await import('brain.js');
+      await import('@tensorflow/tfjs-core');
+      await import('@tensorflow/tfjs-layers');
       return true;
     } catch {
       return false;
     }
   },
   async construct(): Promise<Reasoner> {
-    // Pull the adapter + `brain.js` itself via dynamic imports. The
-    // adapter's module-load side effect drags in brain.js's type
-    // surface; we still need the runtime `NeuralNetwork` constructor
-    // to hydrate the pre-built weights, so we import the peer here
-    // too.
-    const { BrainJsReasoner } = await import('agentonomous/cognition/adapters/brainjs');
-    const brainModule = await import('brain.js');
-    const NeuralNetwork =
-      (brainModule as { NeuralNetwork?: unknown }).NeuralNetwork ??
-      (brainModule as { default?: { NeuralNetwork?: unknown } }).default?.NeuralNetwork;
-    if (typeof NeuralNetwork !== 'function') {
-      throw new Error('learningMode: brain.js NeuralNetwork constructor not found');
-    }
+    await import('@tensorflow/tfjs-backend-cpu');
+    const tf = await import('@tensorflow/tfjs-core');
+    const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
+    type Snapshot = Parameters<typeof TfjsReasoner.fromJSON>[0];
 
-    const Net = NeuralNetwork as new () => {
-      fromJSON: (json: unknown) => unknown;
-      run: (input: unknown) => unknown;
+    const persisted = loadPersistedSnapshot(agentIdForHydration);
+    const seed: Snapshot = (persisted ?? networkJson) as Snapshot;
+
+    const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
+      const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
+        featuresOf: featuresFromNeeds,
+        interpret: interpretUrgency,
+      });
+      // The rebuilt Sequential ships uncompiled; compile with a default
+      // SGD + MSE pair so the Train button can call `r.train(...)`.
+      r.getModel().compile({ optimizer: tf.train.sgd(0.1), loss: 'meanSquaredError' });
+      return r;
     };
-    const network = new Net();
 
-    let seed: unknown = networkJson;
-    if (agentIdForHydration !== null) {
-      try {
-        const persisted = globalThis.localStorage?.getItem(
-          `agentonomous/${agentIdForHydration}/brainjs-network`,
-        );
-        if (typeof persisted === 'string' && persisted.length > 0) {
-          seed = JSON.parse(persisted);
-        }
-      } catch {
-        // Corrupt stored value or localStorage unavailable — fall back
-        // to the default. The Train button regenerates valid state on
-        // its next click.
-        seed = networkJson;
-      }
-    }
     try {
-      network.fromJSON(seed);
+      return await hydrate(seed);
     } catch {
-      // The stored payload parsed as JSON but brain.js rejected its
-      // shape (manual edit, prior format, partial migration). Recover
-      // with the bundled default so Learning mode stays selectable —
-      // otherwise the switcher would disable the option until the user
-      // clicked Reset.
-      network.fromJSON(networkJson);
+      return hydrate(networkJson as Snapshot);
     }
-
-    return new BrainJsReasoner({
-      network: network as never,
-      featuresOf: (_ctx: ReasonerContext, helpers) => helpers.needsLevels() as never,
-      interpret: (output, _ctx, helpers) => {
-        const urgency = Array.isArray(output)
-          ? ((output as unknown as number[])[0] ?? 0)
-          : ((output as { score?: number }).score ?? 0);
-        if (urgency < URGENCY_THRESHOLD) return null;
-        const top = helpers.topCandidate();
-        return top ? top.intention : null;
-      },
-    });
   },
 };

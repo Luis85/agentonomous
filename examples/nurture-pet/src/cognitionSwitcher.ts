@@ -3,27 +3,39 @@ import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
 
 const NEED_IDS = ['hunger', 'cleanliness', 'happiness', 'energy', 'health'] as const;
 const TRAIN_PAIR_COUNT = 30;
-const TRAIN_ITERATIONS = 100;
-const TRAIN_ERROR_THRESH = 0.005;
+const TRAIN_EPOCHS = 100;
 const TRAINED_FLASH_MS = 1500;
 
 /**
- * Duck-typed view of the subset of `brain.js`'s `NeuralNetwork` that the
- * Train click handler uses. Kept structural so the switcher doesn't
- * import the brain.js adapter just to type-narrow.
+ * Duck-typed view of `TfjsReasoner`'s train + snapshot surface. The
+ * switcher doesn't import the adapter to keep the tfjs peer out of
+ * heuristic/bdi/bt loads — any reasoner exposing these methods is
+ * treated as trainable.
  */
-type TrainableNetwork = {
-  train: (pairs: unknown, opts: unknown) => void;
+type TrainableReasoner = {
+  train: (
+    pairs: Array<{ features: number[]; label: number[] }>,
+    opts?: { epochs?: number; learningRate?: number; seed?: number; shuffle?: boolean },
+  ) => Promise<unknown>;
   toJSON: () => unknown;
+  dispose?: () => void;
 };
 
 /**
- * Duck-typed view of `BrainJsReasoner`'s inspection surface. The
- * learning mode's `construct()` returns a `BrainJsReasoner`; here we
- * just need the `getNetwork()` handle without coupling the switcher to
- * the adapter package.
+ * Seeded RNG for the demo's Train button. Deliberately NOT drawn from
+ * `agent.rng` — mutating the agent's RNG stream from a DOM-event handler
+ * would desync subsequent tick draws under replay. This RNG is the
+ * demo's own resource; its seed is fixed at module load so training
+ * runs are reproducible across reloads.
  */
-type NetworkHoldingReasoner = { getNetwork: () => TrainableNetwork };
+function createTrainRng(seed = 0xc0ffee): () => number {
+  let state = seed >>> 0 || 1;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}
+const trainRng = createTrainRng();
 
 /** Handle returned by `mountCognitionSwitcher` for teardown wiring. */
 export interface CognitionSwitcherHandle {
@@ -69,13 +81,11 @@ export interface CognitionSwitcherHandle {
  * on whichever reasoner's `construct()` finishes last rather than
  * whichever the user picked last.
  *
- * **Construct-error handling:** if `mode.construct()` rejects (e.g.
- * the peer's runtime export shape disagrees with the adapter — the
- * CJS-interop case in the plan's §Risks table), the switcher leaves
- * the previously-active reasoner in place, marks the failing option
- * disabled with an error tooltip, and reverts the `<select>` + status
- * span to the last working mode so the user isn't stranded with a UI
- * that lies about which reasoner is running.
+ * **Construct-error handling:** if `mode.construct()` rejects, the
+ * switcher leaves the previously-active reasoner in place, marks the
+ * failing option disabled with an error tooltip, and reverts the
+ * `<select>` + status span to the last working mode so the user isn't
+ * stranded with a UI that lies about which reasoner is running.
  *
  * The switcher intentionally does not persist selection across
  * reloads or demo resets — a fresh mount always starts at heuristic.
@@ -89,11 +99,6 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     );
   }
 
-  // Clear any pre-rendered HTML options from index.html and rebuild
-  // from the registry via createElement + textContent (no innerHTML
-  // interpolation — forward-proofs against mode labels becoming
-  // dynamic / user-supplied in the future, even though the current
-  // labels are static string literals).
   while (select.firstChild) select.removeChild(select.firstChild);
   for (const m of COGNITION_MODES) {
     const option = document.createElement('option');
@@ -116,14 +121,20 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
 
   let disposed = false;
   let changeEpoch = 0;
-  // Tracks the mode id currently wired into the agent, so a failing
-  // `construct()` can revert the `<select>` + status to the last-good
-  // mode rather than leaving the UI inconsistent with reality.
   let activeModeId: CognitionModeSpec['id'] = 'heuristic';
-  // The reasoner last handed to `agent.setReasoner`. The Train click
-  // handler reads this to reach the underlying network — cheaper than
-  // widening `CognitionModeSpec` with a per-mode "trainable" flag.
   let activeReasoner: Reasoner | null = null;
+
+  const disposeIfOwned = (reasoner: Reasoner | null): void => {
+    if (!reasoner) return;
+    const maybe = reasoner as { dispose?: () => void };
+    if (typeof maybe.dispose === 'function') {
+      try {
+        maybe.dispose();
+      } catch {
+        // Best-effort — disposal shouldn't block the UI.
+      }
+    }
+  };
 
   const onChange = async (): Promise<void> => {
     if (disposed) return;
@@ -132,11 +143,15 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     const myEpoch = ++changeEpoch;
     try {
       const reasoner = await mode.construct();
-      // Bail if disposed mid-await OR if a newer change has superseded us.
-      if (disposed || myEpoch !== changeEpoch) return;
+      if (disposed || myEpoch !== changeEpoch) {
+        disposeIfOwned(reasoner);
+        return;
+      }
+      const previous = activeReasoner;
       agent.setReasoner(reasoner);
       activeReasoner = reasoner;
       activeModeId = mode.id;
+      disposeIfOwned(previous);
       status.dataset.mode = mode.id;
       status.textContent = 'active';
       setTrainVisibility(mode.id);
@@ -149,9 +164,6 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         failed.disabled = true;
         failed.title = `${mode.label} failed to load (see console)`;
       }
-      // Programmatic assignment does NOT refire the change event, so
-      // no recursion risk here. Status span reflects the actually-
-      // active reasoner (unchanged).
       select.value = activeModeId;
       status.dataset.mode = activeModeId;
       status.textContent = 'active';
@@ -163,52 +175,43 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   };
   select.addEventListener('change', onChangeWrapped);
 
-  // --- Train button wiring ----------------------------------------------
-  // One-shot click handler attached at mount. Reads `activeReasoner`
-  // from the closure at click time so a fresh `learningMode.construct()`
-  // (triggered by a mode switch or a subsequent remount) is always
-  // trained rather than a stale instance.
   const onTrainClick = async (): Promise<void> => {
     if (!trainBtn) return;
     if (disposed) return;
-    const reasoner = activeReasoner;
-    const holder = reasoner as Partial<NetworkHoldingReasoner> | null;
-    if (!holder || typeof holder.getNetwork !== 'function') return;
+    const reasoner = activeReasoner as Partial<TrainableReasoner> | null;
+    if (!reasoner || typeof reasoner.train !== 'function' || typeof reasoner.toJSON !== 'function')
+      return;
 
     const originalText = trainBtn.textContent ?? 'Train';
     trainBtn.disabled = true;
     trainBtn.textContent = 'Training…';
-    // Yield to the event loop so the disabled/"Training…" state paints
-    // before the synchronous training loop pins the main thread. Also
-    // gives the "disables during training" test a moment between
-    // `click()` and the train call to observe the in-flight state.
     await new Promise<void>((r) => setTimeout(r, 0));
     try {
       if (disposed) return;
-      const network = holder.getNetwork();
       const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
-        const input: Record<string, number> = {};
+        const features: number[] = [];
         let min = 1;
-        for (const id of NEED_IDS) {
+        for (const _id of NEED_IDS) {
           const level = agent.rng.next();
-          input[id] = level;
+          features.push(level);
           if (level < min) min = level;
         }
         const urgency = 1 - min;
-        return { input, output: { score: urgency } };
+        return { features, label: [urgency] };
       });
-      network.train(pairs, {
-        iterations: TRAIN_ITERATIONS,
-        errorThresh: TRAIN_ERROR_THRESH,
+      await reasoner.train(pairs, {
+        epochs: TRAIN_EPOCHS,
+        learningRate: 0.1,
+        seed: Math.floor(trainRng() * 0x7fff_ffff),
       });
       try {
+        const snapshot = reasoner.toJSON();
         globalThis.localStorage?.setItem(
-          `agentonomous/${agent.identity.id}/brainjs-network`,
-          JSON.stringify(network.toJSON()),
+          `agentonomous/${agent.identity.id}/tfjs-network`,
+          JSON.stringify(snapshot),
         );
       } catch {
-        // localStorage unavailable (private mode, quota) — training
-        // still succeeds for this session, just won't survive reload.
+        // localStorage unavailable — training still succeeds for this session.
       }
       flashStatus(status, 'Trained ✓', TRAINED_FLASH_MS);
     } finally {
@@ -221,9 +224,6 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   };
   if (trainBtn) trainBtn.addEventListener('click', onTrainClickWrapped);
 
-  // Probe each mode in parallel. After each resolves, flip its option
-  // enabled/disabled + tooltip. Late-probe guard (see JSDoc invariant
-  // above) prevents DOM mutation after dispose().
   void Promise.all(
     COGNITION_MODES.map(async (mode: CognitionModeSpec) => {
       const available = await mode.probe();
@@ -246,6 +246,8 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       disposed = true;
       select.removeEventListener('change', onChangeWrapped);
       if (trainBtn) trainBtn.removeEventListener('click', onTrainClickWrapped);
+      disposeIfOwned(activeReasoner);
+      activeReasoner = null;
     },
   };
 }
