@@ -113,3 +113,26 @@ jobs:
         run: npm run build
       - name: Enforce bundle-size budget
         run: npx size-limit
+
+  demo-build:
+    name: Demo build (examples/nurture-pet)
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install library dependencies (npm ci)
+        run: npm ci
+      - name: Build library (vite build)
+        run: npm run build
+      - name: Install demo dependencies (npm ci)
+        working-directory: examples/nurture-pet
+        run: npm ci --no-audit --no-fund
+      - name: Build demo (vite build)
+        working-directory: examples/nurture-pet
+        run: npm run build

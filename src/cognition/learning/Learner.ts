@@ -3,7 +3,8 @@ import type { Intention } from '../Intention.js';
 
 /**
  * Scoring / adaptation slot. Consumers who care about reinforcement pass
- * a concrete `Learner` (e.g., a brain.js-backed adapter); the default is
+ * a concrete `Learner` (e.g., a tfjs-backed adapter that forwards
+ * outcomes into a `TfjsReasoner.train(...)` queue); the default is
  * `NoopLearner`, which ignores outcomes.
  *
  * Exposed now so the tick pipeline's Stage 8 (score) has a stable seam.

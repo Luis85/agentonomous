@@ -2,9 +2,10 @@
 /**
  * Module-level DOM test for the demo's cognition switcher. Runs under
  * jsdom via the file-level directive. Uses the real peer-module imports
- * at runtime (mistreevous / js-son-agent / brain.js), so probe-resolution
- * timing depends on npm's resolver rather than the clock — wait with
- * `waitForProbes` (bounded poll) instead of a fixed sleep.
+ * at runtime (mistreevous / js-son-agent / @tensorflow/tfjs-core), so
+ * probe-resolution timing depends on npm's resolver rather than the
+ * clock — wait with `waitForProbes` (bounded poll) instead of a fixed
+ * sleep.
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -35,8 +36,8 @@ function renderRoot(): HTMLElement {
  * so it's considered settled regardless.
  *
  * Replaces a fixed `setTimeout(50)` that was flaky on cold-cache runs:
- * a real dynamic `import('brain.js')` rejection can exceed 50ms on
- * slow disks, which left the option in its initial
+ * a real dynamic `import('@tensorflow/tfjs-core')` rejection can exceed
+ * 50ms on slow disks, which left the option in its initial
  * `disabled=true, title=''` state and tripped the asymmetric assertion.
  */
 async function waitForProbes(select: HTMLSelectElement, timeoutMs = 2000): Promise<void> {
@@ -101,9 +102,9 @@ describe('mountCognitionSwitcher', () => {
     expect(heuristic.disabled).toBe(false);
 
     // The other three depend on whether the peer resolves in the test
-    // env. Root devDependencies include mistreevous + js-son-agent;
-    // brain.js is installed as a demo devDep — at test runtime it may
-    // or may not be hoisted. Assert disabled-with-tooltip iff disabled:
+    // env. Root devDependencies include mistreevous + js-son-agent and
+    // @tensorflow/tfjs-core + tfjs-layers, so all three are expected to
+    // be available here. Assert disabled-with-tooltip iff disabled:
     for (const id of ['bt', 'bdi', 'learning'] as const) {
       const opt = select.querySelector<HTMLOptionElement>(`option[value="${id}"]`)!;
       if (opt.disabled) {

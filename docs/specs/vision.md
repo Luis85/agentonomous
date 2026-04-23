@@ -125,7 +125,7 @@ what they use.
 ### 6. Peer-optional brains
 
 Advanced cognition adapters (`JsSonReasoner`, `MistreevousBehavior`,
-`BrainJsLearner`, `AnthropicLlmProvider`, `OpenAiLlmProvider`) are
+`TfjsReasoner`, `AnthropicLlmProvider`, `OpenAiLlmProvider`) are
 peer dependencies with `peerDependenciesMeta.optional: true`. Core
 stays usable without any of them. Consumers opt in one at a time.
 

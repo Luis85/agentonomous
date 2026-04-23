@@ -60,8 +60,8 @@ export class TfjsBackendNotRegisteredError extends Error {
 
 /**
  * Helpers passed to the consumer-provided `featuresOf` and `interpret`
- * callbacks. Same shape as the brainjs and js-son adapters' helpers so
- * demo code can swap adapters at call site.
+ * callbacks. Same shape as the js-son adapter's helpers so demo code
+ * can swap adapters at call site without plumbing changes.
  */
 export type TfjsHelpers = {
   readonly candidates: readonly IntentionCandidate[];
