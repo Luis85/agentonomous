@@ -144,7 +144,11 @@ export class MistreevousReasoner implements Reasoner {
     return this.selected;
   }
 
-  /** Reset the underlying tree to READY. Use after major state shifts. */
+  /**
+   * Returns the BT to `READY`. Any `RUNNING` node state — including
+   * mid-sequence continuations — is cleared. Implements the `Reasoner.reset`
+   * port contract (see `src/cognition/reasoning/Reasoner.ts`).
+   */
   reset(): void {
     this.tree.reset();
   }

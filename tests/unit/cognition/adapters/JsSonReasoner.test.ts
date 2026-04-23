@@ -204,4 +204,27 @@ describe('JsSonReasoner', () => {
     expect(fresh['needs']).toBeUndefined();
     expect(fresh['counter']).toBe(0);
   });
+
+  describe('reset()', () => {
+    it('restores beliefs to the initial map exactly — port contract', () => {
+      const initial = { alive: true, mood: 'neutral', ticks: 0 };
+      const reasoner = new JsSonReasoner({
+        beliefs: { ...initial },
+        plans: [
+          Plan(
+            () => true,
+            () => [{ log: 'observed' }],
+          ),
+        ],
+      });
+
+      // Tick once — the default toBeliefs mapper injects needs/modifiers/etc.
+      // into the belief map, so the post-tick beliefs differ from initial.
+      reasoner.selectIntention(ctx([], { hunger: 0.5 }));
+      expect(reasoner.getBeliefs()).not.toEqual(initial);
+
+      reasoner.reset();
+      expect(reasoner.getBeliefs()).toEqual(initial);
+    });
+  });
 });

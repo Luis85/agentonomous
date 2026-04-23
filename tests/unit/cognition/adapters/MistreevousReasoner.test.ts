@@ -189,4 +189,33 @@ describe('MistreevousReasoner', () => {
     reasoner.reset();
     expect(reasoner.getTreeState()).toBe(MistreevousState.READY);
   });
+
+  describe('reset()', () => {
+    it('clears a RUNNING node back to READY — port contract', () => {
+      // Mirrors the RUNNING-continuity fixture: a long-running handler
+      // that would otherwise stay RUNNING across multiple selectIntention
+      // ticks. reset() must wipe that mid-sequence state.
+      let stepsRemaining = 5;
+      const reasoner = new MistreevousReasoner({
+        definition: 'root { action [longRunning] }',
+        handlers: {
+          longRunning: (_c, helpers) => {
+            if (stepsRemaining > 0) {
+              stepsRemaining -= 1;
+              return MistreevousState.RUNNING;
+            }
+            helpers.commit({ kind: 'satisfy', type: 'finally-done' });
+            return MistreevousState.SUCCEEDED;
+          },
+        },
+      });
+
+      // One tick — tree enters RUNNING and the handler consumed one step.
+      reasoner.selectIntention(ctx([]));
+      expect(reasoner.getTreeState()).toBe(MistreevousState.RUNNING);
+
+      reasoner.reset();
+      expect(reasoner.getTreeState()).toBe(MistreevousState.READY);
+    });
+  });
 });

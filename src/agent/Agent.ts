@@ -582,8 +582,11 @@ export class Agent {
    * driving the tick loop from outside the agent (UI handler, framework
    * `onPreUpdate`) see this as "applies from the next tick"; a swap
    * issued from a Stage-1 reactive handler is used within the same
-   * tick. Nothing is transferred from the outgoing reasoner — adapters
-   * that want continuity should persist their own state.
+   * tick. Nothing is transferred from the outgoing reasoner; the
+   * incoming reasoner's `reset?()` fires synchronously after assignment
+   * so the next tick starts from a known-clean baseline. Identity swaps
+   * (re-setting the current reasoner) still fire reset — the kernel
+   * treats every call as a fresh assignment.
    *
    * Throws `TypeError` if `reasoner` is null / undefined / lacks
    * `selectIntention`.
@@ -596,7 +599,14 @@ export class Agent {
     ) {
       throw new TypeError('setReasoner: expected a Reasoner with a selectIntention method.');
     }
+    // `reset` is optional, but when present it MUST be callable. Validating
+    // here fails fast at swap-time rather than mid-restore (where a thrown
+    // TypeError would leave the agent in a partially-restored state).
+    if (reasoner.reset !== undefined && typeof reasoner.reset !== 'function') {
+      throw new TypeError('setReasoner: reasoner.reset must be a function when present.');
+    }
     this.reasoner = reasoner;
+    reasoner.reset?.();
   }
 
   /** Current cognition reasoner. */
@@ -658,6 +668,13 @@ export class Agent {
    *
    * If `opts.catchUp` is set, the agent sub-steps forward from
    * `snapshot.snapshotAt` to `clock.now()` using `runCatchUp`.
+   *
+   * After all subsystem rehydration and catch-up ticks complete,
+   * `this.reasoner.reset?.()` is invoked so the first live post-restore
+   * tick starts from a known-clean baseline. Reset fires _after_
+   * catch-up, not before — catch-up ticks are synthetic and their
+   * residual reasoner state (mid-sequence BT nodes, plan accumulators)
+   * is intentionally discarded.
    */
   async restore(
     snapshot: AgentSnapshot,
@@ -738,6 +755,8 @@ export class Agent {
         chunkOpts,
       );
     }
+
+    this.reasoner.reset?.();
   }
 
   /**
