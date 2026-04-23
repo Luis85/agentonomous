@@ -127,12 +127,15 @@ export type TfjsSnapshot = {
 };
 ```
 
-**Generic parameters `In` / `Out`** are unbounded consumer types — whatever
-`featuresOf` produces and whatever `interpret` consumes. The adapter
-internally converts via `tf.tensor(features)` (shape inferred from the
-`model`'s input layer) and `tensor.arraySync()` / `.dataSync()` for output.
-Consumers who want tensor-native inputs can construct a `tf.Tensor` inside
-`featuresOf` — the conversion is idempotent for tensor inputs.
+**Generic parameters `In` / `Out`** are intentionally unbounded (no
+`extends` clause) — `BrainJsReasoner`'s `extends BrainJsNetworkData`
+constraint was tied to brain.js's internal type constraint, which has no
+tfjs equivalent worth importing into our public surface. The adapter
+internally converts `In` → `tf.Tensor` via `tf.tensor(features)` (shape
+inferred from the `model`'s input layer) and `tf.Tensor` → `Out` via
+`tensor.arraySync()` / `.dataSync()`. Consumers who want tensor-native inputs
+can construct a `tf.Tensor` inside `featuresOf` — the conversion is
+idempotent for tensor inputs.
 
 **`selectIntention` is synchronous** — it calls `tensor.dataSync()` (not
 `.data()`) on the prediction. On the default CPU backend this is a pure CPU
@@ -152,12 +155,12 @@ implements). `reset()` does not re-initialize weights via the consumer's
 kernelInitializer — the initializer is consumer-owned and only runs at
 `tf.layers.dense` construction.
 
-**Snapshot shape decision deferred to implementation.** Section §10.1 notes
-two candidate shapes for `TfjsSnapshot` — our hand-rolled split (topology +
-base64 weights + shapes) or tfjs's native combined `tf.io.ModelArtifacts`
-format round-trippable via `tf.loadLayersModel(tf.io.fromMemory(...))`. The
-implementation plan picks one after empirical verification; the
-type-alias-based surface above assumes the hand-rolled split.
+**Snapshot shape is the hand-rolled split** shown above — the spec commits to
+this shape as the public contract. §10.1's note about tfjs's native
+`tf.io.ModelArtifacts` is an alternative considered; if empirical verification
+during implementation finds the native format strictly better, it becomes a
+spec amendment (which also regenerates the baseline `learning.network.json`
+and its round-trip test), not a silent pivot.
 
 `TfjsHelpers` is intentionally identical in shape to `BrainJsHelpers` so
 demo-style cognition adapters are swappable at call-site.
@@ -257,7 +260,9 @@ constructor default):
 
 2. **`train()` pre-shuffles pairs with a seeded LCG** (Fisher-Yates), then
    passes `{ shuffle: false }` to `model.fit`. tfjs's built-in shuffle uses
-   `Math.random` with no seed hook; pre-shuffling avoids it.
+   `Math.random` with no seed hook; pre-shuffling avoids it. The LCG + shuffle
+   live as module-local helpers inside `TfjsReasoner.ts` — they're small
+   (~15 lines together) and don't warrant a shared utility. Not exported.
 
 3. **Training is always async and always outside the tick loop.** The demo's
    Train button is a user-action handler, not part of `agent.tick()`. The
@@ -287,10 +292,20 @@ construct() — when user switches TO learning mode:
 
 Train button click:
   pairs = gather recent heuristic-labelled (needsLevels → urgency) windows
-  await reasoner.train(pairs, { epochs: 200, learningRate: 0.1, seed: agent.rng.next() })
+  await reasoner.train(pairs, { epochs: 200, learningRate: 0.1, seed: trainRng.next() })
   localStorage.setItem('agentonomous/<agentId>/tfjs-network',
                        JSON.stringify(reasoner.toJSON()))
 ```
+
+**Training seed does NOT flow through `agent.rng`.** The demo owns a separate
+`trainRng: SeededRng` module-local to `cognitionSwitcher.ts`, seeded from a
+stable value (e.g., `0` or a hash of `agentId`). Reason: pulling from
+`agent.rng` inside a Train-button click handler would mutate the agent's RNG
+stream mid-session; subsequent ticks would see a different `agent.rng` state
+than a no-click timeline, breaking tick-replay determinism. The library's
+determinism contract covers the tick loop; the demo's Train button is a user
+event off that loop, and its RNG source has to be independent of `agent.rng`
+to keep the contract intact.
 
 ### 5.2 localStorage key rename
 
@@ -502,9 +517,11 @@ Remove the vitest alias (lines 164-178) that routed `brain.js` to the stub.
    filed with `'agentonomous': minor` for the original adapter's addition, so
    a minor bump is the project's precedent for cognition-adapter-level
    changes at pre-1.0.
-3. Run `graphify update .` after merge to refresh the knowledge graph
-   (`BrainJsReasoner` node → `TfjsReasoner` node in the "Cognition Adapters"
-   community, 7-node cluster preserved).
+3. After merge, the author runs `graphify update .` locally to refresh the
+   knowledge graph (`BrainJsReasoner` node → `TfjsReasoner` node in the
+   "Cognition Adapters" community, 7-node cluster preserved). This is an
+   author-side chore per the graphify section in `CLAUDE.md`, not a repo
+   script.
 4. Demo deployment (`demo` branch promotion) happens on the next scheduled
    demo push, per `PUBLISHING.md#demo-deployment`.
 
