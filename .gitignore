@@ -13,3 +13,6 @@ examples/**/dist
 examples/**/node_modules
 .claude/settings.local.json
 .claude/.last-run
+
+graphify-out
+.graphifyignore
