@@ -2,7 +2,7 @@
 
 > **Status:** draft (brainstorm complete, awaiting user + reviewer approval)
 > **Target branch:** `develop`
-> **Relates to:** `.claude/plans/0.9.3-brainjs-training-persistence.md` (superseded)
+> **Relates to:** `docs/plans/2026-04-22-brainjs-training-persistence.md` (superseded)
 > **Supersedes:** `src/cognition/adapters/brainjs/`, `.changeset/cognition-adapter-brainjs.md`
 
 ## 1 — Context
@@ -52,14 +52,19 @@ Mirror the existing adapters' 3-file shape:
 
 ```
 src/cognition/adapters/tfjs/
-├── index.ts          # barrel: re-exports TfjsReasoner, options, snapshot, helpers
-├── TfjsReasoner.ts   # class + TfjsReasonerOptions + TfjsHelpers + TrainOptions + TrainResult
-└── TfjsSnapshot.ts   # snapshot shape + Float32Array <-> base64 codec
+├── index.ts          # barrel: re-exports TfjsReasoner, TfjsBackendNotRegisteredError,
+│                     #   TfjsReasonerOptions, TfjsHelpers, TrainOptions, TrainResult,
+│                     #   TfjsSnapshot
+├── TfjsReasoner.ts   # class + TfjsBackendNotRegisteredError + TfjsReasonerOptions +
+│                     #   TfjsHelpers + TrainOptions + TrainResult
+└── TfjsSnapshot.ts   # TfjsSnapshot type + Float32Array <-> base64 codec
 ```
 
 ### 3.2 Public API
 
-Consumer-facing symbols (plain-JS types per Q5):
+Consumer-facing symbols (plain-JS types per Q5). Style follows
+`STYLE_GUIDE.md` — `type` aliases for value-shaped structures, `interface`
+only where consumers might want to extend (options object, generic):
 
 ```ts
 // TfjsReasoner.ts
@@ -67,33 +72,34 @@ export interface TfjsReasonerOptions<In, Out> {
   model: tf.Sequential;                           // compiled
   featuresOf: (ctx: ReasonerContext, helpers: TfjsHelpers) => In;
   interpret: (output: Out, ctx: ReasonerContext, helpers: TfjsHelpers) => Intention | null;
-  backend?: 'cpu' | 'wasm' | 'webgl';             // default 'cpu'
+  backend?: 'cpu' | 'wasm' | 'webgl';             // default 'cpu' — see §4.1
   seed?: number;                                  // default derived from the consumer's Rng
 }
 
-export interface TfjsHelpers {
-  candidates: readonly IntentionCandidate[];
+export type TfjsHelpers = {
+  readonly candidates: readonly IntentionCandidate[];
   topCandidate: (filter?: (c: IntentionCandidate) => boolean) => IntentionCandidate | null;
   needsLevels: () => Record<string, number>;
-}
+};
 
-export interface TrainOptions {
+export type TrainOptions = {
   epochs?: number;                                // default 50
   batchSize?: number;                             // default min(pairs.length, 32)
   learningRate?: number;                          // default 0.1
   shuffle?: boolean;                              // default true, pre-shuffled
   seed?: number;                                  // overrides constructor seed for this run
-}
+};
 
-export interface TrainResult {
+export type TrainResult = {
   finalLoss: number;
   history: { loss: readonly number[] };
-}
+};
 
 export class TfjsReasoner<In, Out> implements Reasoner {
   constructor(opts: TfjsReasonerOptions<In, Out>);
   selectIntention(ctx: ReasonerContext): Intention | null;
   train(pairs: Array<{ features: In; label: Out }>, opts?: TrainOptions): Promise<TrainResult>;
+  reset(): void;                                  // see below
   toJSON(): TfjsSnapshot;
   static fromJSON<In, Out>(
     snapshot: TfjsSnapshot,
@@ -102,19 +108,56 @@ export class TfjsReasoner<In, Out> implements Reasoner {
   getModel(): tf.Sequential;
   dispose(): void;
 }
+
+export class TfjsBackendNotRegisteredError extends Error {
+  readonly requestedBackend: 'cpu' | 'wasm' | 'webgl';
+  readonly suggestedPackage: string;              // e.g., '@tensorflow/tfjs-backend-cpu'
+}
 ```
 
 ```ts
 // TfjsSnapshot.ts
-export interface TfjsSnapshot {
+export type TfjsSnapshot = {
   version: 1;
   topology: unknown;                // from model.toJSON({ keepWeightsOnly: false })
   weights: string;                  // base64(concat(Float32Array[] from model.getWeights()))
   weightsShapes: readonly (readonly number[])[];  // one shape per weight tensor
   inputKeys?: readonly string[];    // optional metadata for feature columns
   outputKeys?: readonly string[];
-}
+};
 ```
+
+**Generic parameters `In` / `Out`** are unbounded consumer types — whatever
+`featuresOf` produces and whatever `interpret` consumes. The adapter
+internally converts via `tf.tensor(features)` (shape inferred from the
+`model`'s input layer) and `tensor.arraySync()` / `.dataSync()` for output.
+Consumers who want tensor-native inputs can construct a `tf.Tensor` inside
+`featuresOf` — the conversion is idempotent for tensor inputs.
+
+**`selectIntention` is synchronous** — it calls `tensor.dataSync()` (not
+`.data()`) on the prediction. On the default CPU backend this is a pure CPU
+readback with no I/O. On WebGL, `.dataSync()` still returns synchronously but
+stalls the GPU pipeline until readback completes; this is a documented tick-
+loop cost consumers opt into when they pick `backend: 'webgl'`. WASM behaves
+like CPU.
+
+**`reset()`** restores the model weights to the state captured at construction
+time (or at the last successful `fromJSON` — whichever was more recent). The
+constructor snapshots the initial `model.getWeights()` into an internal
+`Tensor[]` buffer; `reset()` calls `model.setWeights(buffer.map(t => t.clone()))`
+and discards any training history. This matches the `Reasoner.reset()` contract
+followed by `JsSonReasoner` (js-son adapter implements it, brainjs opts out
+because it has no between-tick state; tfjs has trained-model state so it
+implements). `reset()` does not re-initialize weights via the consumer's
+kernelInitializer — the initializer is consumer-owned and only runs at
+`tf.layers.dense` construction.
+
+**Snapshot shape decision deferred to implementation.** Section §10.1 notes
+two candidate shapes for `TfjsSnapshot` — our hand-rolled split (topology +
+base64 weights + shapes) or tfjs's native combined `tf.io.ModelArtifacts`
+format round-trippable via `tf.loadLayersModel(tf.io.fromMemory(...))`. The
+implementation plan picks one after empirical verification; the
+type-alias-based surface above assumes the hand-rolled split.
 
 `TfjsHelpers` is intentionally identical in shape to `BrainJsHelpers` so
 demo-style cognition adapters are swappable at call-site.
@@ -147,11 +190,32 @@ import '@tensorflow/tfjs-backend-cpu';  // consumer side — registers CPU backe
 import { TfjsReasoner } from 'agentonomous/cognition/adapters/tfjs';
 ```
 
-Constructor calls `tf.setBackend(opts.backend ?? 'cpu')` if and only if the
-current global backend differs from the requested one. If the requested
-backend is not registered, the adapter throws `TfjsBackendNotRegisteredError`
-(exported) with the name of the package to install. No silent fallback —
-configuration bugs should be loud.
+`tf.setBackend()` returns `Promise<boolean>` — it's asynchronous. To keep the
+constructor idiomatic (`new TfjsReasoner(opts)`) and side-effect-free, the
+backend contract splits along sync/async lines:
+
+- **Synchronous constructor** (`new TfjsReasoner(opts)`). Asserts
+  `tf.getBackend() === (opts.backend ?? 'cpu')` and throws
+  `TfjsBackendNotRegisteredError` (exported from the barrel) if the requested
+  backend is not the current global backend. It does **not** call
+  `tf.setBackend()` — because that would need an `await`. Consumers using
+  `new TfjsReasoner(...)` are responsible for ensuring the backend is active
+  beforehand (typically via side-effect import for CPU, or
+  `await tf.setBackend('wasm')` for non-default backends).
+- **Async static factory** (`await TfjsReasoner.fromJSON(snapshot, opts)`).
+  Awaits `tf.setBackend(opts.backend ?? 'cpu')` if the current backend
+  differs; still throws `TfjsBackendNotRegisteredError` if registration
+  itself fails. This is the path the demo uses.
+
+For CPU specifically, the backend registers synchronously when
+`@tensorflow/tfjs-backend-cpu` is imported, so the distinction is invisible
+to CPU-only consumers. The asymmetry matters only for consumers who pick
+WASM/WebGL and want to construct via plain `new`.
+
+`TfjsBackendNotRegisteredError` carries `requestedBackend` (the value the
+consumer passed) and `suggestedPackage` (the npm package to install) fields so
+UI can render a useful message. No silent fallback — configuration bugs stay
+loud.
 
 ### 4.2 Inference is bit-deterministic
 
@@ -161,6 +225,14 @@ default CPU backend, output is bit-identical across runs and machines. This
 matches agentonomous's tick-loop contract (CLAUDE.md §Non-negotiables).
 
 ### 4.3 Training determinism
+
+Training determinism is **best-effort**: we control every randomness source
+the adapter and its callers own, and document any remaining source tfjs
+introduces. The implementation plan's first verification step (§10.2) is a
+"train twice with identical seeds, compare weights" test. If that test shows
+drift, the adapter's JSDoc documents the exact source and the spec's §7.1
+assertion weakens from "bit-identical weights" to "weights agree within a
+documented tolerance."
 
 Three measures apply when `opts.seed` is provided (directly or via the
 constructor default):
@@ -289,8 +361,10 @@ and the library build resolve everything locally and in CI.
 
 ### 6.3 Size budget (`size-limit` array)
 
-Rename the brainjs entry to tfjs, keep 2 KB gzip — adapter is a thin wrapper
-calling into external tfjs.
+Rename the brainjs entry to tfjs, budget **3 KB gzip** (up from brainjs's
+2 KB — the tfjs adapter adds `reset()` state + base64 codec helpers, which
+the brainjs adapter didn't have). §6.6's 2–3 KB estimate is aligned to this
+budget.
 
 ### 6.4 `vite.config.ts` (root)
 
@@ -326,8 +400,9 @@ Remove the vitest alias (lines 164-178) that routed `brain.js` to the stub.
 ### 6.6 Bundle impact
 
 - Library `dist/`: tfjs is external; overall size effectively unchanged. New
-  adapter chunk (`dist/cognition/adapters/tfjs/index.js`) expected at 2–3 KB
-  gzipped, parity with the old brainjs chunk.
+  adapter chunk (`dist/cognition/adapters/tfjs/index.js`) budgeted at 3 KB
+  gzipped (§6.3), slightly above the old brainjs chunk because of `reset()`
+  state and base64 codec helpers.
 - Demo `examples/nurture-pet/dist/`: brain.js's ~540 KB gzipped browser chunk
   is replaced by tfjs-core + tfjs-layers + tfjs-backend-cpu at ~350–450 KB
   gzipped. **Net small bundle decrease.**
@@ -344,14 +419,29 @@ Remove the vitest alias (lines 164-178) that routed `brain.js` to the stub.
 - `train(pairs)` on a trivial linear mapping converges under a fixed seed —
   assert `finalLoss < threshold` and assert `history.loss` length equals
   `opts.epochs`.
-- Same `pairs` + same `seed` → bit-identical final weights (training
-  determinism under pre-shuffle + `shuffle: false`).
+- Same `pairs` + same `seed` → weights agree **either** bit-for-bit, or within
+  a documented tolerance (see §4.3 — the tolerance path triggers only if the
+  §10.2 verification step reveals tfjs-internal non-determinism we can't
+  suppress).
 - `toJSON() → fromJSON()` round-trip produces a reasoner whose
   `selectIntention` output is bit-identical to the original.
-- `dispose()` releases tracked tensors — assert `tf.memory().numTensors` does
-  not grow after `construct + dispose + construct + dispose` ×N.
-- Constructor with `backend: 'webgl'` when WebGL is not registered throws
-  `TfjsBackendNotRegisteredError`.
+- **Baseline round-trip.** The bundled `examples/nurture-pet/src/cognition/learning.network.json`
+  loads via `TfjsReasoner.fromJSON` without throwing; on the canonical input
+  `{hunger: 1, cleanliness: 0, happiness: 0, energy: 0, health: 0}` the output
+  matches a hand-calculated sigmoid value (`sigmoid(-1) ≈ 0.2689`) to 4
+  decimal places. This catches fat-finger edits to the checked-in baseline.
+- **`reset()`** restores the construct-time weights: train a model for N
+  epochs, call `reset()`, assert `selectIntention` output equals the
+  pre-train baseline on a canonical input.
+- `dispose()` releases tracked tensors — capture
+  `tf.memory().numTensors` after first `construct + dispose` cycle as the
+  baseline, then run 10 further `construct + dispose` cycles and assert the
+  final tensor count equals the baseline (±a small slack for tfjs's own
+  bookkeeping). Not "count does not grow" literally; "count returns to
+  baseline" is the real contract.
+- Constructor with `backend: 'webgl'` when the current backend is not webgl
+  throws `TfjsBackendNotRegisteredError` with `suggestedPackage ===
+  '@tensorflow/tfjs-backend-webgl'`.
 
 ### 7.2 Demo integration — updated `tests/examples/learningMode.train.test.ts`
 
@@ -408,8 +498,10 @@ Remove the vitest alias (lines 164-178) that routed `brain.js` to the stub.
 1. Land the swap as a single PR to `develop` (one topic branch, one PR).
 2. Changeset file documents the breaking change: removed
    `cognition/adapters/brainjs` subpath export, added `cognition/adapters/tfjs`
-   subpath. Minor bump (project convention for pre-1.0 breaking changes, per
-   the existing `cognition-adapter-brainjs.md` changeset's style).
+   subpath. **Minor bump** — `.changeset/cognition-adapter-brainjs.md` was
+   filed with `'agentonomous': minor` for the original adapter's addition, so
+   a minor bump is the project's precedent for cognition-adapter-level
+   changes at pre-1.0.
 3. Run `graphify update .` after merge to refresh the knowledge graph
    (`BrainJsReasoner` node → `TfjsReasoner` node in the "Cognition Adapters"
    community, 7-node cluster preserved).

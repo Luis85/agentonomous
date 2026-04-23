@@ -78,9 +78,10 @@ Node 22 (see `.nvmrc`). Run `nvm use` once per shell.
 - `src/integrations/excalibur/` — optional Excalibur actor sync. Separate
   bundle entry; don't import from core.
 - `tests/unit/` mirrors `src/` 1:1. `tests/integration/` is multi-subsystem.
-- `examples/nurture-pet/` is a workspace-local Vite demo consuming the
-  built `dist/`. Build the library first (`npm run build`) before running
-  the demo.
+- `examples/nurture-pet/` is a Vite demo that resolves `agentonomous` via
+  Vite + tsconfig aliases pointing at `../../dist/` (not an npm dep — a
+  `file:../..` link inside its own target triggers `EISDIR` on Windows).
+  Build the library first (`npm run build`) before running the demo.
 
 ## Style conventions (quick)
 
@@ -98,6 +99,16 @@ Full rules in [`STYLE_GUIDE.md`](./STYLE_GUIDE.md). High-frequency ones:
 - Tests: seed everything (`SeededRng(<literal>)`, `ManualClock(<literal>)`).
   Assert on event streams + `agent.getState()` slices, not protected
   fields.
+
+## Plans & specs location
+
+- **Plans** live in `docs/plans/YYYY-MM-DD-<slug>.md` (implementation
+  roadmaps, chunked task lists). Overrides the superpowers `writing-plans`
+  default of `docs/superpowers/plans/`.
+- **Specs** live in `docs/specs/YYYY-MM-DD-<slug>.md` (design docs,
+  brainstorm outputs).
+- Date prefix = first-commit date. Never drop the date; rename via
+  `git mv` if the slug changes.
 
 ## Changesets
 
@@ -123,4 +134,15 @@ the same PR.
   keep the pause observably frozen. `Modifier.expiresAt` is still an
   absolute wall-clock ms — deferred expiry fires on the first
   post-resume tick. Phase B may re-base expiry on virtual time;
-  see `.claude/plans/pause-semantics.md`.
+  see `docs/plans/2026-04-19-pause-semantics.md`.
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

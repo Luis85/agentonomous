@@ -175,9 +175,9 @@ is out of scope):**
     today; Pixi / three.js / Phaser in the same shape tomorrow).
   - `src/<category>/adapters/<vendor>/` — algorithmic peers within a
     category (cognition: mistreevous / js-son / brainjs).
-- `.claude/plans/` hygiene — archive superseded roadmaps
+- `docs/plans/` hygiene — archive superseded roadmaps
   (`mvp-demo-roadmap.md`, `pre-v1-next-session.md`) under
-  `.claude/plans/archive/` with a one-line banner explaining what
+  `docs/plans/archive/` with a one-line banner explaining what
   replaced them. `v1-comprehensive-plan.md` becomes the single active
   roadmap.
 
@@ -198,7 +198,7 @@ is out of scope):**
 - `src/index.ts` + the four subpath entrypoints for JSDoc sweep
 - `CLAUDE.md`
 - `CONTRIBUTING.md` — new short section on the two adapter patterns
-- `.claude/plans/archive/` — two move-and-banner operations
+- `docs/plans/archive/` — two move-and-banner operations
 
 ### 0.9.6 — D-item cleanup
 
@@ -497,7 +497,7 @@ bundling options noted below). 1.0.0 in **~2 sessions** (5 PRs) after.
 ## Plan chunking
 
 This roadmap is a **superplan**. Each numbered step below gets its own
-self-contained implementation plan under `.claude/plans/`, drafted and
+self-contained implementation plan under `docs/plans/`, drafted and
 executed one at a time. Plans are written with the
 `superpowers:writing-plans` skill and executed with
 `superpowers:subagent-driven-development` (or

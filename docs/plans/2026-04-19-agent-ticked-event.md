@@ -37,7 +37,7 @@ here (roadmap bundling guidance for 0.9.1 says "bundle is OK if both are small
 and the test coverage stays clean" — the library test sweep alone justifies a
 dedicated PR, and the demo's HUD wiring touches independent files).
 
-**Roadmap reference:** `.claude/plans/v1-comprehensive-plan.md → 0.9.1 —
+**Roadmap reference:** `docs/plans/2026-04-19-v1-comprehensive-plan.md → 0.9.1 —
 AgentTicked bus event`. Closes the first "still-outstanding" post-P4 item.
 
 ---
@@ -769,7 +769,7 @@ gh pr create --base develop --title "feat: AgentTicked bus event (0.9.1 library)
 - Replay-equivalence test covers the new emission under a fixed seed.
 
 Implements the library half of 0.9.1 from
-`.claude/plans/v1-comprehensive-plan.md`. Demo wiring follows in the
+`docs/plans/2026-04-19-v1-comprehensive-plan.md`. Demo wiring follows in the
 companion PR.
 
 ## Test plan
@@ -798,7 +798,7 @@ git fetch --prune origin
 
 - [ ] **Step 5: Update roadmap status**
 
-In `.claude/plans/v1-comprehensive-plan.md`, change the `Status` cell for
+In `docs/plans/2026-04-19-v1-comprehensive-plan.md`, change the `Status` cell for
 row 1 (0.9.1) from `Not drafted` to `Shipped — <merged PR URL>`.
 
 Commit on `develop` directly per the
@@ -806,7 +806,7 @@ Commit on `develop` directly per the
 pushing):
 
 ```bash
-git add .claude/plans/v1-comprehensive-plan.md
+git add docs/plans/2026-04-19-v1-comprehensive-plan.md
 git commit -m "docs(plans): mark 0.9.1 library as shipped"
 ```
 
@@ -1282,7 +1282,7 @@ gh pr create --base develop --title "feat(demo): AgentTicked-driven UI refresh +
   `AgentTickedEvent` JSDoc (no behavior change, no changeset).
 
 Implements the demo half of 0.9.1 from
-`.claude/plans/0.9.1-agent-ticked-event.md`. Chunk 1 (library) landed
+`docs/plans/2026-04-19-agent-ticked-event.md`. Chunk 1 (library) landed
 as PR #44.
 
 ## Test plan
@@ -1316,7 +1316,7 @@ git fetch --prune origin
 
 - [ ] **Step 5: Update roadmap status**
 
-In `.claude/plans/v1-comprehensive-plan.md`, row 1 Status →
+In `docs/plans/2026-04-19-v1-comprehensive-plan.md`, row 1 Status →
 `Shipped — library #44, demo #<N>`. Commit on `develop` directly per
 `feedback_plan_crafting_on_develop` memory; ask the user to push.
 

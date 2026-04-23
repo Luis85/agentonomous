@@ -22,7 +22,7 @@ vitest (+ jsdom env for the switcher unit test), Vite for the demo
 build. ESM with `.js` extensions on relative imports.
 
 **Design reference:**
-`.claude/plans/0.9.2-cognition-switcher-design.md` — scope decisions
+`docs/plans/2026-04-19-cognition-switcher-design.md` — scope decisions
 there are out of scope to revisit here.
 
 ---
@@ -62,7 +62,7 @@ there are out of scope to revisit here.
   existing teardown path.
 - `examples/nurture-pet/README.md` — add cognition-switcher to the
   "What it demonstrates" list + a short usage section.
-- `.claude/plans/v1-comprehensive-plan.md` — row 2 status update
+- `docs/plans/2026-04-19-v1-comprehensive-plan.md` — row 2 status update
   (separate commit on `develop`, not part of the PR).
 
 ### No-change files (referenced for anchors)
@@ -1558,7 +1558,7 @@ Closes Chapter C of the MVP demo spec
 (bundled into P4), so this PR is demo-only.
 
 Full design:
-`.claude/plans/0.9.2-cognition-switcher-design.md`.
+`docs/plans/2026-04-19-cognition-switcher-design.md`.
 
 ## Test plan
 
@@ -1590,7 +1590,7 @@ Return the PR URL. Do NOT merge — wait for review.
 
 **Files:**
 
-- Modify: `.claude/plans/v1-comprehensive-plan.md` (row 2 status —
+- Modify: `docs/plans/2026-04-19-v1-comprehensive-plan.md` (row 2 status —
   direct commit on `develop` per `feedback_plan_crafting_on_develop`
   memory)
 
@@ -1605,7 +1605,7 @@ git fetch --prune origin
 
 - [ ] **Step 2: Update roadmap status**
 
-Edit `.claude/plans/v1-comprehensive-plan.md` row 2 to reflect
+Edit `docs/plans/2026-04-19-v1-comprehensive-plan.md` row 2 to reflect
 completion. Current value:
 
 ```
@@ -1629,7 +1629,7 @@ Also update the 0.9.2 prose section (around line 107) — replace
 - [ ] **Step 3: Commit on `develop` directly**
 
 ```bash
-git add .claude/plans/v1-comprehensive-plan.md
+git add docs/plans/2026-04-19-v1-comprehensive-plan.md
 git commit -m "docs(plans): mark 0.9.2 as shipped"
 ```
 

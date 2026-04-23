@@ -1,12 +1,12 @@
 # 0.9.2 Cognition Switcher — Design
 
 > Brainstormed 2026-04-19. Feeds directly into
-> `.claude/plans/0.9.2-set-reasoner-and-switcher.md` (implementation plan,
+> `docs/plans/2026-04-19-set-reasoner-and-switcher.md` (implementation plan,
 > to be produced via `superpowers:writing-plans`).
 
 ## Context
 
-The v1 roadmap (`.claude/plans/v1-comprehensive-plan.md` row 2) framed
+The v1 roadmap (`docs/plans/2026-04-19-v1-comprehensive-plan.md` row 2) framed
 0.9.2 as two PRs — a library PR adding `Agent.setReasoner()` and a demo PR
 adding a cognition-switcher dropdown. A pre-brainstorm survey found that
 the **library PR already shipped** in commit `c58d5f7`
@@ -173,7 +173,7 @@ differentiated BDI authorship is a follow-up plan.
 
 The pre-built net has hand-chosen weights that produce urgency-like
 scoring — again behaviourally close to heuristic. Real training lives
-in 0.9.3 (`.claude/plans/v1-comprehensive-plan.md` row 3).
+in 0.9.3 (`docs/plans/2026-04-19-v1-comprehensive-plan.md` row 3).
 
 ## Capability-probe flow
 
@@ -261,7 +261,7 @@ plan's verification section):
 Two `docs(plans)` edits land in one commit on `develop` directly, per
 the `feedback_plan_crafting_on_develop` memory:
 
-- `.claude/plans/v1-comprehensive-plan.md` row 2 Status → `Library
+- `docs/plans/2026-04-19-v1-comprehensive-plan.md` row 2 Status → `Library
 shipped (c58d5f7 in P4); demo plan drafted (0.9.2-...); demo PR
 pending`.
 - Optional short note in the 0.9.2 prose section acknowledging the
@@ -310,4 +310,4 @@ the topic branch is cut.
 ---
 
 Next step: invoke `superpowers:writing-plans` to produce
-`.claude/plans/0.9.2-set-reasoner-and-switcher.md` from this design.
+`docs/plans/2026-04-19-set-reasoner-and-switcher.md` from this design.
