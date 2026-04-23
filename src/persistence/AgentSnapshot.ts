@@ -1,6 +1,5 @@
 import type { AgentIdentity } from '../agent/AgentIdentity.js';
 import type { AnimationState } from '../animation/AnimationState.js';
-import type { DomainEvent } from '../events/DomainEvent.js';
 import type { LifeStage } from '../lifecycle/LifeStage.js';
 import type { MemoryRecord } from '../memory/MemoryRecord.js';
 import type { Modifier } from '../modifiers/Modifier.js';
@@ -76,12 +75,6 @@ export interface AgentSnapshot {
 
   /** Consumer-owned extension slot. */
   custom?: Record<string, unknown>;
-
-  /**
-   * Pending events queued on the bus at save time. Restored onto the fresh
-   * bus so in-flight interactions aren't lost across reload.
-   */
-  pendingEvents?: readonly DomainEvent[];
 }
 
 export const CURRENT_SNAPSHOT_VERSION = 2 as const;
