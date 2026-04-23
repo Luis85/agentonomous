@@ -10,7 +10,7 @@
 >
 > Revised 2026-04-20: 0.9.1, 0.9.2, and 0.9.6 marked shipped. 0.9.5
 > repurposed from "Excalibur subpath rename" (cancelled — `integrations/
-> <vendor>/` is the intentional convention for engine/rendering peers,
+<vendor>/` is the intentional convention for engine/rendering peers,
 > distinct from `<category>/adapters/<vendor>/` used for cognition
 > peers) to "Docs polish pass (alignment only)".
 
@@ -34,13 +34,13 @@ showcase, and concrete LLM providers are **post-v1** (1.1+ / Phase B).
 
 Status against the MVP demo spec:
 
-| Chapter              | Spec requirement                                    | Actual state                                                                                                                                   | Remaining                                     |
-| -------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| A — Living agent     | Needs decay, HUD, autonomy observable               | ✅ Done. Decay calibrated (`BASE_TIME_SCALE = 10`). HUD renders needs + modifiers + interactions.                                              | —                                             |
-| B — Decision Trace   | Trace panel with needs, candidates, selected action | ✅ Done. `traceView.ts` with progressive disclosure.                                                                                           | Polish only                                   |
-| C — Cognition switch | Dropdown for heuristic / BT / BDI / learning        | ✅ Done. `setReasoner` shipped in P4 (`c58d5f7`); switcher + BT / BDI / brain.js modes shipped in PR #46 + polish #47–#50.                     | —                                             |
-| D — JSON config      | Read/edit/apply species JSON                        | ✅ Done. `speciesConfig.ts` with `applyOverride()`.                                                                                            | Polish only                                   |
-| E — Determinism      | Seed display, replay, new-seed                      | ✅ Done. `seed.ts` panel mounted; D2 parallel-agent determinism integration test shipped (PR #23).                                            | brain.js training persistence (0.9.3)         |
+| Chapter              | Spec requirement                                    | Actual state                                                                                                               | Remaining                             |
+| -------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| A — Living agent     | Needs decay, HUD, autonomy observable               | ✅ Done. Decay calibrated (`BASE_TIME_SCALE = 10`). HUD renders needs + modifiers + interactions.                          | —                                     |
+| B — Decision Trace   | Trace panel with needs, candidates, selected action | ✅ Done. `traceView.ts` with progressive disclosure.                                                                       | Polish only                           |
+| C — Cognition switch | Dropdown for heuristic / BT / BDI / learning        | ✅ Done. `setReasoner` shipped in P4 (`c58d5f7`); switcher + BT / BDI / brain.js modes shipped in PR #46 + polish #47–#50. | —                                     |
+| D — JSON config      | Read/edit/apply species JSON                        | ✅ Done. `speciesConfig.ts` with `applyOverride()`.                                                                        | Polish only                           |
+| E — Determinism      | Seed display, replay, new-seed                      | ✅ Done. `seed.ts` panel mounted; D2 parallel-agent determinism integration test shipped (PR #23).                         | brain.js training persistence (0.9.3) |
 
 Carried forward from the post-P4 implementation review:
 
@@ -406,21 +406,21 @@ Captured so nothing gets lost. Not on the critical path.
 
 ## Sequencing at a glance
 
-| Phase | Step                                           | Depends on    | PR scope                            |
-| ----- | ---------------------------------------------- | ------------- | ----------------------------------- |
-| 0.9.0 | 0.9.1 `AgentTicked` event                      | —             | 1 PR (minor bump) — shipped         |
-| 0.9.0 | 0.9.2 `setReasoner` + dropdown                 | 0.9.1         | 2 PRs (library + demo) — shipped    |
-| 0.9.0 | 0.9.4 `Reasoner.reset()` harmonization         | 0.9.2         | 1 bundled PR or 4 small             |
-| 0.9.0 | 0.9.3 brain.js persistence                     | 0.9.4         | 1 demo PR                           |
-| 0.9.0 | 0.9.5 Docs polish pass (alignment only)        | 0.9.3         | 1 docs PR                           |
-| 0.9.0 | 0.9.6 D-items                                  | —             | shipped in-flight (PRs #17–#31)     |
-| 0.9.0 | 0.9.7 Soak + DoD                               | all above     | 1 PR                                |
-| 0.9.0 | Promote + tag                                  | all above     | —                                   |
-| 1.0.0 | 1.0.1 `_internalPublish`/`_internalDie` rename | 0.9.0 shipped | 1 PR (major)                        |
-| 1.0.0 | 1.0.2 `LlmProviderPort`                        | 1.0.1         | 1 PR                                |
-| 1.0.0 | 1.0.3 Narrow surface                           | 1.0.2         | 1 PR                                |
-| 1.0.0 | 1.0.4 API/JSDoc audit                          | 1.0.3         | 1 PR                                |
-| 1.0.0 | 1.0.5 Changeset + publish                      | 1.0.4         | 1 PR                                |
+| Phase | Step                                           | Depends on    | PR scope                         |
+| ----- | ---------------------------------------------- | ------------- | -------------------------------- |
+| 0.9.0 | 0.9.1 `AgentTicked` event                      | —             | 1 PR (minor bump) — shipped      |
+| 0.9.0 | 0.9.2 `setReasoner` + dropdown                 | 0.9.1         | 2 PRs (library + demo) — shipped |
+| 0.9.0 | 0.9.4 `Reasoner.reset()` harmonization         | 0.9.2         | 1 bundled PR or 4 small          |
+| 0.9.0 | 0.9.3 brain.js persistence                     | 0.9.4         | 1 demo PR                        |
+| 0.9.0 | 0.9.5 Docs polish pass (alignment only)        | 0.9.3         | 1 docs PR                        |
+| 0.9.0 | 0.9.6 D-items                                  | —             | shipped in-flight (PRs #17–#31)  |
+| 0.9.0 | 0.9.7 Soak + DoD                               | all above     | 1 PR                             |
+| 0.9.0 | Promote + tag                                  | all above     | —                                |
+| 1.0.0 | 1.0.1 `_internalPublish`/`_internalDie` rename | 0.9.0 shipped | 1 PR (major)                     |
+| 1.0.0 | 1.0.2 `LlmProviderPort`                        | 1.0.1         | 1 PR                             |
+| 1.0.0 | 1.0.3 Narrow surface                           | 1.0.2         | 1 PR                             |
+| 1.0.0 | 1.0.4 API/JSDoc audit                          | 1.0.3         | 1 PR                             |
+| 1.0.0 | 1.0.5 Changeset + publish                      | 1.0.4         | 1 PR                             |
 
 **Estimated sessions:** 0.9.0 in **~3 sessions** (9–11 PRs, with
 bundling options noted below). 1.0.0 in **~2 sessions** (5 PRs) after.
@@ -507,20 +507,20 @@ Plan-document edits may be committed directly to `develop` (see
 memory: `feedback_plan_crafting_on_develop`). Implementation PRs still
 follow the standard topic-branch flow defined in `CLAUDE.md`.
 
-| #   | Step  | Plan file                               | PRs inside        | Status                                                         |
-| --- | ----- | --------------------------------------- | ----------------- | -------------------------------------------------------------- |
-| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo    | Shipped — library #44, demo #45                                |
-| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo    | Shipped — library c58d5f7 (in P4), demo #46 + polish #47–#50   |
-| 3   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled library | Not drafted — **next up**                                      |
-| 4   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo              | Not drafted — follows 0.9.4                                    |
-| 5   | 0.9.5 | `0.9.5-docs-polish.md`                  | 1 docs            | Not drafted — follows 0.9.3; alignment-only scope              |
+| #   | Step  | Plan file                               | PRs inside        | Status                                                             |
+| --- | ----- | --------------------------------------- | ----------------- | ------------------------------------------------------------------ |
+| 1   | 0.9.1 | `0.9.1-agent-ticked-event.md`           | library + demo    | Shipped — library #44, demo #45                                    |
+| 2   | 0.9.2 | `0.9.2-set-reasoner-and-switcher.md`    | library + demo    | Shipped — library c58d5f7 (in P4), demo #46 + polish #47–#50       |
+| 3   | 0.9.4 | `0.9.4-reasoner-reset-harmonization.md` | 1 bundled library | Not drafted — **next up**                                          |
+| 4   | 0.9.3 | `0.9.3-brainjs-persistence.md`          | demo              | Not drafted — follows 0.9.4                                        |
+| 5   | 0.9.5 | `0.9.5-docs-polish.md`                  | 1 docs            | Not drafted — follows 0.9.3; alignment-only scope                  |
 | 6   | 0.9.6 | —                                       | —                 | Shipped in-flight — D1 #21, D2 #23, D3 #24, D5 #31, D6 #17, D7 #18 |
-| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release       | Not drafted                                                    |
-| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major           | Not drafted                                                    |
-| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                 | Not drafted                                                    |
-| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                 | Not drafted                                                    |
-| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                 | Not drafted                                                    |
-| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release       | Not drafted                                                    |
+| 7   | 0.9.7 | `0.9.7-soak-and-promote.md`             | 1 + release       | Not drafted                                                        |
+| 8   | 1.0.1 | `1.0.1-internal-rename.md`              | 1 major           | Not drafted                                                        |
+| 9   | 1.0.2 | `1.0.2-llm-provider-port.md`            | 1                 | Not drafted                                                        |
+| 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`        | 1                 | Not drafted                                                        |
+| 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`              | 1                 | Not drafted                                                        |
+| 12  | 1.0.5 | `1.0.5-changeset-and-publish.md`        | 1 + release       | Not drafted                                                        |
 
 **Update this table** as plans are drafted (`Drafted`), enter execution
 (`In progress`), or ship (`Shipped — <PR link or tag>`). The table is
