@@ -3,6 +3,15 @@ import type { CognitionModeSpec } from './index.js';
 import networkJson from './learning.network.json';
 
 /**
+ * Urgency floor for the learning-mode `interpret()` gate. The network's
+ * scalar output is a [0, 1] urgency estimate — values below this floor
+ * cause the pet to idle this tick rather than commit an intention.
+ * Picked empirically so the default hand-authored weights produce a
+ * visible idle rate and re-training shifts the observable behavior.
+ */
+const URGENCY_THRESHOLD = 0.35;
+
+/**
  * Module-scoped agent id used as the localStorage key scope when
  * hydrating the trained network. Set once from `main.ts` after the
  * agent is created. Kept module-scoped (rather than widening
@@ -23,9 +32,11 @@ export function setLearningAgentId(id: string | null): void {
  * falls back to the bundled `learning.network.json` default with
  * hand-chosen weights.
  *
- * `interpret()` wires the network's scalar output into intention
- * selection as an urgency gate — see Task 6's `URGENCY_THRESHOLD`
- * constant for the threshold and rationale.
+ * `interpret()` feeds the network's scalar output through an urgency
+ * gate: the pet idles this tick when the output drops below
+ * `URGENCY_THRESHOLD`; otherwise it commits the top heuristic
+ * candidate. Trained and untrained networks thus produce different
+ * idle rates, making training observable in the trace view.
  *
  * `construct()` is async so the adapter subpath (which pulls
  * `brain.js` as a side effect) only loads when this mode is
@@ -84,7 +95,11 @@ export const learningMode: CognitionModeSpec = {
     return new BrainJsReasoner({
       network: network as never,
       featuresOf: (_ctx: ReasonerContext, helpers) => helpers.needsLevels() as never,
-      interpret: (_output, _ctx, helpers) => {
+      interpret: (output, _ctx, helpers) => {
+        const urgency = Array.isArray(output)
+          ? ((output as unknown as number[])[0] ?? 0)
+          : ((output as { score?: number }).score ?? 0);
+        if (urgency < URGENCY_THRESHOLD) return null;
         const top = helpers.topCandidate();
         return top ? top.intention : null;
       },
