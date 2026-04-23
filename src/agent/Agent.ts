@@ -892,7 +892,7 @@ export class Agent {
       rng: this.rng,
       logger: this.logger,
       publishEvent: (event: DomainEvent) => {
-        this.eventBus.publish(event);
+        this._internalPublish(event);
       },
       invokeSkill: async (skillId, params) => {
         await this.cognitionPipeline.invokeSkillAction(
