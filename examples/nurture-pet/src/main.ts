@@ -82,9 +82,13 @@ const randomEvents = new RandomEventTicker([
   }),
 ]);
 
-// --- Skill registry populated with active + expressive defaults ---------------
+// --- Skill registry populated with expressive + approach defaults -------------
+// `createAgent({ modules: [defaultPetInteractionModule] })` auto-installs
+// that module's active-care skills (feed/clean/play/rest/pet/scold/
+// medicate), so we don't pre-register them here. The expressive + approach
+// skills below are not bundled in any module, so they still need manual
+// registration.
 const skills = new SkillRegistry();
-skills.registerAll(defaultPetInteractionModule.skills ?? []);
 skills.register(ExpressMeowSkill);
 skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
