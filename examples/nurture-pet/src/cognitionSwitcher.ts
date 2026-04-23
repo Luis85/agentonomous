@@ -123,8 +123,16 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   let changeEpoch = 0;
   let activeModeId: CognitionModeSpec['id'] = 'heuristic';
   let activeReasoner: Reasoner | null = null;
+  // If the Train button is in flight when the user swaps modes, the
+  // outgoing reasoner still has a live `model.fit` running against its
+  // tensors. Disposing it immediately frees those tensors mid-fit and
+  // turns the pending `train` promise into an unhandled rejection. We
+  // track the in-flight promise + its owning reasoner and defer disposal
+  // of that one reasoner until training settles.
+  let trainingReasoner: Reasoner | null = null;
+  let pendingTrain: Promise<void> | null = null;
 
-  const disposeIfOwned = (reasoner: Reasoner | null): void => {
+  const disposeNow = (reasoner: Reasoner | null): void => {
     if (!reasoner) return;
     const maybe = reasoner as { dispose?: () => void };
     if (typeof maybe.dispose === 'function') {
@@ -134,6 +142,16 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         // Best-effort — disposal shouldn't block the UI.
       }
     }
+  };
+
+  const disposeIfOwned = (reasoner: Reasoner | null): void => {
+    if (!reasoner) return;
+    if (reasoner === trainingReasoner && pendingTrain) {
+      // Defer until training settles, then dispose.
+      void pendingTrain.catch(() => undefined).then(() => disposeNow(reasoner));
+      return;
+    }
+    disposeNow(reasoner);
   };
 
   const onChange = async (): Promise<void> => {
@@ -178,15 +196,22 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   const onTrainClick = async (): Promise<void> => {
     if (!trainBtn) return;
     if (disposed) return;
-    const reasoner = activeReasoner as Partial<TrainableReasoner> | null;
-    if (!reasoner || typeof reasoner.train !== 'function' || typeof reasoner.toJSON !== 'function')
+    const reasonerHandle = activeReasoner;
+    const reasoner = reasonerHandle as Partial<TrainableReasoner> | null;
+    if (
+      !reasonerHandle ||
+      !reasoner ||
+      typeof reasoner.train !== 'function' ||
+      typeof reasoner.toJSON !== 'function'
+    )
       return;
 
     const originalText = trainBtn.textContent ?? 'Train';
     trainBtn.disabled = true;
     trainBtn.textContent = 'Training…';
     await new Promise<void>((r) => setTimeout(r, 0));
-    try {
+
+    const run = async (): Promise<void> => {
       if (disposed) return;
       const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
         const features: number[] = [];
@@ -199,13 +224,13 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         const urgency = 1 - min;
         return { features, label: [urgency] };
       });
-      await reasoner.train(pairs, {
+      await reasoner.train!(pairs, {
         epochs: TRAIN_EPOCHS,
         learningRate: 0.1,
         seed: Math.floor(trainRng() * 0x7fff_ffff),
       });
       try {
-        const snapshot = reasoner.toJSON();
+        const snapshot = reasoner.toJSON!();
         globalThis.localStorage?.setItem(
           `agentonomous/${agent.identity.id}/tfjs-network`,
           JSON.stringify(snapshot),
@@ -214,7 +239,18 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         // localStorage unavailable — training still succeeds for this session.
       }
       flashStatus(status, 'Trained ✓', TRAINED_FLASH_MS);
+    };
+
+    trainingReasoner = reasonerHandle;
+    const promise = run();
+    pendingTrain = promise.catch(() => undefined);
+    try {
+      await promise;
     } finally {
+      if (trainingReasoner === reasonerHandle) {
+        trainingReasoner = null;
+        pendingTrain = null;
+      }
       trainBtn.disabled = false;
       trainBtn.textContent = originalText;
     }

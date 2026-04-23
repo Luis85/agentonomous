@@ -240,6 +240,10 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
    * in localStorage; rehydrate with `TfjsReasoner.fromJSON(...)`.
    */
   toJSON(): TfjsSnapshot {
+    // `LayersModel.getWeights()` returns the underlying weight-variable
+    // tensors directly (via `LayerVariable.read()` — NOT clones), so we
+    // read their host-side data via `dataSync()` without disposing them;
+    // disposing here would destroy the model's backing storage.
     const weightTensors = this.model.getWeights();
     const weightsShapes = weightTensors.map((t) => [...t.shape]);
     const weightsArrays = weightTensors.map((t) => {
