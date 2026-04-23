@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
 import { setLearningAgentId } from '../../examples/nurture-pet/src/cognition/learning.js';
+import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
 import { NeuralNetwork as StubNeuralNetwork } from './stubs/brain-js.js';
 
 interface FakeAgent {
@@ -46,7 +47,8 @@ function renderRoot(): HTMLElement {
     '<select id="cognition-mode-select"></select>' +
     '<span id="cognition-status" data-mode="heuristic">active</span>' +
     '<button id="train-network" type="button" hidden>Train</button>' +
-    '</div>';
+    '</div>' +
+    '<button id="reset-button" type="button">Reset</button>';
   return document.querySelector<HTMLElement>('#cognition-switcher')!;
 }
 
@@ -81,6 +83,7 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
   selectMode: (id: string) => Promise<void>;
   fakeAgent: FakeAgent;
   getStubNetwork: () => StubNeuralNetwork<unknown, unknown>;
+  confirmReset: () => Promise<void>;
 }> {
   const agentId = opts.agentId ?? 'test-pet';
   const root = renderRoot();
@@ -94,6 +97,7 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
     rng: makeFakeRng(),
   };
   mountCognitionSwitcher(fakeAgent as never, root);
+  mountResetButton(fakeAgent as never);
   const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
   await waitForProbes(select);
 
@@ -108,6 +112,12 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
         );
       }
       return StubNeuralNetwork.last;
+    },
+    confirmReset: async () => {
+      // Nothing to poll — resetSimulation runs synchronously on the
+      // click handler's current turn. Yield once so any pending
+      // microtasks (e.g. other listeners) drain first.
+      await Promise.resolve();
     },
     selectMode: async (id) => {
       const prevCount = fakeAgent.setReasoner.mock.calls.length;
@@ -271,5 +281,52 @@ describe('learningMode.construct() hydration order', () => {
 
     const loaded = getStubNetwork().lastFromJSON() as { type?: string; sizes?: number[] };
     expect(loaded.sizes).toEqual([5, 1]);
+  });
+});
+
+describe('Reset button clears trained network', () => {
+  let origLocation: Location;
+
+  beforeEach(() => {
+    localStorage.clear();
+    // Auto-accept the confirm dialog raised by mountResetButton.
+    vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
+    // resetSimulation() calls location.reload() after wiping storage.
+    // jsdom marks `Location.prototype.reload` non-configurable, so
+    // override the whole `window.location` slot — that property *is*
+    // configurable on the window object.
+    origLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...origLocation, reload: () => undefined },
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+    vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: origLocation,
+      writable: true,
+    });
+  });
+
+  it('removes agentonomous/<agentId>/brainjs-network when Reset is clicked', async () => {
+    const agentId = 'test-pet';
+    localStorage.setItem(
+      `agentonomous/${agentId}/brainjs-network`,
+      JSON.stringify({ stub: true, trainedFrom: 'prior' }),
+    );
+
+    const { document: doc, confirmReset } = await mountDemo({ agentId });
+    const resetBtn = doc.getElementById('reset-button') as HTMLButtonElement;
+
+    resetBtn.click();
+    await confirmReset();
+
+    expect(localStorage.getItem(`agentonomous/${agentId}/brainjs-network`)).toBeNull();
   });
 });
