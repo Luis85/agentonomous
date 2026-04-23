@@ -75,6 +75,13 @@ export interface BrainJsReasonerOptions<
  * `.train()` consults `Math.random` for weight initialisation and SGD
  * shuffling. Train offline, serialise with `.toJSON()`, and rehydrate
  * at construction time via `new NeuralNetwork().fromJSON(saved)`.
+ *
+ * This adapter does not implement `Reasoner.reset()`. It has no
+ * ephemeral between-tick state: the wrapped `NeuralNetwork` is used in
+ * forward-pass-only mode and its weights are consumer-owned (hydrated
+ * via the constructor and preserved for the adapter's lifetime). The
+ * kernel's null-safe `reset?.()` call handles the absence without
+ * requiring a no-op here.
  */
 export class BrainJsReasoner<
   In extends BrainJsNetworkData = BrainJsNetworkData,
