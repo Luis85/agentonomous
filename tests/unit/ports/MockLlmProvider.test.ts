@@ -126,6 +126,20 @@ describe('MockLlmProvider', () => {
     await expect(provider.complete(ASK)).rejects.toThrow(/exhausted/);
   });
 
+  it('counts empty content as 0 tokens (no floor)', async () => {
+    const provider = new MockLlmProvider({ scripts: [{ text: '' }] });
+    const completion = await provider.complete([{ role: 'user', content: '' }]);
+
+    expect(completion.usage.inputTokens).toBe(0);
+    expect(completion.usage.outputTokens).toBe(0);
+  });
+
+  it('honours maxOutputTokens: 0 against an empty scripted response', async () => {
+    const provider = new MockLlmProvider({ scripts: [{ text: '' }] });
+    const completion = await provider.complete(ASK, { budget: { maxOutputTokens: 0 } });
+    expect(completion.usage.outputTokens).toBe(0);
+  });
+
   it('reports cached usage when the script marks it', async () => {
     const provider = new MockLlmProvider({
       scripts: [{ text: 'cached', usage: { cached: true, inputTokens: 10, outputTokens: 2 } }],

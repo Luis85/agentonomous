@@ -166,5 +166,8 @@ function estimateTokens(messages: readonly LlmMessage[]): number {
 }
 
 function estimateTokensFor(text: string): number {
-  return Math.max(1, Math.ceil(text.length / 4));
+  // Empty strings count as 0 tokens so `maxOutputTokens: 0` with an empty
+  // scripted response behaves as documented. Honoring the ceil/4
+  // convention strictly — no floor.
+  return Math.ceil(text.length / 4);
 }
