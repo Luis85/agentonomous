@@ -186,7 +186,16 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
         const parsed: unknown = JSON.parse(legacyIndexRaw);
         if (Array.isArray(parsed)) {
           for (const entry of parsed) {
-            if (typeof entry === 'string') legacyKeys.add(entry);
+            // Defensive: skip the index sentinel itself. A v1 store that
+            // hit the original collision bug (saving under a key of
+            // `__agentonomous/index__`) could leave that string listed
+            // in the index; copying the raw payload at that path — which
+            // is index metadata, not a snapshot — into the new data
+            // namespace would surface garbage as an AgentSnapshot and
+            // break `load()` for that key.
+            if (typeof entry === 'string' && entry !== LEGACY_INDEX_SUFFIX) {
+              legacyKeys.add(entry);
+            }
           }
         }
       } catch {

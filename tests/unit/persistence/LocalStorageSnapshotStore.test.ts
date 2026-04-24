@@ -278,6 +278,35 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(storage.has('p/__agentonomous/meta/index')).toBe(true);
   });
 
+  it('migration skips the legacy index sentinel even when the pre-split index listed it as a user key', async () => {
+    // A v1 store could hit a nasty state: after saving under the evil key
+    // `__agentonomous/index__`, the store's appendIndex path could leave
+    // the legacy index listing `['__agentonomous/index__']` — pointing
+    // back at its own path. If migration treated that entry as a normal
+    // user key, it would copy the index metadata into the data namespace
+    // and `load('__agentonomous/index__')` would return an array typed
+    // as AgentSnapshot, breaking downstream restore.
+    const storage = new FakeStorage();
+    storage.setItem('p/foo', JSON.stringify(snap('foo', 1)));
+    // Legacy index lists a real key AND the index sentinel itself.
+    storage.setItem('p/__agentonomous/index__', JSON.stringify(['foo', '__agentonomous/index__']));
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    // Real user key migrated normally.
+    expect(await store.load('foo')).toMatchObject({ identity: { id: 'foo' } });
+    // Index sentinel is NOT promoted to a data entry.
+    expect(await store.load('__agentonomous/index__')).toBeNull();
+    // Listed keys do not include the sentinel.
+    expect([...(await store.list())]).toEqual(['foo']);
+    // No stray data-namespace write for the sentinel encoding.
+    expect(
+      storage.getItem(`p/__agentonomous/data/${encodeURIComponent('__agentonomous/index__')}`),
+    ).toBeNull();
+    // Legacy index cleared post-migration.
+    expect(storage.getItem('p/__agentonomous/index__')).toBeNull();
+  });
+
   it("rejects an empty prefix so migration can't match and nuke unrelated storage keys", () => {
     // A prefix of '' would make startsWith(prefix) true for every key in
     // the storage, so migration would rewrite and delete unrelated
