@@ -95,7 +95,7 @@ export class CognitionPipeline {
       }
       if (action.type === 'emit-event' && 'event' in action) {
         const event = (action as { event: DomainEvent }).event;
-        this.agent._internalPublish(event);
+        this.agent.publishEvent(event);
         continue;
       }
       // Unknown action kinds are left for consumer modules to interpret;
@@ -126,7 +126,7 @@ export class CognitionPipeline {
           code: 'stage-blocked',
           message: `Skill '${skillId}' is blocked at stage '${agent.ageModel.stage}'.`,
         };
-        agent._internalPublish(event);
+        agent.publishEvent(event);
         return;
       }
     }
@@ -139,7 +139,7 @@ export class CognitionPipeline {
         code: 'not-registered',
         message: `No skill registered with id '${skillId}'.`,
       };
-      agent._internalPublish(event);
+      agent.publishEvent(event);
       return;
     }
     // Expose the running skill to the animation reconciler. Scoped to this
@@ -166,7 +166,7 @@ export class CognitionPipeline {
         message,
         details: { cause: message },
       };
-      agent._internalPublish(event);
+      agent.publishEvent(event);
       return;
     }
     agent.currentActiveSkillId = previousActive;
@@ -184,7 +184,7 @@ export class CognitionPipeline {
         ...(result.value.fxHint !== undefined ? { fxHint: result.value.fxHint } : {}),
         ...(result.value.details !== undefined ? { details: result.value.details } : {}),
       };
-      agent._internalPublish(event);
+      agent.publishEvent(event);
       agent.learner.score({
         intention: { kind: 'satisfy', type: skillId },
         actions: [{ type: 'invoke-skill', skillId, ...(params !== undefined ? { params } : {}) }],
@@ -200,7 +200,7 @@ export class CognitionPipeline {
         message: result.error.message,
         ...(result.error.details !== undefined ? { details: result.error.details } : {}),
       };
-      agent._internalPublish(event);
+      agent.publishEvent(event);
     }
   }
 
@@ -218,7 +218,7 @@ export class CognitionPipeline {
       removeModifier: (id) => agent.removeModifier(id),
       hasModifier: (id) => agent.modifiers.has(id),
       publishEvent: (event) => {
-        agent._internalPublish(event);
+        agent.publishEvent(event);
       },
       ageSeconds: () => agent.ageModel?.ageSeconds ?? 0,
     };

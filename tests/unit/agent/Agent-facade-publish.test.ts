@@ -9,7 +9,7 @@ import { ManualClock } from '../../../src/ports/ManualClock.js';
 /**
  * Regression coverage for `AgentFacade.publishEvent`. The facade must publish
  * through the same internal path used by skill contexts and kernel-originated
- * events — i.e. `_internalPublish` — so facade-emitted events (a) land on the
+ * events — i.e. `Agent.publishEvent` — so facade-emitted events (a) land on the
  * current tick's `DecisionTrace.emitted` list and (b) are observed by the
  * autosave event-trigger tracker. Both invariants regressed when the facade
  * was wired straight to `eventBus.publish()`.
@@ -44,7 +44,7 @@ describe('AgentFacade.publishEvent', () => {
 
     // Seed a Trigger onto the bus so Stage 1 dispatches the reactive handler
     // mid-tick. The handler then publishes FacadeCustom via the facade — the
-    // code path the fix unifies with `_internalPublish`.
+    // code path the fix unifies with `Agent.publishEvent`.
     bus.publish({ type: 'Trigger', at: 0 } as DomainEvent);
 
     const trace = await agent.tick(0.016);
