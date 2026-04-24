@@ -33,8 +33,17 @@ export {
 export { type Result, ok, err, isOk, isErr, map, mapErr, andThen, unwrap } from './agent/result.js';
 
 // Events.
+//
+// `DomainEvent` = the shape every event on the bus shares. `EventBusPort`
+// = the publish/subscribe port (consumers can swap in a provider that
+// fans out across windows / web-workers / sim-ecs systems).
+// `InMemoryEventBus` is the default adapter. `InteractionRequestedEvent`
+// is emitted by `agent.interact(verb, params?)` and consumed by the
+// default pet-interaction module; register your own handler on the bus
+// if you route bespoke verbs.
 export type { DomainEvent } from './events/DomainEvent.js';
 export type { EventBusPort } from './events/EventBusPort.js';
+/** Default synchronous pub/sub adapter for a single simulation. */
 export { InMemoryEventBus } from './events/InMemoryEventBus.js';
 export {
   type InteractionRequestedEvent,
@@ -83,7 +92,12 @@ export type { Learner, LearningOutcome } from './cognition/learning/Learner.js';
 /** Learner that ignores outcomes. Default when no learner is wired. */
 export { NoopLearner } from './cognition/learning/NoopLearner.js';
 
-// Tuning constants.
+// Tuning constants — hand-picked defaults that subsystems reach for when
+// a consumer hasn't supplied their own. Exposed so power users can
+// reference the same numbers in custom reasoners / policies / skills.
+// Changes here ripple through the default persona bias, the mood
+// thresholds, and skill effectiveness; tune via species descriptors
+// first and only override these if species tuning isn't enough.
 export {
   MOOD_URGENCY_THRESHOLDS,
   PERSONA_TRAIT_WEIGHTS,
@@ -150,7 +164,15 @@ export type { MoodModel, MoodEvaluationContext } from './mood/MoodModel.js';
 export { DefaultMoodModel } from './mood/DefaultMoodModel.js';
 
 // Control modes (M6).
+//
+// `autonomous` (default) lets cognition drive actions. `remote` hands
+// each tick to a `RemoteController` (multiplayer proxy, LLM controller,
+// or recorded replay). `scripted` consumes a pre-recorded
+// `ScriptedController` queue — the same agent doubles as NPC, bot, or
+// player-proxy without code branching.
+/** Default `RemoteController` backed by an in-memory queue — useful for tests and local proxies. */
 export { InMemoryRemoteController, type RemoteController } from './agent/RemoteController.js';
+/** Default `ScriptedController` that pops `AgentAction` entries from a fixed array in order. */
 export { ArrayScriptedController, type ScriptedController } from './agent/ScriptedController.js';
 
 // Species (M12).
