@@ -143,6 +143,26 @@ describe('FsSnapshotStore', () => {
     await expect(store.delete('never-saved')).resolves.toBeUndefined();
   });
 
+  it('list() returns keys in deterministic localeCompare order regardless of readdir order', async () => {
+    // Stub readdir to return an unsorted response — real filesystems do
+    // this (ext4 hash order, NTFS MFT order, tmpfs insertion order), so
+    // list() must sort before returning to give callers reproducible
+    // output across platforms.
+    const unsorted = ['charlie.json', 'alpha.json', 'bravo.json', 'aardvark.json'];
+    const fs: FsAdapter = {
+      readFile: () => Promise.resolve('{}'),
+      writeFile: () => Promise.resolve(),
+      mkdir: () => Promise.resolve(),
+      readdir: () => Promise.resolve([...unsorted]),
+      unlink: () => Promise.resolve(),
+      access: () => Promise.resolve(),
+    };
+    const store = new FsSnapshotStore({ directory: '/var/snaps', fs });
+
+    const keys = await store.list();
+    expect(keys).toEqual(['aardvark', 'alpha', 'bravo', 'charlie']);
+  });
+
   it('list() skips files whose names the encoder would never produce', async () => {
     // Foreign `.json` files in a shared snapshot directory must not cause
     // list() to reject — `decodeURIComponent` throws URIError on malformed
