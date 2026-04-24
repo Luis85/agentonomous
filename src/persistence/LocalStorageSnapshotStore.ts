@@ -278,32 +278,20 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       }
     }
 
-    // Abort without clearing artifacts when:
-    //   1. Legacy index is present but not parseable as a string array
-    //      (corrupt, or holds a colliding v1 snapshot), AND
-    //   2. The backend does not expose iteration, so we cannot find
-    //      orphans via scan.
-    // Leaving legacy artifacts intact lets a subsequent construction
-    // (different backend wiring, restored index) retry migration.
-    if (!isIterableStorage(this.storage) && legacyIndexRaw !== null && !legacyIndexParseable) {
-      return;
-    }
-
     if (isIterableStorage(this.storage)) {
       for (let i = 0; i < this.storage.length; i++) {
         const storageKey = this.storage.key(i);
         if (storageKey === null || !storageKey.startsWith(this.prefix)) continue;
         const suffix = storageKey.slice(this.prefix.length);
+        // The legacy index sentinel path is handled separately above.
         if (suffix === LEGACY_INDEX_SUFFIX) continue;
-        // Skip our own metadata namespace (index / migrated marker) —
-        // not user data, never legacy. Note: do NOT filter out
-        // `__agentonomous/data/...` here. Those strings were valid v1
-        // user keys, and a pathological v1 store with the legacy index
-        // missing would leave them orphaned if we excluded them. The
-        // META_MIGRATED_KEY sentinel (checked at function entry) is
-        // what prevents re-processing the new-layout entries this
-        // code writes on a prior construction.
-        if (suffix.startsWith('__agentonomous/meta/')) continue;
+        // Everything else under the prefix is a candidate v1 user key.
+        // Do NOT filter on `__agentonomous/data/...` or
+        // `__agentonomous/meta/...` — both were valid v1 user keys in
+        // the pre-split `{prefix}{key}` layout. The META_MIGRATED_KEY
+        // sentinel (checked at function entry) is what prevents
+        // re-processing the new-layout entries this code writes on a
+        // prior construction.
         legacyKeys.add(suffix);
       }
     }
@@ -327,6 +315,36 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       this.storage.removeItem(this.prefix + userKey);
       migrated.push(userKey);
     }
+    // Decide whether we can safely finalize (clear legacy artifacts +
+    // stamp the re-entrance sentinel). Finalization is destructive —
+    // once the marker is set, future constructions short-circuit and
+    // lose any chance to recover still-orphaned v1 data. Allow it only
+    // when the discovery path is trustworthy:
+    //
+    //   - Iterable backend: the orphan scan observed every key under
+    //     the prefix, so nothing recoverable was missed.
+    //   - Fresh install (no legacy index at all): there is no v1 data
+    //     to worry about.
+    //   - Parseable legacy index + every listed key migrated OR was
+    //     already gone: we handled what v1 said existed. An index
+    //     that pointed at entries with raw === null still requires
+    //     migrated.length === legacyKeys.size to finalize — if none
+    //     moved, prefer to keep artifacts intact for a retry.
+    //
+    // Anything else (non-iterable + unparseable index, or non-iterable
+    // with a non-empty index where nothing moved) leaves the legacy
+    // artifacts intact so a later construction on a better-wired
+    // backend can still recover.
+    const iterable = isIterableStorage(this.storage);
+    const safeToFinalize =
+      iterable ||
+      legacyIndexRaw === null ||
+      (legacyIndexParseable && migrated.length === legacyKeys.size);
+
+    if (!safeToFinalize) {
+      return;
+    }
+
     if (legacyIndexRaw !== null) {
       this.storage.removeItem(this.prefix + LEGACY_INDEX_SUFFIX);
     }
@@ -338,10 +356,9 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       this.writeIndex([...migratedIndex]);
     }
 
-    // Always set the re-entrance sentinel — even on a fresh install
-    // with no legacy data — so subsequent constructions short-circuit
-    // the scan before it can misinterpret v2 `data/` entries as v1
-    // user keys.
+    // Re-entrance sentinel — even on a fresh install with no legacy
+    // data — so subsequent constructions short-circuit the scan
+    // before it can misinterpret v2 `data/` entries as v1 user keys.
     this.storage.setItem(this.prefix + META_MIGRATED_KEY, MIGRATED_MARKER_VALUE);
   }
 }

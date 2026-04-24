@@ -113,9 +113,12 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
 
   it('recovers gracefully when the index payload is malformed JSON', async () => {
     const storage = new FakeStorage();
-    // Pre-populate storage with a corrupt index BEFORE constructing the store
-    // so migration has nothing to rewrite and the corrupt payload survives.
+    // Pre-populate storage with a corrupt index BEFORE constructing the
+    // store. Stamp the migrated sentinel so migration short-circuits
+    // and the corrupt payload is read by list() directly (the path
+    // this test is actually exercising — defensive index parsing).
     storage.setItem('p/__agentonomous/meta/index', '{not valid json');
+    storage.setItem('p/__agentonomous/meta/migrated', '__agentonomous_v2_migrated__');
     const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
 
     // list() does not throw; returns empty.
@@ -371,6 +374,45 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     );
     await expect(store.load(loneSurrogate)).rejects.toThrow(/not a well-formed UTF-16 string/);
     await expect(store.delete(loneSurrogate)).rejects.toThrow(/not a well-formed UTF-16 string/);
+  });
+
+  it('orphan scan recovers v1 user keys under __agentonomous/meta/* subpath', async () => {
+    // Pre-split v1 accepted any string as a key. `__agentonomous/meta/
+    // dashboard` was a legal v1 user key. If the legacy index is
+    // missing (original collision bug) the orphan scan is the only
+    // recovery path, and it must not filter out meta-subpath keys or
+    // those snapshots become permanently unreachable after upgrade.
+    const storage = new FakeStorage();
+    const v1MetaKey = '__agentonomous/meta/dashboard';
+    storage.setItem(`p/${v1MetaKey}`, JSON.stringify(snap(v1MetaKey, 1)));
+    // Deliberately no legacy index.
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    expect([...(await store.list())]).toEqual([v1MetaKey]);
+    expect(await store.load(v1MetaKey)).toMatchObject({ identity: { id: v1MetaKey } });
+    expect(storage.getItem(`p/${v1MetaKey}`)).toBeNull();
+    expect(
+      storage.getItem(`p/__agentonomous/data/${encodeURIComponent(v1MetaKey)}`),
+    ).not.toBeNull();
+  });
+
+  it('non-iterable backend with legacy-index entries that do not resolve leaves artifacts for retry', () => {
+    // Non-iterable adapter. Legacy index lists entries but none of the
+    // payload paths resolve (getItem returns null) — migration can't
+    // confirm it recovered anything. Finalizing would set the marker
+    // and destroy the legacy index, losing any still-orphaned data a
+    // later retry could recover. Migration must preserve the legacy
+    // artifacts instead.
+    const storage = new NonIterableStorage();
+    storage.seed('p/__agentonomous/index__', JSON.stringify(['ghost-alpha', 'ghost-beta']));
+    // Deliberately no payloads at `p/ghost-alpha` or `p/ghost-beta`.
+
+    new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    // Legacy index retained; migrated sentinel NOT set.
+    expect(storage.has('p/__agentonomous/index__')).toBe(true);
+    expect(storage.has('p/__agentonomous/meta/migrated')).toBe(false);
   });
 
   it('aborts migration cleanup when non-iterable backend has a non-parseable legacy index', () => {
