@@ -68,6 +68,13 @@ export class FsSnapshotStore implements SnapshotStorePort {
         // surfacing it would just hand callers an unusable key.
       }
     }
+    // Sort before returning so callers see deterministic output across
+    // platforms — ext4, NTFS, tmpfs, and various CI runners all return
+    // readdir entries in different orders. Use a locale-independent
+    // code-point comparison so the order stays stable regardless of the
+    // host process's `LANG` / ICU locale; `localeCompare` would re-
+    // introduce cross-host divergence for non-ASCII keys.
+    out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     return out;
   }
 

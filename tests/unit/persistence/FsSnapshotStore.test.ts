@@ -143,6 +143,63 @@ describe('FsSnapshotStore', () => {
     await expect(store.delete('never-saved')).resolves.toBeUndefined();
   });
 
+  it('list() returns keys in deterministic order regardless of readdir order', async () => {
+    // Stub readdir to return an unsorted response — real filesystems do
+    // this (ext4 hash order, NTFS MFT order, tmpfs insertion order), so
+    // list() must sort before returning to give callers reproducible
+    // output across platforms.
+    const unsorted = ['charlie.json', 'alpha.json', 'bravo.json', 'aardvark.json'];
+    const fs: FsAdapter = {
+      readFile: () => Promise.resolve('{}'),
+      writeFile: () => Promise.resolve(),
+      mkdir: () => Promise.resolve(),
+      readdir: () => Promise.resolve([...unsorted]),
+      unlink: () => Promise.resolve(),
+      access: () => Promise.resolve(),
+    };
+    const store = new FsSnapshotStore({ directory: '/var/snaps', fs });
+
+    const keys = await store.list();
+    expect(keys).toEqual(['aardvark', 'alpha', 'bravo', 'charlie']);
+  });
+
+  it('list() sort is locale-independent — non-ASCII keys follow Unicode code-point order', async () => {
+    // `localeCompare` would re-introduce cross-host divergence for
+    // non-ASCII keys (the sort order depends on the process `LANG` / ICU
+    // locale). The store uses raw code-point comparison instead so the
+    // list() output stays byte-identical across machines regardless of
+    // their configured locale.
+    //
+    // Code points:
+    //   'cafe'  = [99, 97, 102, 101]
+    //   'café'  = [99, 97, 102, 233]
+    //   'caffé' = [99, 97, 102, 102, 233]
+    //   'zebra' = [122, …]
+    // Comparing 'café' vs 'caffé' at index 3: 'é' (233) vs 'f' (102) —
+    // 102 < 233, so 'caffé' sorts BEFORE 'café' in code-point order.
+    // ICU locales typically sort these the other way ('café' < 'caffé')
+    // via collation rules; the test pins the code-point behavior so
+    // we'd catch a regression back to `localeCompare`.
+    const fs: FsAdapter = {
+      readFile: () => Promise.resolve('{}'),
+      writeFile: () => Promise.resolve(),
+      mkdir: () => Promise.resolve(),
+      readdir: () =>
+        Promise.resolve([
+          `${encodeKey('zebra')}.json`,
+          `${encodeKey('café')}.json`,
+          `${encodeKey('cafe')}.json`,
+          `${encodeKey('caffé')}.json`,
+        ]),
+      unlink: () => Promise.resolve(),
+      access: () => Promise.resolve(),
+    };
+    const store = new FsSnapshotStore({ directory: '/var/snaps', fs });
+
+    const keys = await store.list();
+    expect(keys).toEqual(['cafe', 'caffé', 'café', 'zebra']);
+  });
+
   it('list() skips files whose names the encoder would never produce', async () => {
     // Foreign `.json` files in a shared snapshot directory must not cause
     // list() to reject — `decodeURIComponent` throws URIError on malformed
