@@ -141,8 +141,11 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
 
     // No raw storage key contains the unencoded special chars in the
     // user-supplied portion — all live under the encoded data/ prefix.
+    // Entries under the meta/ sub-namespace (index, migrated sentinel)
+    // are internal bookkeeping and not subject to the data-encoding
+    // invariant.
     for (const rawKey of storage.rawKeys()) {
-      if (rawKey.endsWith('/meta/index')) continue;
+      if (rawKey.startsWith('p/__agentonomous/meta/')) continue;
       expect(rawKey.startsWith('p/__agentonomous/data/')).toBe(true);
     }
   });
@@ -276,6 +279,28 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(storage.has('p/__agentonomous/data/alpha')).toBe(true);
     expect(storage.has('p/__agentonomous/data/beta')).toBe(true);
     expect(storage.has('p/__agentonomous/meta/index')).toBe(true);
+  });
+
+  it('orphan scan recovers v1 data-subpath keys when the legacy index is missing', async () => {
+    // Pathological v1 state: user saved under a key like
+    // `__agentonomous/data/foo` AND the legacy index is missing (the
+    // recovery path this scan is meant to handle). The payload sits at
+    // the old `{prefix}{key}` location; without an orphan scan that
+    // includes the data-subpath shape, migration would leave the
+    // payload behind and `load()` could no longer reach it.
+    const storage = new FakeStorage();
+    const v1Key = '__agentonomous/data/foo';
+    storage.setItem(`p/${v1Key}`, JSON.stringify(snap(v1Key, 1)));
+    // Deliberately no legacy index.
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    expect([...(await store.list())]).toEqual([v1Key]);
+    expect(await store.load(v1Key)).toMatchObject({ identity: { id: v1Key } });
+
+    // Old path cleared; data lives under the new encoded path.
+    expect(storage.getItem(`p/${v1Key}`)).toBeNull();
+    expect(storage.getItem(`p/__agentonomous/data/${encodeURIComponent(v1Key)}`)).not.toBeNull();
   });
 
   it('migration skips the legacy index sentinel even when the pre-split index listed it as a user key', async () => {

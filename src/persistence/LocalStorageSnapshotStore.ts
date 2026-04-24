@@ -21,6 +21,14 @@ const DATA_PREFIX = '__agentonomous/data/';
  */
 const LEGACY_INDEX_SUFFIX = '__agentonomous/index__';
 
+/**
+ * Sentinel written once at the end of `migrateLegacyKeys` so subsequent
+ * constructions short-circuit. Guarantees re-entrance safety without
+ * having to disambiguate v1-user-key shapes that happen to match the
+ * new `data/` layout.
+ */
+const META_MIGRATED_KEY = '__agentonomous/meta/migrated';
+
 /** Minimal storage contract; browser `Storage` satisfies this. */
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -173,11 +181,22 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
    * - **Orphan scan.** Runs only when the backend exposes `length` +
    *   `key(index)`. Picks up entries whose registration in the legacy
    *   index was lost (the original v1 collision bug where saving under
-   *   `__agentonomous/index__` wiped the index). The filter on the
-   *   new-layout subpaths keeps the scan re-entrant — on subsequent
-   *   constructions it finds only post-split entries and short-circuits.
+   *   `__agentonomous/index__` wiped the index).
+   *
+   * Re-entrance: a `META_MIGRATED_KEY` sentinel written at the end
+   * short-circuits subsequent constructions. The sentinel is what
+   * distinguishes "v1 user key shaped like the new data/ subpath"
+   * (migrate) from "new-layout entry this code wrote last run" (leave
+   * alone) — without it the scan would have to guess, and any guess
+   * loses data in one direction or the other.
    */
   private migrateLegacyKeys(): void {
+    // Re-entrance guard: once migration has run, the sentinel is set.
+    // Further constructions must not scan — the storage now contains
+    // new-layout entries written by this code that would be
+    // indistinguishable from v1 user keys of the same shape.
+    if (this.storage.getItem(this.prefix + META_MIGRATED_KEY) !== null) return;
+
     const legacyKeys = new Set<string>();
     const legacyIndexRaw = this.storage.getItem(this.prefix + LEGACY_INDEX_SUFFIX);
 
@@ -210,14 +229,18 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
         if (storageKey === null || !storageKey.startsWith(this.prefix)) continue;
         const suffix = storageKey.slice(this.prefix.length);
         if (suffix === LEGACY_INDEX_SUFFIX) continue;
-        // Skip new-layout subpaths so subsequent constructions don't
-        // re-process entries this code wrote on a prior run.
-        if (suffix.startsWith(DATA_PREFIX) || suffix.startsWith('__agentonomous/meta/')) continue;
+        // Skip our own metadata namespace (index / migrated marker) —
+        // not user data, never legacy. Note: do NOT filter out
+        // `__agentonomous/data/...` here. Those strings were valid v1
+        // user keys, and a pathological v1 store with the legacy index
+        // missing would leave them orphaned if we excluded them. The
+        // META_MIGRATED_KEY sentinel (checked at function entry) is
+        // what prevents re-processing the new-layout entries this
+        // code writes on a prior construction.
+        if (suffix.startsWith('__agentonomous/meta/')) continue;
         legacyKeys.add(suffix);
       }
     }
-
-    if (legacyKeys.size === 0 && legacyIndexRaw === null) return;
 
     for (const userKey of legacyKeys) {
       const raw = this.storage.getItem(this.prefix + userKey);
@@ -233,7 +256,15 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
     const migratedIndex = new Set<string>(legacyKeys);
     const existingIndex = this.readIndex();
     for (const entry of existingIndex) migratedIndex.add(entry);
-    this.writeIndex([...migratedIndex]);
+    if (migratedIndex.size > 0) {
+      this.writeIndex([...migratedIndex]);
+    }
+
+    // Always set the re-entrance sentinel — even on a fresh install
+    // with no legacy data — so subsequent constructions short-circuit
+    // the scan before it can misinterpret v2 `data/` entries as v1
+    // user keys.
+    this.storage.setItem(this.prefix + META_MIGRATED_KEY, '1');
   }
 }
 
