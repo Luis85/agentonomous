@@ -70,6 +70,21 @@ describe('MockLlmProvider', () => {
     );
   });
 
+  it('budget rejections do not consume queued scripts', async () => {
+    const provider = new MockLlmProvider({
+      scripts: [{ text: 'too long', usage: { outputTokens: 50 } }, { text: 'first success' }],
+    });
+    // First call rejects on budget — cursor must NOT advance.
+    await expect(provider.complete(ASK, { budget: { maxOutputTokens: 1 } })).rejects.toBeInstanceOf(
+      BudgetExceededError,
+    );
+    // Retry with a looser budget — must still get script[0], not script[1].
+    const first = await provider.complete(ASK);
+    expect(first.text).toBe('too long');
+    const second = await provider.complete(ASK);
+    expect(second.text).toBe('first success');
+  });
+
   it('throws BudgetExceededError when cost exceeds maxCostCents', async () => {
     const provider = new MockLlmProvider({
       scripts: [{ text: 'ok', usage: { costCents: 200 } }],

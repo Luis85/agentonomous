@@ -92,7 +92,8 @@ export class MockLlmProvider implements LlmProviderPort {
       };
     }
 
-    const script = this.pickScript(messages, options);
+    const picked = this.pickScript(messages, options);
+    const script = picked.script;
     const model = script.model ?? options.model ?? this.defaultModel;
     const inputTokens = script.usage?.inputTokens ?? estimateTokens(messages);
     const outputTokens = script.usage?.outputTokens ?? estimateTokensFor(script.text);
@@ -119,6 +120,11 @@ export class MockLlmProvider implements LlmProviderPort {
       );
     }
 
+    // Only commit the queue cursor once budget checks have passed —
+    // otherwise a budget-rejected request would consume a scripted
+    // entry and make retries non-deterministic.
+    picked.commit();
+
     const usage: LlmUsage = {
       inputTokens,
       outputTokens,
@@ -133,7 +139,10 @@ export class MockLlmProvider implements LlmProviderPort {
     };
   }
 
-  private pickScript(messages: readonly LlmMessage[], options: LlmCompleteOptions): MockLlmScript {
+  private pickScript(
+    messages: readonly LlmMessage[],
+    options: LlmCompleteOptions,
+  ): { script: MockLlmScript; commit: () => void } {
     if (this.dispatch === 'match-or-error') {
       // Strict dispatch must fail fast on both zero and multi-match — the
       // whole point is that each request resolves to exactly one scripted
@@ -148,15 +157,23 @@ export class MockLlmProvider implements LlmProviderPort {
           `MockLlmProvider: ${hits.length} scripts matched the request (match-or-error requires exactly one).`,
         );
       }
-      return hits[0]!;
+      // match-or-error has no queue state to advance; commit is a no-op.
+      return { script: hits[0]!, commit: () => undefined };
     }
     // Queue mode: honour a `match` predicate if it's set; otherwise take
-    // the next positional script. Exhausted queue throws.
-    while (this.cursor < this.scripts.length) {
-      const candidate = this.scripts[this.cursor]!;
-      this.cursor += 1;
+    // the next positional script. Exhausted queue throws. The returned
+    // `commit` advances the queue cursor; callers defer it until after
+    // budget checks so a rejected request doesn't consume an entry.
+    for (let i = this.cursor; i < this.scripts.length; i++) {
+      const candidate = this.scripts[i]!;
       if (candidate.match === undefined || candidate.match(messages, options)) {
-        return candidate;
+        const advanceTo = i + 1;
+        return {
+          script: candidate,
+          commit: () => {
+            this.cursor = advanceTo;
+          },
+        };
       }
     }
     throw new Error('MockLlmProvider: script queue exhausted.');
