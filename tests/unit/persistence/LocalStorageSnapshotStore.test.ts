@@ -46,6 +46,36 @@ class FakeStorage implements StorageLike {
   }
 }
 
+/**
+ * `StorageLike`-satisfying fake WITHOUT iteration — exposes only the
+ * three methods the public interface requires. Used to assert that
+ * persistent custom adapters (which may not implement `length` / `key`)
+ * still get legacy data migrated via the legacy-index lookup path.
+ */
+class NonIterableStorage implements StorageLike {
+  private readonly data = new Map<string, string>();
+
+  getItem(key: string): string | null {
+    return this.data.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string): void {
+    this.data.set(key, value);
+  }
+
+  removeItem(key: string): void {
+    this.data.delete(key);
+  }
+
+  seed(key: string, value: string): void {
+    this.data.set(key, value);
+  }
+
+  has(key: string): boolean {
+    return this.data.has(key);
+  }
+}
+
 describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () => {
   it('save / load / list / delete round-trip for a plain key', async () => {
     const storage = new FakeStorage();
@@ -217,5 +247,59 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(rawAfterSecond).toEqual(rawAfterFirst);
     expect(await store.load('alpha')).toMatchObject({ identity: { id: 'alpha' } });
     expect([...(await store.list())]).toEqual(['alpha']);
+  });
+
+  it('migration works on StorageLike backends that do NOT expose iteration (length/key)', async () => {
+    // Persistent custom adapters (`node-localstorage`-style, custom
+    // IndexedDB shims) may satisfy only the required getItem/setItem/
+    // removeItem surface of StorageLike. Without iteration the store
+    // cannot do an orphan scan, but it CAN still migrate every key
+    // registered in the legacy index — the index path is known, read via
+    // getItem. Snapshots listed in the legacy index must therefore
+    // migrate end-to-end on those backends too.
+    const storage = new NonIterableStorage();
+    storage.seed('p/alpha', JSON.stringify(snap('alpha', 1)));
+    storage.seed('p/beta', JSON.stringify(snap('beta', 2)));
+    storage.seed('p/__agentonomous/index__', JSON.stringify(['alpha', 'beta']));
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    const listed = [...(await store.list())].sort();
+    expect(listed).toEqual(['alpha', 'beta']);
+    expect(await store.load('alpha')).toMatchObject({ identity: { id: 'alpha' } });
+    expect(await store.load('beta')).toMatchObject({ identity: { id: 'beta' } });
+
+    // Legacy paths cleared; data lives under the new encoded data path.
+    expect(storage.has('p/alpha')).toBe(false);
+    expect(storage.has('p/beta')).toBe(false);
+    expect(storage.has('p/__agentonomous/index__')).toBe(false);
+    expect(storage.has('p/__agentonomous/data/alpha')).toBe(true);
+    expect(storage.has('p/__agentonomous/data/beta')).toBe(true);
+    expect(storage.has('p/__agentonomous/meta/index')).toBe(true);
+  });
+
+  it("rejects an empty prefix so migration can't match and nuke unrelated storage keys", () => {
+    // A prefix of '' would make startsWith(prefix) true for every key in
+    // the storage, so migration would rewrite and delete unrelated
+    // application data on first construction. Fail loudly at the
+    // boundary instead.
+    const storage = new FakeStorage();
+    expect(() => new LocalStorageSnapshotStore({ storage, prefix: '' })).toThrow(
+      /prefix.*must not be empty/i,
+    );
+  });
+
+  it('empty-prefix guard does not corrupt pre-existing unrelated storage data', () => {
+    // Concretely: if a consumer tried the misuse, the constructor must
+    // throw BEFORE migration runs, so any unrelated keys they had in
+    // storage stay untouched.
+    const storage = new FakeStorage();
+    storage.setItem('unrelated-app/userPrefs', JSON.stringify({ theme: 'dark' }));
+    storage.setItem('other-tool/cache', 'abc');
+
+    expect(() => new LocalStorageSnapshotStore({ storage, prefix: '' })).toThrow();
+
+    expect(storage.getItem('unrelated-app/userPrefs')).toBe(JSON.stringify({ theme: 'dark' }));
+    expect(storage.getItem('other-tool/cache')).toBe('abc');
   });
 });

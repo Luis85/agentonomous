@@ -74,7 +74,18 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   private readonly storage: StorageLike;
 
   constructor(opts: LocalStorageSnapshotStoreOptions = {}) {
-    this.prefix = opts.prefix ?? 'agentonomous/';
+    const prefix = opts.prefix ?? 'agentonomous/';
+    // An empty prefix would make the migration scan match every storage
+    // key (`startsWith('')` is always true), which could rewrite and
+    // remove unrelated application data on first construction after
+    // upgrade. Reject it at the boundary rather than letting it silently
+    // corrupt other data.
+    if (prefix === '') {
+      throw new Error(
+        'LocalStorageSnapshotStore: `prefix` must not be empty — an empty namespace would cause migration to match and rewrite unrelated storage keys.',
+      );
+    }
+    this.prefix = prefix;
     const resolved = opts.storage ?? resolveBrowserStorage();
     if (!resolved) {
       throw new Error(
@@ -151,42 +162,24 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
    * - `{prefix}{userKey}` → `{prefix}__agentonomous/data/{encodeURIComponent(userKey)}`
    * - `{prefix}__agentonomous/index__` → `{prefix}__agentonomous/meta/index`
    *
-   * Skipped silently when the storage backend does not expose iteration
-   * (`length` + `key(index)`) — minimal test stubs have no legacy data
-   * anyway, so there is nothing to migrate.
+   * Two discovery paths so the public `StorageLike` contract (which
+   * requires only getItem/setItem/removeItem) remains supported:
+   *
+   * - **Legacy index lookup.** Always runs. Reads the known legacy
+   *   path directly via `getItem` — no iteration required — and
+   *   migrates every user key it lists. Covers persistent custom
+   *   adapters that don't expose iteration but still hold legacy data.
+   *
+   * - **Orphan scan.** Runs only when the backend exposes `length` +
+   *   `key(index)`. Picks up entries whose registration in the legacy
+   *   index was lost (the original v1 collision bug where saving under
+   *   `__agentonomous/index__` wiped the index). The filter on the
+   *   new-layout subpaths keeps the scan re-entrant — on subsequent
+   *   constructions it finds only post-split entries and short-circuits.
    */
   private migrateLegacyKeys(): void {
-    if (!isIterableStorage(this.storage)) return;
-
-    // Two sources of "what counts as a legacy user key":
-    //
-    // 1. Scan: any `{prefix}{suffix}` entry whose suffix is NOT under the
-    //    new-layout `data/` or `meta/` subpaths. Picks up orphans the
-    //    legacy index may have lost (the original v1 collision bug).
-    //    Filter on the new-layout subpaths makes migration re-entrant —
-    //    on subsequent constructions the scan finds only post-split
-    //    entries and short-circuits.
-    //
-    // 2. Legacy index: user keys that v1 explicitly registered. This is
-    //    authoritative — a user who saved under a key that LOOKS like a
-    //    new-layout subpath (e.g. `__agentonomous/data/foo`) would be
-    //    skipped by the scan filter, so we union the index in so those
-    //    keys still migrate. Without this, such snapshots become
-    //    unreachable after upgrade.
     const legacyKeys = new Set<string>();
-    let legacyIndexRaw: string | null = null;
-
-    for (let i = 0; i < this.storage.length; i++) {
-      const storageKey = this.storage.key(i);
-      if (storageKey === null || !storageKey.startsWith(this.prefix)) continue;
-      const suffix = storageKey.slice(this.prefix.length);
-      if (suffix === LEGACY_INDEX_SUFFIX) {
-        legacyIndexRaw = this.storage.getItem(storageKey);
-        continue;
-      }
-      if (suffix.startsWith(DATA_PREFIX) || suffix.startsWith('__agentonomous/meta/')) continue;
-      legacyKeys.add(suffix);
-    }
+    const legacyIndexRaw = this.storage.getItem(this.prefix + LEGACY_INDEX_SUFFIX);
 
     if (legacyIndexRaw !== null) {
       try {
@@ -197,9 +190,21 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
           }
         }
       } catch {
-        // Corrupted legacy index — fall through with whatever the scan
-        // found. Best-effort recovery; can't synthesize keys we don't
-        // know about.
+        // Corrupted legacy index — fall through with whatever the
+        // orphan scan (if available) finds. Best-effort recovery.
+      }
+    }
+
+    if (isIterableStorage(this.storage)) {
+      for (let i = 0; i < this.storage.length; i++) {
+        const storageKey = this.storage.key(i);
+        if (storageKey === null || !storageKey.startsWith(this.prefix)) continue;
+        const suffix = storageKey.slice(this.prefix.length);
+        if (suffix === LEGACY_INDEX_SUFFIX) continue;
+        // Skip new-layout subpaths so subsequent constructions don't
+        // re-process entries this code wrote on a prior run.
+        if (suffix.startsWith(DATA_PREFIX) || suffix.startsWith('__agentonomous/meta/')) continue;
+        legacyKeys.add(suffix);
       }
     }
 
