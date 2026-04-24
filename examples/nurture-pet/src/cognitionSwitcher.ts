@@ -220,6 +220,11 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     const originalText = trainBtn.textContent ?? 'Train';
     trainBtn.disabled = true;
     trainBtn.textContent = 'Training…';
+    // Lock Untrain out of the UI for the duration of the train so the
+    // two handlers can't race on the `localStorage.setItem(...)` tail
+    // below. (Untrain also awaits `pendingTrain` as a belt-and-
+    // suspenders guard for programmatic callers.)
+    if (untrainBtn) untrainBtn.disabled = true;
     await new Promise<void>((r) => setTimeout(r, 0));
 
     const run = async (): Promise<void> => {
@@ -264,6 +269,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       }
       trainBtn.disabled = false;
       trainBtn.textContent = originalText;
+      if (untrainBtn) untrainBtn.disabled = false;
     }
   };
   const onTrainClickWrapped = (): void => {
@@ -331,11 +337,12 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       console.error('cognitionSwitcher: untrain failed', err);
       flashStatus(status, 'Untrain failed', TRAINED_FLASH_MS);
     } finally {
-      if (!disposed) {
-        untrainBtn.disabled = false;
-        untrainBtn.textContent = originalText;
-        if (trainBtn) trainBtn.disabled = false;
-      }
+      // Always restore button state so a `dispose()` that races with an
+      // in-flight Untrain doesn't leave the DOM stuck on "Resetting…"
+      // for the next mount (DOM elements outlive the closure).
+      untrainBtn.disabled = false;
+      untrainBtn.textContent = originalText;
+      if (trainBtn) trainBtn.disabled = false;
     }
   };
   const onUntrainClickWrapped = (): void => {
