@@ -2,6 +2,7 @@ dist
 coverage
 docs
 node_modules
+graphify-out
 *.min.js
 pnpm-lock.yaml
 package-lock.json

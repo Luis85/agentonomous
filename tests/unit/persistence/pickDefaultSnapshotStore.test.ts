@@ -30,4 +30,33 @@ describe('pickDefaultSnapshotStore', () => {
     const store = pickDefaultSnapshotStore();
     expect(store).toBeInstanceOf(LocalStorageSnapshotStore);
   });
+
+  it('returns InMemorySnapshotStore when reading globalThis.localStorage throws (e.g. sandboxed iframe SecurityError)', () => {
+    // Install a property descriptor whose getter throws — mirrors the
+    // behavior some browsers use for blocked third-party storage access.
+    // Save + restore via defineProperty so the outer afterEach's plain
+    // assignment can reach a writable property again on cleanup.
+    const prev = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    try {
+      Object.defineProperty(globalThis, 'localStorage', {
+        configurable: true,
+        get() {
+          throw new Error('SecurityError');
+        },
+      });
+      expect(() => pickDefaultSnapshotStore()).not.toThrow();
+      const store = pickDefaultSnapshotStore();
+      expect(store).toBeInstanceOf(InMemorySnapshotStore);
+    } finally {
+      if (prev) {
+        Object.defineProperty(globalThis, 'localStorage', prev);
+      } else {
+        Object.defineProperty(globalThis, 'localStorage', {
+          configurable: true,
+          writable: true,
+          value: undefined,
+        });
+      }
+    }
+  });
 });
