@@ -667,6 +667,14 @@ export class Agent {
    * are the consumer's responsibility and are typically re-supplied via
    * `new Agent(deps)` before calling `restore`.
    *
+   * "Replaces" extends to collection-shaped slices. When the snapshot
+   * includes a `modifiers` slice, pre-existing modifiers on the target
+   * agent are wiped before the snapshot's are applied — so a restored
+   * agent carries snapshot truth and nothing else. Slices omitted from
+   * the snapshot (partial `include`-filtered captures) are left
+   * untouched, matching how `needs` / `mood` / `animation` already gate
+   * on field presence.
+   *
    * If `opts.catchUp` is set, the agent sub-steps forward from
    * `snapshot.snapshotAt` to `clock.now()` using `runCatchUp`.
    *
@@ -705,6 +713,14 @@ export class Agent {
       this.needs.restore(snapshot.needs);
     }
     if (snapshot.modifiers) {
+      // Restore replaces (not merges) modifier state — see restore()'s
+      // contract above. Clear any pre-existing modifiers on the target
+      // agent before re-applying the snapshot's. Gated on presence of the
+      // `modifiers` slice so partial snapshots (`include: [...]`) still
+      // leave unrelated slices untouched on the target.
+      for (const existingId of new Set(this.modifiers.list().map((m) => m.id))) {
+        this.modifiers.removeAll(existingId);
+      }
       const nowMs = this.clock.now();
       for (const mod of snapshot.modifiers) {
         // Boundary case: modifiers whose expiresAt has already passed at
