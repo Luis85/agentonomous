@@ -16,3 +16,4 @@ examples/**/node_modules
 
 graphify-out
 
+.claude/scheduled_tasks.lock
