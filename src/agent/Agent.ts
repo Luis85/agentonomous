@@ -279,16 +279,17 @@ export class Agent {
 
   // =========================================================================
   // Internal protocol (exposed for helper classes under src/agent/internal/).
-  // Underscore prefix signals "internal"; consumers should not call these.
+  // Marked @internal — not re-exported from the public barrel; consumers go
+  // through `AgentFacade` / `createAgent` instead.
   // =========================================================================
 
-  /** @internal publish an event onto the bus and into the tick's emitted list. */
-  _internalPublish(event: DomainEvent): void {
+  /** @internal Publish an event onto the bus and into the tick's emitted list. */
+  publishEvent(event: DomainEvent): void {
     this.publish(event);
   }
 
-  /** @internal route the death path — used by NeedsTicker when health hits 0. */
-  _internalDie(
+  /** @internal Route the death path — used by `NeedsTicker` when health hits 0. */
+  routeDeath(
     cause: 'health-depleted' | 'stage-transition' | 'explicit' | (string & {}),
     reason: string | undefined,
     at: number,
@@ -892,7 +893,7 @@ export class Agent {
       rng: this.rng,
       logger: this.logger,
       publishEvent: (event: DomainEvent) => {
-        this._internalPublish(event);
+        this.publishEvent(event);
       },
       invokeSkill: async (skillId, params) => {
         await this.cognitionPipeline.invokeSkillAction(

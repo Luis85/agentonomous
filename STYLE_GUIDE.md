@@ -91,9 +91,12 @@ Where prettier or eslint already enforces a rule, we say so and move on.
   functions are `camelCase`.
 - **Booleans:** `is` / `has` / `should` / `can` prefix. `isInvokeSkillAction`,
   `hasModifier`, `shouldSave`.
-- **Private / internal:** leading underscore on exported-but-internal
-  symbols (`_internalPublish`, `_internalDie`). Every other private
-  member uses TypeScript's `private` or `protected`.
+- **Private / internal:** `public` methods needed by in-repo tick
+  helpers (e.g. `Agent.publishEvent`, `Agent.routeDeath`) carry the
+  TSDoc `@internal` tag and are not re-exported from the public
+  barrel. Every other private member uses TypeScript's `private` or
+  `protected`. Avoid leading-underscore names — the `@internal` tag
+  and barrel discipline are the contract.
 
 ## Commenting
 

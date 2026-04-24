@@ -31,7 +31,7 @@ export class MoodReconciler {
       to: next.category,
       valence: next.valence,
     };
-    agent._internalPublish(event);
+    agent.publishEvent(event);
     return { from: previous?.category, to: next.category, valence: next.valence };
   }
 }

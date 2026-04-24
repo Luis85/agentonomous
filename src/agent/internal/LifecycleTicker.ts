@@ -24,7 +24,7 @@ export class LifecycleTicker {
         to: t.to,
         atAgeSeconds: t.atAgeSeconds,
       };
-      this.agent._internalPublish(event);
+      this.agent.publishEvent(event);
     }
     return transitions;
   }
