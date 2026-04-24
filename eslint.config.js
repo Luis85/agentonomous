@@ -92,7 +92,7 @@ export default tseslint.config(
       // clean. Ratcheting targets live in
       // docs/plans/2026-04-24-codebase-review-findings.md.
       // ────────────────────────────────────────────────────────────
-      'max-lines': ['error', { max: 1000, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 350, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': [
         'warn',
         { max: 150, skipBlankLines: true, skipComments: true, IIFEs: true },
@@ -123,6 +123,22 @@ export default tseslint.config(
         'error',
         { allowDefaultCaseForExhaustiveSwitch: true, considerDefaultExhaustiveForUnions: true },
       ],
+      // Determinism: `[].sort()` without a comparator uses
+      // locale-dependent UTF-16 ordering. Always pass an explicit
+      // comparator (the project does this — this rule locks it in).
+      '@typescript-eslint/require-array-sort-compare': ['error', { ignoreStringArrays: false }],
+      // Type-safety idioms.
+      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'error',
+      '@typescript-eslint/consistent-type-exports': 'error',
+      '@typescript-eslint/prefer-readonly': 'warn',
+      // Style nudges.
+      'prefer-template': 'error',
+      'no-useless-concat': 'error',
+      'no-useless-rename': 'error',
+      radix: 'error',
+      'default-case-last': 'error',
+      'no-lonely-if': 'error',
 
       // ────────────────────────────────────────────────────────────
       // Style nudges that strict rules miss.
@@ -207,6 +223,26 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────
+  // Per-file size overrides for the one legacy outlier.
+  //
+  // The global cap is 350. Agent.ts currently sits at ~484 effective
+  // LOC; this PR already extracted `restore()`, `die()`, and
+  // `snapshot()` into `src/agent/internal/` helpers (saved ~110 LOC).
+  // The remaining hotspot is `tick()` (~150 LOC of stage
+  // orchestration) — splitting it cleanly is its own focused PR
+  // (Track C2 of docs/plans/2026-04-24-codebase-review-findings.md).
+  //
+  // Cap at 500 here so the file cannot grow further while the split
+  // is pending. Drop this override once tick() has been broken out.
+  // ────────────────────────────────────────────────────────────────
+  {
+    files: ['src/agent/Agent.ts'],
+    rules: {
+      'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
     },
   },
 

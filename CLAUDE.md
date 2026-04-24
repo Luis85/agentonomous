@@ -42,7 +42,7 @@ origin` when switching contexts.
 ## Key commands
 
 ```bash
-npm test              # vitest run (~300 tests)
+npm test              # vitest run
 npm run typecheck     # tsc --noEmit (strict + exactOptionalPropertyTypes)
 npm run lint          # eslint flat config
 npm run format        # prettier --write .
@@ -64,8 +64,9 @@ Node 22 (see `.nvmrc`). Run `nvm use` once per shell.
 - `src/cognition/` — `UrgencyReasoner`, `DirectBehaviorRunner`, needs
   policies (`Expressive`, `Active`, `Composed`). Tuning constants in
   `src/cognition/tuning.ts`.
-- `src/skills/` — `Skill` interface + `SkillRegistry` + 10 defaults under
-  `src/skills/defaults/`. Skills return `ok(...)` / `err(...)`.
+- `src/skills/` — `Skill` interface + `SkillRegistry` + a default
+  bundle under `src/skills/defaults/`. Skills return `ok(...)` /
+  `err(...)`.
 - `src/modifiers/` — stackable buff/debuff system with replace / refresh /
   ignore policies.
 - `src/needs/`, `src/mood/`, `src/lifecycle/`, `src/animation/` —

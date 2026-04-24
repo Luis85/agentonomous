@@ -13,18 +13,24 @@ branch each per CLAUDE.md §Non-negotiables.
 
 ## Verify gate (baseline)
 
-As of this PR (before any remediation beyond the lint ratchet):
+As of this PR (after the lint ratchet + extractions in Track A):
 
 - `format:check` → clean
-- `lint` → **0 errors, 11 warnings** (ratchet targets — see Track C)
+- `lint` → 0 errors; the residual warnings are the ratchet targets
+  documented under Track C
 - `typecheck` → clean (strict + `exactOptionalPropertyTypes` +
   `noUncheckedIndexedAccess`)
-- `test` → **454 tests, 72 files** passing (~10 s)
-- `build` → clean; gzipped sizes: core 34.28 KB / tfjs 5.98 KB /
-  excalibur 1.43 KB / mistreevous 1.17 KB / js-son 1.39 KB — all under
-  budget
+- `test` → all green
+- `build` → clean; every entry point under its `size-limit` budget
+  (per-entry caps live in `package.json`)
 - `docs` → typedoc generates `docs/api/` from all five public entry
   points, 0 errors
+
+> Note on metrics in docs: counts like "N tests", "M files",
+> "X KB gzip" go stale fast and rot with every PR. This doc and the
+> review findings deliberately point at the source of truth (the
+> CI logs, the `size-limit` config) rather than baking specific
+> numbers into prose.
 
 Overall the codebase is **exceptionally disciplined**: determinism is
 fully enforced, no default exports, no enums, no `any`, and all Skills
@@ -81,14 +87,47 @@ passes clean as error-level; tighter limits tracked under Track C.
 ### A4. Duplicate-import cleanups
 
 Consolidated three `import` + `import type` pairs into a single inline
-`type` form. No behaviour change.
+`type` form. No behaviour change. Required by the new
+`no-duplicate-imports` rule.
 
-- `src/agent/Agent.ts:41-42` → single import of
-  `CURRENT_SNAPSHOT_VERSION` + `type AgentSnapshot` + `type SnapshotPart`
-- `src/agent/Agent.ts:57-58` → single import of `NullLogger` +
-  `type Logger`
-- `src/integrations/excalibur/ExcaliburAnimationBridge.ts:3-4` → single
-  import of `ANIMATION_TRANSITION` + `type AnimationTransitionEvent`
+### A6. Agent.ts extractions (avoid the per-file LOC override)
+
+`Agent.ts` was the one file over the new `max-lines: 350` cap. To
+reduce the override rather than just hiding behind it, three
+self-contained methods were extracted into focused helpers under
+`src/agent/internal/`:
+
+- `restore()` → `RestoreCoordinator.ts` (`runRestore`)
+- `die()` → `DeathCoordinator.ts` (`runDeath`)
+- `snapshot()` → `SnapshotAssembler.ts` (`assembleSnapshot`)
+
+Plus a small `applyLifecycleSnapshot()` method on Agent so the
+coordinator never reaches into protected fields, and the duplicated
+`isInMemoryMemoryAdapter` typeguard moved next to the class it
+guards (`src/memory/InMemoryMemoryAdapter.ts`).
+
+Result: Agent.ts dropped ~110 effective LOC (562 → 484). A per-file
+`max-lines: 500` override remains until `tick()` itself is split
+(Track C2 below). The cap is tighter than a global lift would be and
+makes the legacy outlier visible in CI.
+
+### A7. Express skill consolidation (D1)
+
+Three near-identical 24-line skills (`ExpressMeowSkill`,
+`ExpressSadSkill`, `ExpressSleepySkill`) collapsed onto a single
+`createExpressionSkill(id, label, expression, fxHint)` factory in
+`src/skills/defaults/ExpressionSkill.ts`. The three exports now stay
+as one-line declarations, eliminating ~50 lines of boilerplate. No
+caller-visible change.
+
+### A8. Stale-prone metrics removed from prose
+
+Counts like "~300 tests" (in CLAUDE.md), "10 default skills"
+(README.md, CLAUDE.md, `docs/specs/vision.md`), and "~80 KB
+unminified ESM" (README.md) replaced with descriptive phrasing or
+pointers to the source of truth (`size-limit` config, CI logs).
+These metrics had drifted (the test count was already 50% off) and
+will drift again — best not to bake them into docs.
 
 ### A5. Typedoc wired into CI
 
@@ -128,8 +167,11 @@ Action: prepend a banner/note ("pre-v1, not yet published — use
 
 ### B3. `CLAUDE.md:46` — test count stale ("~300")
 
-Actual: **454 tests across 72 files**. Action: update to "~450 tests"
-or use a softer phrasing ("~500 tests").
+The `npm test` line in CLAUDE.md included a hard-coded count that
+was already off by ~50%. Track A drops the number entirely — counts
+like this go stale every PR. The same pattern is corrected for "10
+default skills" in CLAUDE.md / README.md / `docs/specs/vision.md`
+(replaced with "a default bundle").
 
 ### B4. `docs/plans/2026-04-24-polish-and-harden.md:9` — broken
 `MEMORY.md` reference
@@ -283,10 +325,11 @@ for excalibur `^0.32`, `^4.0.0` for Anthropic SDK, etc.).
 
 ### E3. Skill defaults have no per-skill tests
 
-All 10 defaults share one grouped test file
-(`tests/unit/skills/defaults.test.ts`). Grouped is fine for effectiveness
-tables, but per-skill behaviour (events emitted, edge cases) is thin.
-Action: consider splitting as each skill gains specific logic.
+Every default skill shares one grouped test file
+(`tests/unit/skills/defaults.test.ts`). Grouped is fine for
+effectiveness tables, but per-skill behaviour (events emitted, edge
+cases) is thin. Action: consider splitting as each skill gains
+specific logic.
 
 ### E4. 86 src files without unit tests
 

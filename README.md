@@ -31,8 +31,9 @@ zero configuration.
 - **Cognition** — `UrgencyReasoner` default picks the highest-scored intention;
   `DirectBehaviorRunner` maps intentions to skill invocations;
   `Expressive` / `Active` / `Composed` needs policies.
-- **Skills** — typed `Skill` + `SkillRegistry` + 10 default skills
-  (feed/clean/play/rest/pet/scold/medicate + express-meow/sad/sleepy).
+- **Skills** — typed `Skill` + `SkillRegistry` + a default bundle
+  (feed / clean / play / rest / pet / scold / medicate + a few
+  expressive reactions). Easy to extend with custom skills.
 - **Animation state machine** driven by mood + active skill + modifiers.
 - **Control modes** — autonomous / scripted / remote. Works as NPC, bot, or
   player-proxy.
@@ -292,8 +293,9 @@ npm run analyze       # build + list the 20 largest dist/*.js files by bytes
 
 ### Bundle-size budget
 
-The library's core bundle (everything re-exported from
-`agentonomous`) targets ~80 KB unminified ESM. The
+The library's core bundle and each adapter subpath have a per-entry
+size budget enforced via `size-limit` (see the `size-limit` field in
+`package.json` for the current caps; CI rejects regressions). The
 `agentonomous/integrations/excalibur` subpath is a separate entry so
 consumers who don't use Excalibur don't pay for it. Run
 `npm run analyze` after meaningful changes; a significant regression is a

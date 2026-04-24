@@ -22,8 +22,9 @@ const EXPECTED_SUBPATH_KEYS = [
 describe('package.json#exports', () => {
   it('lists exactly the 1.0 subpath contract', () => {
     const exports = (pkgJson as { exports: Record<string, unknown> }).exports;
-    const actual = Object.keys(exports).sort();
-    const expected = [...EXPECTED_SUBPATH_KEYS].sort();
+    const byCodepoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+    const actual = Object.keys(exports).sort(byCodepoint);
+    const expected = [...EXPECTED_SUBPATH_KEYS].sort(byCodepoint);
     expect(actual).toEqual(expected);
   });
 
