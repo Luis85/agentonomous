@@ -274,6 +274,26 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   const onUntrainClick = async (): Promise<void> => {
     if (!untrainBtn || disposed) return;
     if (activeModeId !== 'learning') return;
+
+    const originalText = untrainBtn.textContent ?? 'Untrain';
+    untrainBtn.disabled = true;
+    untrainBtn.textContent = 'Resetting…';
+    if (trainBtn) trainBtn.disabled = true;
+    const myEpoch = ++changeEpoch;
+
+    // If Train is in flight, wait for it to finish before wiping the
+    // snapshot key. Otherwise the pending `localStorage.setItem(...)` at
+    // the tail of `onTrainClick` would re-persist trained weights after
+    // Untrain has cleared them — the user would see "Reset to baseline ✓"
+    // but a reload would still hydrate the trained model.
+    if (pendingTrain) {
+      try {
+        await pendingTrain;
+      } catch {
+        // Train rejections are already surfaced via the train-click
+        // handler; Untrain just needs the persist step to have settled.
+      }
+    }
     // Clear only the tfjs snapshot key — leave the rest of the agent's
     // persisted state alone (this is not a full reset). A fresh
     // `construct()` then rehydrates from the bundled baseline.
@@ -285,13 +305,14 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     }
 
     const mode = COGNITION_MODES.find((m) => m.id === 'learning');
-    if (!mode) return;
-
-    const originalText = untrainBtn.textContent ?? 'Untrain';
-    untrainBtn.disabled = true;
-    untrainBtn.textContent = 'Resetting…';
-    if (trainBtn) trainBtn.disabled = true;
-    const myEpoch = ++changeEpoch;
+    if (!mode) {
+      if (!disposed) {
+        untrainBtn.disabled = false;
+        untrainBtn.textContent = originalText;
+        if (trainBtn) trainBtn.disabled = false;
+      }
+      return;
+    }
 
     try {
       const reasoner = await mode.construct();
