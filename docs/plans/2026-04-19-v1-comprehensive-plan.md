@@ -403,7 +403,7 @@ Captured so nothing gets lost. Not on the critical path.
 | 0.9.0 | 0.9.2 `setReasoner` + dropdown                 | 0.9.1         | 2 PRs (library + demo) — shipped                          |
 | 0.9.0 | 0.9.4 `Reasoner.reset()` harmonization         | 0.9.2         | shipped — changeset `reasoner-reset-harmonization.md`     |
 | 0.9.0 | 0.9.3 brain.js persistence                     | 0.9.4         | **obsolete** — superseded by tfjs swap (PR #60)           |
-| 0.9.0 | 0.9.5 Docs polish pass (alignment only)        | 0.9.3         | 1 docs PR                                                 |
+| 0.9.0 | 0.9.5 Docs polish pass (alignment only)        | 0.9.4 shipped | 1 docs PR                                                 |
 | 0.9.0 | 0.9.6 D-items                                  | —             | shipped in-flight (PRs #17–#31)                           |
 | 0.9.0 | 0.9.7 Soak + DoD                               | all above     | 1 PR                                                      |
 | 0.9.0 | Promote + tag                                  | all above     | —                                                         |
@@ -507,7 +507,7 @@ follow the standard topic-branch flow defined in `CLAUDE.md`.
 | 5   | 0.9.5 | `0.9.5-docs-polish.md`                                | 1 docs            | Not drafted — alignment-only scope                                 |
 | 6   | 0.9.6 | —                                                     | —                 | Shipped in-flight — D1 #21, D2 #23, D3 #24, D5 #31, D6 #17, D7 #18 |
 | 7   | 0.9.7 | `0.9.7-soak-and-promote.md`                           | 1 + release       | Not drafted                                                        |
-| 8   | 1.0.1 | `1.0.1-internal-rename.md`                            | 1 major           | Not drafted — **next up** (see `docs/specs/2026-04-24-post-tfjs-improvements.md` for parallel demo-polish items) |
+| 8   | 1.0.1 | `1.0.1-internal-rename.md`                            | 1 major           | Not drafted — queued behind 0.9.5 + 0.9.7 per sequencing; can run in parallel with demo-polish items from `docs/specs/2026-04-24-post-tfjs-improvements.md` since those don't touch the 0.9.0 release-train gates. |
 | 9   | 1.0.2 | `1.0.2-llm-provider-port.md`                          | 1                 | Not drafted                                                        |
 | 10  | 1.0.3 | `1.0.3-narrow-public-surface.md`                      | 1                 | Not drafted                                                        |
 | 11  | 1.0.4 | `1.0.4-api-jsdoc-audit.md`                            | 1                 | Not drafted                                                        |
