@@ -222,12 +222,16 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     trainBtn.textContent = 'Training…';
     // Lock Untrain out of the UI for the duration of the train so the
     // two handlers can't race on the `localStorage.setItem(...)` tail
-    // below. (Untrain also awaits `pendingTrain` as a belt-and-
-    // suspenders guard for programmatic callers.)
+    // below.
     if (untrainBtn) untrainBtn.disabled = true;
-    await new Promise<void>((r) => setTimeout(r, 0));
 
     const run = async (): Promise<void> => {
+      // Yield once so the browser paints the "Training…" label before
+      // the synchronous `model.fit` bookkeeping inside the reasoner
+      // begins. The yield now lives INSIDE `run`, after
+      // `pendingTrain` is set — so Untrain's `pendingTrain !== null`
+      // gate can't be bypassed during this microtask window.
+      await new Promise<void>((r) => setTimeout(r, 0));
       if (disposed) return;
       const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
         const features: number[] = [];
@@ -257,6 +261,9 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       flashStatus(status, formatTrainedToast(result), TRAINED_FLASH_MS);
     };
 
+    // Mark training as in-flight BEFORE any yield so Untrain's
+    // `pendingTrain !== null` guard catches the race window between
+    // the click and the first microtask tick.
     trainingReasoner = reasonerHandle;
     const promise = run();
     pendingTrain = promise.catch(() => undefined);
