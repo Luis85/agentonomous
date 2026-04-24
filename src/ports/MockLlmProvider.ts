@@ -135,11 +135,20 @@ export class MockLlmProvider implements LlmProviderPort {
 
   private pickScript(messages: readonly LlmMessage[], options: LlmCompleteOptions): MockLlmScript {
     if (this.dispatch === 'match-or-error') {
-      const hit = this.scripts.find((s) => s.match?.(messages, options) === true);
-      if (!hit) {
+      // Strict dispatch must fail fast on both zero and multi-match — the
+      // whole point is that each request resolves to exactly one scripted
+      // response. Silently taking the first match would mask misconfigured
+      // scripts and produce the wrong completion in replay tests.
+      const hits = this.scripts.filter((s) => s.match?.(messages, options) === true);
+      if (hits.length === 0) {
         throw new Error('MockLlmProvider: no script matched the request.');
       }
-      return hit;
+      if (hits.length > 1) {
+        throw new Error(
+          `MockLlmProvider: ${hits.length} scripts matched the request (match-or-error requires exactly one).`,
+        );
+      }
+      return hits[0]!;
     }
     // Queue mode: honour a `match` predicate if it's set; otherwise take
     // the next positional script. Exhausted queue throws.

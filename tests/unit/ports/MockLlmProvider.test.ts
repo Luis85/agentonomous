@@ -126,6 +126,17 @@ describe('MockLlmProvider', () => {
     await expect(provider.complete(ASK)).rejects.toThrow(/exhausted/);
   });
 
+  it('match-or-error dispatch: rejects when more than one script matches', async () => {
+    const provider = new MockLlmProvider({
+      dispatch: 'match-or-error',
+      scripts: [
+        { text: 'first', match: () => true },
+        { text: 'second', match: () => true },
+      ],
+    });
+    await expect(provider.complete(ASK)).rejects.toThrow(/2 scripts matched/);
+  });
+
   it('counts empty content as 0 tokens (no floor)', async () => {
     const provider = new MockLlmProvider({ scripts: [{ text: '' }] });
     const completion = await provider.complete([{ role: 'user', content: '' }]);
