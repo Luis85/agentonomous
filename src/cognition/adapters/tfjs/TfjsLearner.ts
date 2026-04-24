@@ -127,9 +127,7 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
     this.buffer.push(pair);
     const cap = this.capacity();
     while (this.buffer.length > cap) this.buffer.shift();
-    if (this.buffer.length >= this.batchSize() && this.inflight === null) {
-      void this.trainBackground();
-    }
+    this.maybeScheduleTrain();
   }
 
   /**
@@ -172,11 +170,30 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
   }
 
   private batchSize(): number {
-    return this.opts.batchSize ?? 50;
+    // Clamp to ≥ 1 so a caller-supplied `batchSize: 0` or a negative
+    // value doesn't turn `score()` into a no-op or `runTrain` into an
+    // infinite-zero-slice loop.
+    return Math.max(1, this.opts.batchSize ?? 50);
   }
 
   private capacity(): number {
-    return this.opts.bufferCapacity ?? this.batchSize() * 4;
+    // Clamp to ≥ 0 so a negative `bufferCapacity` (or a negative
+    // derived default) can't turn the buffer-trim loop into a hang —
+    // `buffer.length > cap` would stay true at 0 when `cap` is negative.
+    return Math.max(0, this.opts.bufferCapacity ?? this.batchSize() * 4);
+  }
+
+  /**
+   * Start a background train if the buffer has enough pairs and no
+   * training is currently running. Called both from `score()` and from
+   * the tail of a previous `trainBackground()` run so consecutive full
+   * batches drain without the caller having to invoke `flush()`.
+   */
+  private maybeScheduleTrain(): void {
+    if (this.disposed) return;
+    if (this.inflight !== null) return;
+    if (this.buffer.length < this.batchSize()) return;
+    void this.trainBackground();
   }
 
   private async trainBackground(): Promise<void> {
@@ -189,6 +206,8 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
       await promise;
     } finally {
       this.inflight = null;
+      // Drain any batches that queued up while this one was training.
+      this.maybeScheduleTrain();
     }
   }
 

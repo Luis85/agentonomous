@@ -180,6 +180,89 @@ describe('TfjsLearner', () => {
     expect(learner.isTraining()).toBe(false);
   });
 
+  it('drains queued batches after an in-flight train completes', async () => {
+    let resolveFirst!: () => void;
+    const firstBlocked = new Promise<void>((r) => {
+      resolveFirst = r;
+    });
+    let callCount = 0;
+    const slowFake: {
+      calls: Array<{ pairs: Array<{ features: number[]; label: number[] }> }>;
+      train: (
+        pairs: ReadonlyArray<{ features: number[]; label: number[] }>,
+      ) => Promise<TrainResult>;
+    } = {
+      calls: [],
+      train(pairs) {
+        const index = callCount++;
+        slowFake.calls.push({
+          pairs: pairs.map((p) => ({ features: [...p.features], label: [...p.label] })),
+        });
+        const gate = index === 0 ? firstBlocked : Promise.resolve();
+        return gate.then(() => ({ finalLoss: 1 / pairs.length, history: { loss: [1, 0.5] } }));
+      },
+    };
+    const learner = new TfjsLearner<number[], number[]>({
+      reasoner: slowFake,
+      toTrainingPair: project,
+      batchSize: 2,
+    });
+
+    // Fill the first batch; it starts training but stalls on firstBlocked.
+    learner.score(outcome(0.1));
+    learner.score(outcome(0.2));
+    expect(learner.isTraining()).toBe(true);
+
+    // Queue a second full batch while the first is still training.
+    learner.score(outcome(0.3));
+    learner.score(outcome(0.4));
+    expect(slowFake.calls).toHaveLength(1);
+
+    // Release the first batch; the tail should auto-schedule the second.
+    resolveFirst();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(slowFake.calls).toHaveLength(2);
+    expect(learner.bufferedCount()).toBe(0);
+  });
+
+  it('clamps non-positive bufferCapacity so the trim loop cannot hang', () => {
+    const fake = makeFakeReasoner();
+    const learner = new TfjsLearner<number[], number[]>({
+      reasoner: fake,
+      toTrainingPair: project,
+      batchSize: 10, // high enough that we never auto-train in this test
+      bufferCapacity: -3,
+    });
+
+    // Before the clamp, `buffer.length > -3` stays true at length 0, so
+    // `while (buffer.length > cap) buffer.shift()` spins forever.
+    // After the clamp, cap is Math.max(0, -3) = 0, so each pushed pair
+    // is immediately shifted back out and `score()` returns.
+    learner.score(outcome(0.1));
+    learner.score(outcome(0.2));
+
+    expect(learner.bufferedCount()).toBe(0);
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it('clamps non-positive batchSize so runTrain cannot loop on zero-slice batches', async () => {
+    const fake = makeFakeReasoner();
+    const learner = new TfjsLearner<number[], number[]>({
+      reasoner: fake,
+      toTrainingPair: project,
+      batchSize: 0,
+    });
+
+    learner.score(outcome(0.1));
+    // Clamped to 1 → the single outcome triggers a batch immediately.
+    await learner.flush();
+
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]?.pairs).toHaveLength(1);
+  });
+
   it('dispose() stops accepting new outcomes', () => {
     const fake = makeFakeReasoner();
     const learner = new TfjsLearner<number[], number[]>({
