@@ -339,9 +339,20 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       return;
     }
 
-    // Phase 3: commit the plan. Every write here is part of a path
-    // that ends with the finalized marker — no half-finished state
-    // can outlive the constructor.
+    // Phase 3: commit the plan. Skip entirely when there's nothing
+    // to migrate AND no legacy index to clean up — a fresh install
+    // on any backend should not perform a `setItem` for the marker
+    // (which could throw on a read-only / quota-exceeded store and
+    // turn a no-op upgrade path into a startup failure). Subsequent
+    // constructions will re-enter this function, find nothing again,
+    // and short-circuit at zero cost.
+    const hasLegacyArtifacts = plan.length > 0 || legacyIndexRaw !== null;
+    if (!hasLegacyArtifacts) {
+      return;
+    }
+
+    // Every write here is part of a path that ends with the finalized
+    // marker — no half-finished state can outlive the constructor.
     for (const { userKey, encoded, raw } of plan) {
       this.storage.setItem(encoded, raw);
       this.storage.removeItem(this.prefix + userKey);

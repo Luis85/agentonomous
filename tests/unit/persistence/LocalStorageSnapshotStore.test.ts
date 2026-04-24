@@ -511,6 +511,46 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(await store.load('good')).toMatchObject({ identity: { id: 'good' } });
   });
 
+  it('fresh install does not perform any storage writes during construction', () => {
+    // A store constructed against empty storage must not call setItem
+    // at all. Otherwise a read-only / quota-exceeded backend would
+    // throw from the constructor for a no-op upgrade path, breaking
+    // consumers who only want to load-and-list pre-existing snapshots.
+    class WriteCountingStorage implements StorageLike {
+      public writes = 0;
+      public removals = 0;
+      private readonly data = new Map<string, string>();
+
+      get length(): number {
+        return this.data.size;
+      }
+
+      key(index: number): string | null {
+        return [...this.data.keys()][index] ?? null;
+      }
+
+      getItem(key: string): string | null {
+        return this.data.get(key) ?? null;
+      }
+
+      setItem(key: string, value: string): void {
+        this.writes++;
+        this.data.set(key, value);
+      }
+
+      removeItem(key: string): void {
+        this.removals++;
+        this.data.delete(key);
+      }
+    }
+
+    const storage = new WriteCountingStorage();
+    new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    expect(storage.writes).toBe(0);
+    expect(storage.removals).toBe(0);
+  });
+
   it("rejects an empty prefix so migration can't match and nuke unrelated storage keys", () => {
     // A prefix of '' would make startsWith(prefix) true for every key in
     // the storage, so migration would rewrite and delete unrelated
