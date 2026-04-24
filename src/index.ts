@@ -14,7 +14,17 @@ export type { AgentInput, AgentOutput } from './agent/types.js';
 export type { ControlMode } from './agent/ControlMode.js';
 
 // Agent core.
-export { Agent, type AgentDependencies } from './agent/Agent.js';
+//
+// `Agent` is exported because `createAgent` returns one; the direct
+// constructor + `AgentDependencies` are intentionally NOT re-exported —
+// consumers go through `createAgent(config)`. Tests can still reach the
+// raw class via a relative `./agent/Agent.js` import if they need full
+// control over every slot (see `src/agent/Agent.ts` JSDoc).
+//
+// `AgentModule` + `ReactiveHandler` are tagged `@experimental` — the
+// shape reshapes in 1.1 (composable kernel). Treat additions to either
+// as minor bumps, not major.
+export { Agent } from './agent/Agent.js';
 export { createAgent, type CreateAgentConfig } from './agent/createAgent.js';
 export type { AgentFacade } from './agent/AgentFacade.js';
 export type { AgentModule, ReactiveHandler } from './agent/AgentModule.js';

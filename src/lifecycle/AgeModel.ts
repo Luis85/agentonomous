@@ -27,6 +27,12 @@ export interface AgeModelOptions {
  * stage thresholds (for instance after restoring from a snapshot saved hours
  * ago), every crossed transition is reported in order so downstream emitters
  * can fire all intermediate `LifeStageChanged` events.
+ *
+ * @experimental — the direct constructor is wrapped by a `lifecycle`
+ * module in the 1.1 composable kernel. Prefer
+ * `createAgent({ species: { lifecycle: defineLifecycle(...) } })` over
+ * `new AgeModel(...)`; reach for the class only when you need full
+ * control over the slot (tests and tick-helper extraction do).
  */
 export class AgeModel {
   readonly bornAt: number;
