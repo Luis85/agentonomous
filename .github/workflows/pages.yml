@@ -41,9 +41,9 @@ jobs:
       - name: Build library (vite build)
         run: npm run build
 
-      - name: Install demo dependencies
+      - name: Install demo dependencies (npm ci)
         working-directory: examples/nurture-pet
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Build demo (vite build, PAGES_BASE=/repo/)
         working-directory: examples/nurture-pet

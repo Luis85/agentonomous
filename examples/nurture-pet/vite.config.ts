@@ -20,17 +20,13 @@ const libDist = (subpath: string) => resolve(here, '..', '..', 'dist', subpath);
  * the same specifiers, so runtime behaviour is equivalent. `npm run build` at
  * the repo root must have produced `dist/` before the demo can be served.
  *
- * Regex aliases (rather than string prefixes) so `agentonomous/…/brainjs`
- * isn't rewritten as `<index.js>/…/brainjs` via Vite's prefix substitution.
+ * Regex aliases (rather than string prefixes) so `agentonomous/…/tfjs`
+ * isn't rewritten as `<index.js>/…/tfjs` via Vite's prefix substitution.
  */
 const agentonomousAliases = [
   {
     find: /^agentonomous$/,
     replacement: libDist('index.js'),
-  },
-  {
-    find: /^agentonomous\/cognition\/adapters\/brainjs$/,
-    replacement: libDist('cognition/adapters/brainjs/index.js'),
   },
   {
     find: /^agentonomous\/cognition\/adapters\/mistreevous$/,
@@ -39,6 +35,10 @@ const agentonomousAliases = [
   {
     find: /^agentonomous\/cognition\/adapters\/js-son$/,
     replacement: libDist('cognition/adapters/js-son/index.js'),
+  },
+  {
+    find: /^agentonomous\/cognition\/adapters\/tfjs$/,
+    replacement: libDist('cognition/adapters/tfjs/index.js'),
   },
 ];
 

@@ -37,9 +37,9 @@
       "import": "./dist/cognition/adapters/js-son/index.js",
       "types": "./dist/cognition/adapters/js-son/index.d.ts"
     },
-    "./cognition/adapters/brainjs": {
-      "import": "./dist/cognition/adapters/brainjs/index.js",
-      "types": "./dist/cognition/adapters/brainjs/index.d.ts"
+    "./cognition/adapters/tfjs": {
+      "import": "./dist/cognition/adapters/tfjs/index.js",
+      "types": "./dist/cognition/adapters/tfjs/index.d.ts"
     },
     "./package.json": "./package.json"
   },
@@ -91,6 +91,9 @@
     "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
     "@size-limit/file": "^12.1.0",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
+    "@tensorflow/tfjs-layers": "^4.22.0",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
     "eslint": "^10.2.1",
@@ -112,7 +115,8 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": "*",
-    "brain.js": "^2.0.0-beta.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
+    "@tensorflow/tfjs-layers": "^4.22.0",
     "excalibur": "*",
     "js-son-agent": "*",
     "mistreevous": "^4.0.0",
@@ -123,7 +127,10 @@
     "@anthropic-ai/sdk": {
       "optional": true
     },
-    "brain.js": {
+    "@tensorflow/tfjs-core": {
+      "optional": true
+    },
+    "@tensorflow/tfjs-layers": {
       "optional": true
     },
     "excalibur": {
@@ -168,10 +175,10 @@
       "limit": "2 KB"
     },
     {
-      "name": "dist/cognition/adapters/brainjs/index.js (gzip)",
-      "path": "dist/cognition/adapters/brainjs/index.js",
+      "name": "dist/cognition/adapters/tfjs/index.js (gzip)",
+      "path": "dist/cognition/adapters/tfjs/index.js",
       "gzip": true,
-      "limit": "2 KB"
+      "limit": "5 KB"
     }
   ],
   "lint-staged": {

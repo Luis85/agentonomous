@@ -236,7 +236,7 @@ const SNAPSHOT_INDEX_KEY = `${SNAPSHOT_PREFIX}__agentonomous/index__`;
  * Mirrors the `LocalStorageSnapshotStore` key layout
  * (`agentonomous/<id>` + the shared `agentonomous/__agentonomous/index__`)
  * and additionally clears the learning-mode trained-network key
- * (`agentonomous/<id>/brainjs-network`) so Reset stays a single
+ * (`agentonomous/<id>/tfjs-network`) so Reset stays a single
  * "fresh start" concept — the next learning-mode `construct()` falls
  * back to the default `learning.network.json` asset.
  */
@@ -244,7 +244,7 @@ export function resetSimulation(agentId: string): void {
   try {
     globalThis.localStorage?.removeItem(`${SNAPSHOT_PREFIX}${agentId}`);
     globalThis.localStorage?.removeItem(SNAPSHOT_INDEX_KEY);
-    globalThis.localStorage?.removeItem(`${SNAPSHOT_PREFIX}${agentId}/brainjs-network`);
+    globalThis.localStorage?.removeItem(`${SNAPSHOT_PREFIX}${agentId}/tfjs-network`);
   } catch {
     // localStorage unavailable — nothing to clean up; reload still resets in-memory state.
   }

@@ -134,9 +134,12 @@ Modes:
   another burst on top.
 - **BDI** — js-son-backed stub. Routes selection through beliefs /
   desires / plans but yields heuristic-equivalent behaviour.
-- **Learning (brain.js)** — brain.js-backed stub. Loads a pre-built
-  1-layer network; scoring is close to heuristic. Real training +
-  weight persistence is the subject of 0.9.3.
+- **Learning (tfjs)** — TensorFlow.js-backed. Loads a hand-authored
+  1-layer sigmoid network from `cognition/learning.network.json`;
+  the Train button trains it on ~30 synthetic pairs (seeded via a
+  demo-local LCG so agent tick replay stays deterministic) and
+  persists the resulting `TfjsSnapshot` to
+  `agentonomous/<id>/tfjs-network` for the next reload.
 
 ## localStorage key layout
 
@@ -144,6 +147,7 @@ Modes:
 | ------------------------------------- | ---------------------------------------------- |
 | `agentonomous/whiskers`               | Agent snapshot (auto-save, every 5 s)          |
 | `agentonomous/__agentonomous/index__` | Snapshot store index                           |
+| `agentonomous/whiskers/tfjs-network`  | Trained Learning-mode snapshot (Train button)  |
 | `agentonomous/speed`                  | Speed-picker preference (not part of snapshot) |
 
-Reset clears the first two and reloads. Speed preference survives.
+Reset clears the first three and reloads. Speed preference survives.

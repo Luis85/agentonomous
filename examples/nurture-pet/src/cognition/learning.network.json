@@ -1,19 +1,44 @@
 {
-  "type": "NeuralNetwork",
-  "sizes": [5, 1],
-  "layers": [
-    { "weights": [], "biases": [] },
-    { "weights": [[-1, -0.8, -0.6, -0.7, -0.9]], "biases": [0] }
-  ],
-  "inputLookup": {
-    "hunger": 0,
-    "cleanliness": 1,
-    "happiness": 2,
-    "energy": 3,
-    "health": 4
+  "version": 1,
+  "topology": {
+    "class_name": "Sequential",
+    "config": {
+      "name": "sequential_1",
+      "layers": [
+        {
+          "class_name": "Dense",
+          "config": {
+            "units": 1,
+            "activation": "sigmoid",
+            "use_bias": true,
+            "kernel_initializer": {
+              "class_name": "VarianceScaling",
+              "config": {
+                "scale": 1,
+                "mode": "fan_avg",
+                "distribution": "normal",
+                "seed": null
+              }
+            },
+            "bias_initializer": { "class_name": "Zeros", "config": {} },
+            "kernel_regularizer": null,
+            "bias_regularizer": null,
+            "activity_regularizer": null,
+            "kernel_constraint": null,
+            "bias_constraint": null,
+            "name": "dense_Dense1",
+            "trainable": true,
+            "batch_input_shape": [null, 5],
+            "dtype": "float32"
+          }
+        }
+      ]
+    },
+    "keras_version": "tfjs-layers 4.22.0",
+    "backend": "tensor_flow.js"
   },
-  "inputLookupLength": 5,
-  "outputLookup": { "score": 0 },
-  "outputLookupLength": 1,
-  "options": {}
+  "weights": "AACAv83MTL+amRm/MzMzv2ZmZr8AAAAA",
+  "weightsShapes": [[5, 1], [1]],
+  "inputKeys": ["hunger", "cleanliness", "happiness", "energy", "health"],
+  "outputKeys": ["score"]
 }
