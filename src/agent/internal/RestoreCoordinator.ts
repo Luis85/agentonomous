@@ -97,8 +97,12 @@ export async function runRestore(
   if (opts.catchUp !== undefined && opts.catchUp !== false) {
     const nowMs = agent.clock.now();
     const elapsedMs = Math.max(0, nowMs - snapshot.snapshotAt);
-    const ts = agent.getTimeScale();
-    const elapsedSec = (elapsedMs / 1000) * ts;
+    // Total virtual budget is computed once at restore entry. The
+    // per-chunk divisor below re-reads `getTimeScale()` so a reactive
+    // handler that calls `setTimeScale()` mid-catch-up still applies
+    // on the next chunk, matching the documented `setTimeScale`
+    // semantics ("takes effect on the NEXT tick").
+    const elapsedSec = (elapsedMs / 1000) * agent.getTimeScale();
     const chunkOpts =
       typeof opts.catchUp === 'object' && opts.catchUp.chunkVirtualSeconds !== undefined
         ? { chunkVirtualSeconds: opts.catchUp.chunkVirtualSeconds }
@@ -106,9 +110,10 @@ export async function runRestore(
     await runCatchUp(
       elapsedSec,
       async (chunk) => {
-        // Feed virtual dt back through tick(). dt is in real seconds before
-        // timeScale; invert it here so total virtual advance matches.
-        const realDt = chunk / ts;
+        // Feed virtual dt back through tick(). dt is in real seconds
+        // before timeScale; invert it here using the *current* scale
+        // so a setTimeScale() between chunks propagates.
+        const realDt = chunk / agent.getTimeScale();
         await agent.tick(realDt);
       },
       chunkOpts,
