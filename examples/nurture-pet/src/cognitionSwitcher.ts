@@ -278,22 +278,38 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   if (trainBtn) trainBtn.addEventListener('click', onTrainClickWrapped);
 
   const onUntrainClick = async (): Promise<void> => {
-    if (!untrainBtn || disposed) return;
+    // Hard gate first, all preconditions on a single line so a reader
+    // can see at a glance that Untrain is BLOCKED while Train is in
+    // flight. The Train handler also disables the Untrain button when
+    // it starts, but a programmatic caller or stale click could still
+    // reach here — refuse rather than interleave, or Train's trailing
+    // `localStorage.setItem(...)` would re-persist trained weights
+    // after Untrain wipes them.
+    if (!untrainBtn || disposed || pendingTrain !== null) return;
     if (activeModeId !== 'learning') return;
-    // Hard gate: while Train is in flight the Untrain button is also
-    // disabled (see onTrainClick), so a user click can't reach here. If
-    // a programmatic caller or stale click slips past, refuse rather
-    // than interleave — Train's trailing `localStorage.setItem(...)`
-    // would otherwise re-persist trained weights after Untrain wipes
-    // them, and the user would see "Reset to baseline ✓" but a reload
-    // would hydrate the trained model.
-    if (pendingTrain) return;
 
     const originalText = untrainBtn.textContent ?? 'Untrain';
     untrainBtn.disabled = true;
     untrainBtn.textContent = 'Resetting…';
     if (trainBtn) trainBtn.disabled = true;
     const myEpoch = ++changeEpoch;
+
+    // Optimistically snap the selector / status / train-button
+    // visibility to `'learning'` right now. Bumping `changeEpoch`
+    // discarded any in-flight `onChange` work — including a non-
+    // learning mode selection the user may have clicked just before
+    // Untrain — so the UI would otherwise keep showing that cancelled
+    // mode's label while the agent is running learning.
+    if (select.value !== 'learning') select.value = 'learning';
+    status.dataset.mode = 'learning';
+    setTrainVisibility('learning');
+    // `flashStatus` captures `status.textContent` at call time as the
+    // value to restore after the timeout. If a Train toast (`"Trained
+    // ✓ …"`) is still on-screen when Untrain fires, it would be
+    // restored after our own toast times out — making the status claim
+    // the model is trained even after a successful reset. Snap back to
+    // the canonical "active" text now so flashStatus captures that.
+    status.textContent = 'active';
 
     // Clear only the tfjs snapshot key — leave the rest of the agent's
     // persisted state alone (this is not a full reset). A fresh
@@ -323,15 +339,6 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       agent.setReasoner(reasoner);
       activeReasoner = reasoner;
       activeModeId = 'learning';
-      // Re-sync the selector + status span: bumping `changeEpoch` above
-      // discarded any in-flight `onChange` work, so if the user had
-      // selected a non-learning mode and clicked Untrain before that
-      // `construct()` resolved, the dropdown could now show the old
-      // non-learning label while the agent is actually running
-      // learning. Snap both to the installed reasoner's reality.
-      if (select.value !== 'learning') select.value = 'learning';
-      status.dataset.mode = 'learning';
-      setTrainVisibility('learning');
       disposeIfOwned(previous);
       flashStatus(status, 'Reset to baseline ✓', TRAINED_FLASH_MS);
     } catch (err) {
