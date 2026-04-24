@@ -70,6 +70,26 @@ describe('MockLlmProvider', () => {
     );
   });
 
+  it('maxInputTokens checks request tokens, not script-reported usage', async () => {
+    // Script under-reports input to try to sneak past the budget.
+    const provider = new MockLlmProvider({
+      scripts: [{ text: 'ok', usage: { inputTokens: 1 } }],
+    });
+    // ASK estimates to 6 tokens. maxInputTokens=2 must reject despite
+    // the script claiming inputTokens=1.
+    await expect(provider.complete(ASK, { budget: { maxInputTokens: 2 } })).rejects.toBeInstanceOf(
+      BudgetExceededError,
+    );
+  });
+
+  it('usage.inputTokens in the completion still honours the script override', async () => {
+    const provider = new MockLlmProvider({
+      scripts: [{ text: 'ok', usage: { inputTokens: 999 } }],
+    });
+    const completion = await provider.complete(ASK);
+    expect(completion.usage.inputTokens).toBe(999);
+  });
+
   it('budget rejections do not consume queued scripts', async () => {
     const provider = new MockLlmProvider({
       scripts: [{ text: 'too long', usage: { outputTokens: 50 } }, { text: 'first success' }],

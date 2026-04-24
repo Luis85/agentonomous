@@ -95,13 +95,18 @@ export class MockLlmProvider implements LlmProviderPort {
     const picked = this.pickScript(messages, options);
     const script = picked.script;
     const model = script.model ?? options.model ?? this.defaultModel;
-    const inputTokens = script.usage?.inputTokens ?? estimateTokens(messages);
+    // Request-side input count used for the budget check — scripts must
+    // not be able to under-report `inputTokens` and sneak an oversize
+    // prompt past `maxInputTokens`. The reported usage on the completion
+    // still honours the script override so tests can pin exact numbers.
+    const requestInputTokens = estimateTokens(messages);
+    const reportedInputTokens = script.usage?.inputTokens ?? requestInputTokens;
     const outputTokens = script.usage?.outputTokens ?? estimateTokensFor(script.text);
 
     const budget = options.budget;
-    if (budget?.maxInputTokens !== undefined && inputTokens > budget.maxInputTokens) {
+    if (budget?.maxInputTokens !== undefined && requestInputTokens > budget.maxInputTokens) {
       throw new BudgetExceededError(
-        `MockLlmProvider: input ${inputTokens} tokens exceeds maxInputTokens ${budget.maxInputTokens}.`,
+        `MockLlmProvider: input ${requestInputTokens} tokens exceeds maxInputTokens ${budget.maxInputTokens}.`,
       );
     }
     if (budget?.maxOutputTokens !== undefined && outputTokens > budget.maxOutputTokens) {
@@ -126,7 +131,7 @@ export class MockLlmProvider implements LlmProviderPort {
     picked.commit();
 
     const usage: LlmUsage = {
-      inputTokens,
+      inputTokens: reportedInputTokens,
       outputTokens,
       ...(costCents !== undefined ? { costCents } : {}),
       ...(script.usage?.cached !== undefined ? { cached: script.usage.cached } : {}),
