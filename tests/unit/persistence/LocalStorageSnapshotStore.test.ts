@@ -415,6 +415,23 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(storage.has('p/__agentonomous/meta/migrated')).toBe(false);
   });
 
+  it('non-iterable backend with no legacy index does NOT stamp the migrated sentinel', () => {
+    // Non-iterable + no legacy index is ambiguous: genuinely fresh
+    // install OR pathological v1 that lost its index to the original
+    // collision bug. On a non-iterable backend we can't tell them
+    // apart — if we stamp the marker in the pathological case,
+    // orphaned `{prefix}{userKey}` payloads become permanently
+    // unreachable (future constructions short-circuit on the marker).
+    // Err safe: refuse to finalize; keep the retry door open for a
+    // later construction on an iterable backend.
+    const storage = new NonIterableStorage();
+    // No seeded data at all.
+
+    new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    expect(storage.has('p/__agentonomous/meta/migrated')).toBe(false);
+  });
+
   it('aborts migration cleanup when non-iterable backend has a non-parseable legacy index', () => {
     // Non-iterable backend (StorageLike minimum) + legacy index that
     // isn't a string array (corrupted, or holds a colliding v1

@@ -323,23 +323,19 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
     //
     //   - Iterable backend: the orphan scan observed every key under
     //     the prefix, so nothing recoverable was missed.
-    //   - Fresh install (no legacy index at all): there is no v1 data
-    //     to worry about.
-    //   - Parseable legacy index + every listed key migrated OR was
-    //     already gone: we handled what v1 said existed. An index
-    //     that pointed at entries with raw === null still requires
-    //     migrated.length === legacyKeys.size to finalize — if none
-    //     moved, prefer to keep artifacts intact for a retry.
+    //   - Non-iterable backend with a parseable legacy index AND every
+    //     listed key migrated (or was already gone): the index told us
+    //     exactly what v1 wrote, and we handled all of it.
     //
-    // Anything else (non-iterable + unparseable index, or non-iterable
-    // with a non-empty index where nothing moved) leaves the legacy
-    // artifacts intact so a later construction on a better-wired
-    // backend can still recover.
+    // Anything else — including non-iterable with NO legacy index (we
+    // can't distinguish "genuinely fresh" from "pathological v1 that
+    // lost its index to the original collision bug") — leaves the
+    // legacy artifacts intact and does NOT stamp the marker. A later
+    // construction on an iterable backend, or after the index is
+    // restored, can still recover orphaned payloads.
     const iterable = isIterableStorage(this.storage);
     const safeToFinalize =
-      iterable ||
-      legacyIndexRaw === null ||
-      (legacyIndexParseable && migrated.length === legacyKeys.size);
+      iterable || (legacyIndexParseable && migrated.length === legacyKeys.size);
 
     if (!safeToFinalize) {
       return;
