@@ -234,28 +234,30 @@ describe('Agent snapshot/restore — R-01 animation + mood + active skill', () =
     expect(b.modifiers.list().map((m) => m.id)).toEqual(['from-snap']);
   });
 
-  it('restore with no modifiers in snapshot still clears pre-existing modifiers', async () => {
-    // Snapshot taken from an agent that never applied any modifier; the
-    // modifiers slice may be omitted from the snapshot entirely. Even so,
-    // restore must not leave the target agent carrying stale modifiers.
+  it('restore with no modifiers slice leaves target agent modifiers untouched (partial-snapshot semantics)', async () => {
+    // A snapshot taken via include filter (e.g. `include: ['lifecycle']`)
+    // omits the modifiers slice entirely. Restore must leave the target
+    // agent's modifiers alone in that case — matching how needs / mood /
+    // animation already gate on field presence. Wiping here would be a
+    // data-loss regression for partial-restore consumers.
     const a = new Agent(baseDeps());
-    const snap = a.snapshot();
+    const snap = a.snapshot({ include: ['lifecycle'] });
     expect(snap.modifiers).toBeUndefined();
 
     const clockB = new ManualClock(1_000);
     const b = new Agent(baseDeps({ clock: clockB }));
     b.applyModifier({
-      id: 'stale',
+      id: 'keep-me',
       source: 'test',
       appliedAt: clockB.now(),
       stack: 'replace',
       effects: [],
     });
-    expect(b.modifiers.list().map((m) => m.id)).toContain('stale');
+    expect(b.modifiers.list().map((m) => m.id)).toContain('keep-me');
 
     await b.restore(snap);
 
-    expect(b.modifiers.list()).toEqual([]);
+    expect(b.modifiers.list().map((m) => m.id)).toEqual(['keep-me']);
   });
 });
 
