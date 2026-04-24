@@ -181,6 +181,82 @@ describe('Agent snapshot/restore — R-01 animation + mood + active skill', () =
       ),
     ).toHaveLength(0);
   });
+
+  it('restore replaces (not merges) modifier state — pre-existing modifiers are cleared', async () => {
+    // Agent A takes a snapshot carrying exactly one modifier, "from-snap".
+    const clockA = new ManualClock(1_000);
+    const a = new Agent(baseDeps({ clock: clockA }));
+    a.applyModifier({
+      id: 'from-snap',
+      source: 'test',
+      appliedAt: clockA.now(),
+      stack: 'replace',
+      effects: [],
+    });
+    const snap = a.snapshot();
+
+    // Agent B starts with two pre-existing modifiers the snapshot does NOT
+    // include. Plus one that shares an id with the snapshot's entry so we
+    // can assert no duplicate survives.
+    const clockB = new ManualClock(1_000);
+    const b = new Agent(baseDeps({ clock: clockB }));
+    b.applyModifier({
+      id: 'pre-existing-A',
+      source: 'test',
+      appliedAt: clockB.now(),
+      stack: 'stack',
+      effects: [],
+    });
+    b.applyModifier({
+      id: 'pre-existing-B',
+      source: 'test',
+      appliedAt: clockB.now(),
+      stack: 'stack',
+      effects: [],
+    });
+    b.applyModifier({
+      id: 'from-snap',
+      source: 'test',
+      appliedAt: clockB.now(),
+      stack: 'stack',
+      effects: [],
+    });
+    expect(b.modifiers.list().map((m) => m.id)).toEqual([
+      'pre-existing-A',
+      'pre-existing-B',
+      'from-snap',
+    ]);
+
+    await b.restore(snap);
+
+    // Only the snapshot's modifier survives. Pre-existing ones are gone,
+    // and the id collision does not double up.
+    expect(b.modifiers.list().map((m) => m.id)).toEqual(['from-snap']);
+  });
+
+  it('restore with no modifiers in snapshot still clears pre-existing modifiers', async () => {
+    // Snapshot taken from an agent that never applied any modifier; the
+    // modifiers slice may be omitted from the snapshot entirely. Even so,
+    // restore must not leave the target agent carrying stale modifiers.
+    const a = new Agent(baseDeps());
+    const snap = a.snapshot();
+    expect(snap.modifiers).toBeUndefined();
+
+    const clockB = new ManualClock(1_000);
+    const b = new Agent(baseDeps({ clock: clockB }));
+    b.applyModifier({
+      id: 'stale',
+      source: 'test',
+      appliedAt: clockB.now(),
+      stack: 'replace',
+      effects: [],
+    });
+    expect(b.modifiers.list().map((m) => m.id)).toContain('stale');
+
+    await b.restore(snap);
+
+    expect(b.modifiers.list()).toEqual([]);
+  });
 });
 
 describe('Agent snapshot/restore — timeScale round-trip', () => {
