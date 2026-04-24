@@ -17,6 +17,12 @@ export interface ModifierRemoval {
  * Mood (M5), Skills (M7), and the Reasoner (M7). Stores modifiers by
  * internal key (id + incrementing ordinal) to support `stack` entries
  * that share an id.
+ *
+ * @experimental — the direct constructor is wrapped by a `modifiers`
+ * module in the 1.1 composable kernel. Prefer applying modifiers via
+ * the agent (`facade.applyModifier(...)` / `SkillContext.applyModifier`)
+ * or declaring them on a species descriptor; reach for `new
+ * Modifiers()` only when you need full control over the slot.
  */
 export class Modifiers {
   private readonly entries: { key: string; mod: Modifier }[] = [];

@@ -9,6 +9,11 @@ export type DecayMultiplierFn = (needId: string) => number;
 /**
  * Collection of `Need` values on an agent. Owns decay, urgency, satisfaction,
  * and snapshot/restore for its own slice of state.
+ *
+ * @experimental — the direct constructor is wrapped by a `needs` module
+ * in the 1.1 composable kernel. Prefer `createAgent({ species: { needs:
+ * [...] } })` over `new Needs(...)`; reach for the class only if you
+ * need full control over the slot.
  */
 export class Needs {
   private readonly needs = new Map<string, Need>();
