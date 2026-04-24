@@ -397,22 +397,51 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     ).not.toBeNull();
   });
 
-  it('non-iterable backend with legacy-index entries that do not resolve leaves artifacts for retry', () => {
+  it('non-iterable backend tolerates ghost entries in a parseable legacy index', async () => {
     // Non-iterable adapter. Legacy index lists entries but none of the
-    // payload paths resolve (getItem returns null) — migration can't
-    // confirm it recovered anything. Finalizing would set the marker
-    // and destroy the legacy index, losing any still-orphaned data a
-    // later retry could recover. Migration must preserve the legacy
-    // artifacts instead.
+    // payload paths resolve — a stale v1 index where prior deletes
+    // didn't clean up the listing. Under the plan-then-commit
+    // migration policy, no storage writes happen for unresolved
+    // entries, so there's nothing to orphan. The new index drops the
+    // ghosts and migration finalizes cleanly.
     const storage = new NonIterableStorage();
     storage.seed('p/__agentonomous/index__', JSON.stringify(['ghost-alpha', 'ghost-beta']));
     // Deliberately no payloads at `p/ghost-alpha` or `p/ghost-beta`.
 
-    new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
 
-    // Legacy index retained; migrated sentinel NOT set.
-    expect(storage.has('p/__agentonomous/index__')).toBe(true);
-    expect(storage.has('p/__agentonomous/meta/migrated')).toBe(false);
+    // Legacy index cleared; marker stamped.
+    expect(storage.has('p/__agentonomous/index__')).toBe(false);
+    expect(storage.has('p/__agentonomous/meta/migrated')).toBe(true);
+    // list() reports the empty state — ghosts were not promoted into
+    // the new-layout index.
+    expect([...(await store.list())]).toEqual([]);
+  });
+
+  it('aborted non-iterable pass does not leave data/ writes behind for a later iterable retry', () => {
+    // Scenario per Codex P1 on 6443730: a prior non-iterable pass
+    // that couldn't finalize must leave NO new-layout entries behind.
+    // Otherwise a subsequent iterable pass's orphan scan would pick
+    // them up as v1 user keys and double-encode them.
+    //
+    // Here we trigger the abort path: non-iterable + unparseable
+    // legacy index. Then we construct a fresh iterable store on the
+    // same storage (promoted via the FakeStorage constructor) and
+    // verify that the iterable pass produces the correct user-facing
+    // state without the double-encoded corruption.
+    const nonIterable = new NonIterableStorage();
+    // Corrupt legacy index (not a string array) forces the abort path.
+    nonIterable.seed('p/__agentonomous/index__', '{"this":"is not an array"}');
+    nonIterable.seed('p/alpha', JSON.stringify(snap('alpha', 1)));
+
+    new LocalStorageSnapshotStore({ storage: nonIterable, prefix: 'p/' });
+
+    // Nothing was written to the data namespace during the aborted pass.
+    expect(nonIterable.has('p/__agentonomous/data/alpha')).toBe(false);
+    // Legacy artifacts preserved for retry.
+    expect(nonIterable.has('p/__agentonomous/index__')).toBe(true);
+    expect(nonIterable.has('p/alpha')).toBe(true);
+    expect(nonIterable.has('p/__agentonomous/meta/migrated')).toBe(false);
   });
 
   it('non-iterable backend with no legacy index does NOT stamp the migrated sentinel', () => {

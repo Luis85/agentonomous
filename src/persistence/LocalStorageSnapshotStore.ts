@@ -296,7 +296,13 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       }
     }
 
-    const migrated: string[] = [];
+    // Phase 1: PLAN the migration without mutating storage. Collect
+    // every discoverable user key's payload into `plan`. If we decide
+    // to abort in phase 2, storage stays untouched — so a prior
+    // non-iterable pass that couldn't finalize never leaves orphan
+    // `data/*` entries that a subsequent iterable pass would
+    // mistake for v1 user keys (Codex P1, 2026-04-24).
+    const plan: Array<{ userKey: string; encoded: string; raw: string }> = [];
     for (const userKey of legacyKeys) {
       const raw = this.storage.getItem(this.prefix + userKey);
       if (raw === null) continue;
@@ -304,57 +310,56 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       try {
         encoded = this.dataKey(userKey);
       } catch {
-        // Malformed UTF-16 key (lone surrogate) — can't round-trip
-        // through encodeURIComponent. Skip so migration doesn't crash
-        // store initialization for the other, well-formed entries. The
-        // payload stays at the legacy path; the consumer sees it
-        // missing from `list()` but storage isn't mutated.
+        // Malformed UTF-16 key (lone surrogate) — skip without
+        // aborting the whole migration. Other well-formed entries
+        // still migrate.
         continue;
       }
-      this.storage.setItem(encoded, raw);
-      this.storage.removeItem(this.prefix + userKey);
-      migrated.push(userKey);
+      plan.push({ userKey, encoded, raw });
     }
-    // Decide whether we can safely finalize (clear legacy artifacts +
-    // stamp the re-entrance sentinel). Finalization is destructive —
-    // once the marker is set, future constructions short-circuit and
-    // lose any chance to recover still-orphaned v1 data. Allow it only
-    // when the discovery path is trustworthy:
+
+    // Phase 2: decide whether to finalize. Conditions:
     //
     //   - Iterable backend: the orphan scan observed every key under
-    //     the prefix, so nothing recoverable was missed.
-    //   - Non-iterable backend with a parseable legacy index AND every
-    //     listed key migrated (or was already gone): the index told us
-    //     exactly what v1 wrote, and we handled all of it.
+    //     the prefix; nothing recoverable was missed.
+    //   - Non-iterable backend + parseable legacy index: the index
+    //     is v1's source of truth for what was written. Stale/ghost
+    //     entries (raw === null) are tolerated — v1 deletes should
+    //     have updated the index so ghosts are rare and don't
+    //     indicate lost data.
     //
-    // Anything else — including non-iterable with NO legacy index (we
-    // can't distinguish "genuinely fresh" from "pathological v1 that
-    // lost its index to the original collision bug") — leaves the
-    // legacy artifacts intact and does NOT stamp the marker. A later
-    // construction on an iterable backend, or after the index is
-    // restored, can still recover orphaned payloads.
+    // Anything else (non-iterable + no index; non-iterable + unparseable
+    // index) leaves the legacy artifacts intact. A later construction
+    // on an iterable backend, or after the index is restored, can
+    // still recover orphans.
     const iterable = isIterableStorage(this.storage);
-    const safeToFinalize =
-      iterable || (legacyIndexParseable && migrated.length === legacyKeys.size);
+    const safeToFinalize = iterable || legacyIndexParseable;
 
     if (!safeToFinalize) {
       return;
+    }
+
+    // Phase 3: commit the plan. Every write here is part of a path
+    // that ends with the finalized marker — no half-finished state
+    // can outlive the constructor.
+    for (const { userKey, encoded, raw } of plan) {
+      this.storage.setItem(encoded, raw);
+      this.storage.removeItem(this.prefix + userKey);
     }
 
     if (legacyIndexRaw !== null) {
       this.storage.removeItem(this.prefix + LEGACY_INDEX_SUFFIX);
     }
 
-    const migratedIndex = new Set<string>(migrated);
+    const migratedIndex = new Set<string>(plan.map((p) => p.userKey));
     const existingIndex = this.readIndex();
     for (const entry of existingIndex) migratedIndex.add(entry);
     if (migratedIndex.size > 0) {
       this.writeIndex([...migratedIndex]);
     }
 
-    // Re-entrance sentinel — even on a fresh install with no legacy
-    // data — so subsequent constructions short-circuit the scan
-    // before it can misinterpret v2 `data/` entries as v1 user keys.
+    // Re-entrance sentinel. Subsequent constructions short-circuit
+    // here via `rawAtMarker === MIGRATED_MARKER_VALUE` at the top.
     this.storage.setItem(this.prefix + META_MIGRATED_KEY, MIGRATED_MARKER_VALUE);
   }
 }
