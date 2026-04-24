@@ -373,6 +373,36 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     await expect(store.delete(loneSurrogate)).rejects.toThrow(/not a well-formed UTF-16 string/);
   });
 
+  it('aborts migration cleanup when non-iterable backend has a non-parseable legacy index', () => {
+    // Non-iterable backend (StorageLike minimum) + legacy index that
+    // isn't a string array (corrupted, or holds a colliding v1
+    // snapshot). The store has no way to enumerate legacy payload
+    // paths. If migration still cleared the legacy index and stamped
+    // the marker, legacy {prefix}{userKey} entries would become
+    // permanently unreachable after upgrade. Instead, migration must
+    // bail without touching either artifact so a subsequent
+    // construction (maybe on an iterable backend, or after the
+    // corruption is fixed) can retry.
+    const storage = new NonIterableStorage();
+    // Simulate the original v1 collision: legacy index path now holds
+    // a snapshot JSON (not an array).
+    const colliding = JSON.stringify(snap('__agentonomous/index__', 1));
+    storage.seed('p/__agentonomous/index__', colliding);
+    // And a v1 user payload at an unrelated path, which we can't find
+    // via orphan scan on this backend.
+    storage.seed('p/alpha', JSON.stringify(snap('alpha', 2)));
+
+    // Constructor must not crash, and must NOT destroy the legacy
+    // artifacts.
+    new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    expect(storage.has('p/__agentonomous/index__')).toBe(true);
+    expect(storage.getItem('p/__agentonomous/index__')).toBe(colliding);
+    expect(storage.has('p/alpha')).toBe(true);
+    // Marker NOT set — next construction can retry.
+    expect(storage.has('p/__agentonomous/meta/migrated')).toBe(false);
+  });
+
   it('migration skips malformed-UTF-16 legacy entries without crashing store init', async () => {
     // A legacy index could theoretically list a key whose string
     // representation is not well-formed UTF-16 (lone surrogate). Pre-

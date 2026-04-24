@@ -248,10 +248,17 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       legacyKeys.add(META_MIGRATED_KEY);
     }
 
+    // Track whether we could parse the legacy index into a usable array.
+    // If the index exists but is not parseable AND the backend doesn't
+    // expose iteration, we have no way to enumerate legacy payloads —
+    // abort before touching anything so a later construction (maybe on
+    // an iterable backend) can still recover the data.
+    let legacyIndexParseable = false;
     if (legacyIndexRaw !== null) {
       try {
         const parsed: unknown = JSON.parse(legacyIndexRaw);
         if (Array.isArray(parsed)) {
+          legacyIndexParseable = true;
           for (const entry of parsed) {
             // Defensive: skip the index sentinel itself. A v1 store that
             // hit the original collision bug (saving under a key of
@@ -266,9 +273,20 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
           }
         }
       } catch {
-        // Corrupted legacy index — fall through with whatever the
-        // orphan scan (if available) finds. Best-effort recovery.
+        // Corrupted legacy index — fall through; `legacyIndexParseable`
+        // stays false so the non-iterable abort below fires.
       }
+    }
+
+    // Abort without clearing artifacts when:
+    //   1. Legacy index is present but not parseable as a string array
+    //      (corrupt, or holds a colliding v1 snapshot), AND
+    //   2. The backend does not expose iteration, so we cannot find
+    //      orphans via scan.
+    // Leaving legacy artifacts intact lets a subsequent construction
+    // (different backend wiring, restored index) retry migration.
+    if (!isIterableStorage(this.storage) && legacyIndexRaw !== null && !legacyIndexParseable) {
+      return;
     }
 
     if (isIterableStorage(this.storage)) {
