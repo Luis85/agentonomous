@@ -38,8 +38,11 @@ import { Modifiers } from '../modifiers/Modifiers.js';
 import type { Mood } from '../mood/Mood.js';
 import type { MoodModel } from '../mood/MoodModel.js';
 import type { Needs } from '../needs/Needs.js';
-import type { AgentSnapshot, SnapshotPart } from '../persistence/AgentSnapshot.js';
-import { CURRENT_SNAPSHOT_VERSION } from '../persistence/AgentSnapshot.js';
+import {
+  CURRENT_SNAPSHOT_VERSION,
+  type AgentSnapshot,
+  type SnapshotPart,
+} from '../persistence/AgentSnapshot.js';
 import {
   AutoSaveTracker,
   DEFAULT_AUTOSAVE_POLICY,
@@ -54,8 +57,7 @@ import type { RemoteController } from './RemoteController.js';
 import type { ScriptedController } from './ScriptedController.js';
 import type { Rng } from '../ports/Rng.js';
 import type { WallClock } from '../ports/WallClock.js';
-import type { Logger } from '../ports/Logger.js';
-import { NullLogger } from '../ports/Logger.js';
+import { NullLogger, type Logger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
 import type { AgentState } from '../persistence/AgentState.js';
 import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.js';

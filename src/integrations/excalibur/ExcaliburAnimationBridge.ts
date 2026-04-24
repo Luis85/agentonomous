@@ -1,7 +1,9 @@
 import type { Agent } from '../../agent/Agent.js';
 import type { AnimationState } from '../../animation/AnimationState.js';
-import type { AnimationTransitionEvent } from '../../animation/AnimationTransitionEvent.js';
-import { ANIMATION_TRANSITION } from '../../animation/AnimationTransitionEvent.js';
+import {
+  ANIMATION_TRANSITION,
+  type AnimationTransitionEvent,
+} from '../../animation/AnimationTransitionEvent.js';
 import type { ActorLike } from './types.js';
 
 /**
