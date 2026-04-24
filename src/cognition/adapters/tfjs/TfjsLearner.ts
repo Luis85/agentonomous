@@ -140,7 +140,24 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
     if (this.disposed) return null;
     if (this.inflight !== null) await this.inflight;
     if (this.buffer.length === 0) return null;
-    return this.runTrain();
+    // Mark as in-flight for the duration of the forced train so a
+    // concurrent `score()` can't fire `trainBackground()` in parallel
+    // on the same reasoner — overlapping `model.fit` calls are a
+    // nondeterminism / backend-error footgun. `isTraining()` also
+    // reports true here, matching the auto-batch path.
+    const promise = this.runTrain();
+    this.inflight = promise.then(
+      () => null,
+      () => null,
+    );
+    try {
+      return await promise;
+    } finally {
+      this.inflight = null;
+      // Same drain-tail as `trainBackground`: if more pairs queued up
+      // during this flush, schedule the next batch automatically.
+      this.maybeScheduleTrain();
+    }
   }
 
   /**
@@ -170,17 +187,24 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
   }
 
   private batchSize(): number {
-    // Clamp to ≥ 1 so a caller-supplied `batchSize: 0` or a negative
-    // value doesn't turn `score()` into a no-op or `runTrain` into an
-    // infinite-zero-slice loop.
-    return Math.max(1, this.opts.batchSize ?? 50);
+    // Normalise the caller-supplied value before clamping: `Math.max`
+    // propagates NaN (a common `Number(envVar)` result), and a NaN
+    // batch size would turn the `<` guard in `maybeScheduleTrain`
+    // into a no-op and make `splice(0, NaN)` remove zero items — the
+    // learner would loop forever scheduling empty batches.
+    const raw = this.opts.batchSize;
+    const n = typeof raw === 'number' && Number.isFinite(raw) ? raw : 50;
+    return Math.max(1, Math.trunc(n));
   }
 
   private capacity(): number {
-    // Clamp to ≥ 0 so a negative `bufferCapacity` (or a negative
-    // derived default) can't turn the buffer-trim loop into a hang —
-    // `buffer.length > cap` would stay true at 0 when `cap` is negative.
-    return Math.max(0, this.opts.bufferCapacity ?? this.batchSize() * 4);
+    // Same NaN-safety as `batchSize()` + clamp to ≥ 0 so a negative
+    // `bufferCapacity` (or a negative derived default) can't turn the
+    // buffer-trim loop into a hang at `buffer.length > cap === -n`.
+    const raw = this.opts.bufferCapacity;
+    const n =
+      typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : this.batchSize() * 4;
+    return Math.max(0, n);
   }
 
   /**

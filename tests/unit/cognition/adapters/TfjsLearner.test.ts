@@ -263,6 +263,67 @@ describe('TfjsLearner', () => {
     expect(fake.calls[0]?.pairs).toHaveLength(1);
   });
 
+  it('sanitises NaN batchSize / bufferCapacity to defaults', async () => {
+    const fake = makeFakeReasoner();
+    const learner = new TfjsLearner<number[], number[]>({
+      reasoner: fake,
+      toTrainingPair: project,
+      batchSize: Number.NaN,
+      bufferCapacity: Number.NaN,
+    });
+    // Default batchSize=50, so one pair should buffer rather than
+    // triggering an empty-batch training loop.
+    learner.score(outcome(0.1));
+    expect(learner.bufferedCount()).toBe(1);
+    expect(fake.calls).toHaveLength(0);
+
+    // flush() trains the single pair — and crucially doesn't hang.
+    await learner.flush();
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]?.pairs).toHaveLength(1);
+  });
+
+  it('flush() marks isTraining() true while training and blocks concurrent batches', async () => {
+    let resolveGate!: () => void;
+    const gate = new Promise<void>((r) => {
+      resolveGate = r;
+    });
+    const slowFake: {
+      calls: number;
+      train: (
+        pairs: ReadonlyArray<{ features: number[]; label: number[] }>,
+      ) => Promise<TrainResult>;
+    } = {
+      calls: 0,
+      train(pairs) {
+        slowFake.calls++;
+        return gate.then(() => ({ finalLoss: 1 / pairs.length, history: { loss: [0.5] } }));
+      },
+    };
+    const learner = new TfjsLearner<number[], number[]>({
+      reasoner: slowFake,
+      toTrainingPair: project,
+      batchSize: 10,
+    });
+
+    // Two pairs below the batchSize so auto-train never kicks in.
+    learner.score(outcome(0.1));
+    learner.score(outcome(0.2));
+
+    const flushPromise = learner.flush();
+    // Immediately after flush() starts, isTraining() must report true
+    // and a concurrent burst that fills the buffer must NOT kick off a
+    // second background train in parallel.
+    expect(learner.isTraining()).toBe(true);
+    for (let i = 0; i < 15; i++) learner.score(outcome(i / 100));
+    expect(slowFake.calls).toBe(1);
+
+    resolveGate();
+    await flushPromise;
+    // The drain-tail then picks up the queued batches.
+    expect(slowFake.calls).toBeGreaterThan(1);
+  });
+
   it('dispose() stops accepting new outcomes', () => {
     const fake = makeFakeReasoner();
     const learner = new TfjsLearner<number[], number[]>({
