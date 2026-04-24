@@ -280,3 +280,19 @@ export {
 } from './ports/ConsoleLogger.js';
 export type { Validator, ValidationResult, ValidationIssue } from './ports/Validator.js';
 export { PassthroughValidator } from './ports/Validator.js';
+export type {
+  LlmRole,
+  LlmCacheHint,
+  LlmMessage,
+  LlmBudget,
+  LlmCompleteOptions,
+  LlmUsage,
+  LlmCompletion,
+  LlmProviderPort,
+} from './ports/LlmProviderPort.js';
+/** Deterministic `LlmProviderPort` for tests / golden replays — no RNG, no clock, no network. */
+export {
+  MockLlmProvider,
+  type MockLlmProviderOptions,
+  type MockLlmScript,
+} from './ports/MockLlmProvider.js';
