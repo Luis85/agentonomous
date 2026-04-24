@@ -14,9 +14,24 @@ examples/**/node_modules
 .claude/settings.local.json
 .claude/.last-run
 
-# keep graph outputs, skip heavy/local-only files
-graphify-out/cache/            # optional: commit for shared extraction speed, skip to keep repo small
-graphify-out/manifest.json     # mtime-based, invalid after git clone — always gitignore this
-graphify-out/cost.json         # local token tracking, not useful to share
+# Keep graph outputs (graph.html, graph.json, GRAPH_REPORT.md). Skip heavy/local-only files.
+# Use **/ so stray nested graphify-out/ dirs (e.g. src/graphify-out/) are caught too.
+# NOTE: gitignore has no inline comments — everything after the pattern is part of it.
+
+# optional: commit for shared extraction speed, skip to keep repo small
+**/graphify-out/cache/
+# mtime-based, invalid after git clone
+**/graphify-out/manifest.json
+**/graphify-out/cost.json
+# per-node vault: one file per node, huge churn
+**/graphify-out/obsidian/
+# regeneratable exports
+**/graphify-out/cypher.txt
+**/graphify-out/graph.graphml
+**/graphify-out/graph.svg
+# watch-mode flag
+**/graphify-out/needs_update
+# all temp/helper files written during a run
+.graphify_**
 
 .claude/scheduled_tasks.lock
