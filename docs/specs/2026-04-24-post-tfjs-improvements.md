@@ -235,6 +235,51 @@ stream opens several wins.
 
 ---
 
+## 3A. Pre-existing tech debt (unblocks but doesn't belong to the tfjs migration)
+
+These existed before the brainjs swap and were NOT introduced by it.
+Logged here so a later pass can close them in one sweep instead of
+surfacing on every IDE reopen.
+
+### 3A.1 Demo `js-son-agent` ambient-module gap
+
+- **Symptom.** `cd examples/nurture-pet && npx tsc --noEmit` reports
+  four `TS7016 Could not find a declaration file for module
+  'js-son-agent'` errors in `src/cognition/bdi.ts` and the
+  transitively-referenced `src/cognition/adapters/js-son/*.ts`.
+- **Why it exists.** The root workspace carries an ambient shim
+  (`src/cognition/adapters/js-son/js-son-agent.d.ts`, copied into
+  `dist/` by the vite ambient-dts plugin) but the demo's
+  `tsconfig.json` `include` only covers `examples/nurture-pet/src/**/*`
+  — the shim lives outside that scope. When the demo tsc reaches into
+  `../../src/cognition/adapters/js-son/` via `paths`, it sees the TS
+  source but the ambient module declaration is out of reach.
+- **Fix options (pick one).**
+  (a) Extend demo tsconfig's `include` to pull in the shim file only
+  (`"../../src/cognition/adapters/js-son/js-son-agent.d.ts"`).
+  (b) Put a copy of the ambient shim in `examples/nurture-pet/src/`
+  scoped to the demo.
+  (c) Let the demo target the built `dist/` via `paths` pointing at
+  `../../dist/...` — would mirror production resolution and the
+  ambient `/// <reference>` the copy plugin already prepends takes
+  effect.
+- **Cost.** XS (a) / S (c).
+- **Unblocked by.** Nothing — orthogonal to the tfjs work.
+
+### 3A.2 `vite.config.ts` `test` key typing
+
+Already fixed on `fix/ide-red-marks-vite-tsconfig` (PR #61) — switched
+`defineConfig` import to `vitest/config`. Keeping a breadcrumb here
+in case the wrapper doc is read before that PR lands.
+
+### 3A.3 Demo tsconfig `baseUrl` deprecation
+
+Already fixed on the same PR #61 — dropped `baseUrl: "."`. `paths`
+resolves relative to tsconfig under `moduleResolution: Bundler`. Zero
+behaviour change, silences the TS 7.0 deprecation note.
+
+---
+
 ## 4. Out of scope / deferred
 
 - **Replacing `UrgencyReasoner` with a trained tfjs model by
@@ -250,15 +295,16 @@ stream opens several wins.
 
 ## Recommended order
 
-1. **3.2** (DRY release) + **3.3** (size-limit comment) — tiny, make CI loop tighter immediately.
-2. **2.3** (loss toast) + **2.5** (Untrain button) — XS wins, ship one demo PR.
-3. **2.1** (loss curve) — makes training a feature, not plumbing.
-4. **2.2** (epoch progress) — polish on top of 2.1.
-5. **1.2** (multi-output softmax) + **2.4** (richer features) — bundled PR; changes what the network *is*.
-6. **1.1** (`TfjsLearner`) — closes the Learner seam.
-7. **1.5** (snapshot versioning of weights) — gated on R-08.
-8. **1.6** (WebGL backend) + **2.7** (backend picker) — bundled PR.
-9. **3.4** (`npm audit` gate) — ship once we have a stable transitive tree.
-10. **3.6** + **3.7** (matrix / OS) — nice-to-haves for pre-1.0.
+1. **3A.1** (demo js-son-agent ambient shim) — one-line tsconfig change, gets the demo's local tsc clean.
+2. **3.2** (DRY release) + **3.3** (size-limit comment) — tiny, make CI loop tighter immediately.
+3. **2.3** (loss toast) + **2.5** (Untrain button) — XS wins, ship one demo PR.
+4. **2.1** (loss curve) — makes training a feature, not plumbing.
+5. **2.2** (epoch progress) — polish on top of 2.1.
+6. **1.2** (multi-output softmax) + **2.4** (richer features) — bundled PR; changes what the network *is*.
+7. **1.1** (`TfjsLearner`) — closes the Learner seam.
+8. **1.5** (snapshot versioning of weights) — gated on R-08.
+9. **1.6** (WebGL backend) + **2.7** (backend picker) — bundled PR.
+10. **3.4** (`npm audit` gate) — ship once we have a stable transitive tree.
+11. **3.6** + **3.7** (matrix / OS) — nice-to-haves for pre-1.0.
 
-Everything except (7) can land on `develop` today. (7) waits on R-08.
+Everything except (8) can land on `develop` today. (8) waits on R-08.
