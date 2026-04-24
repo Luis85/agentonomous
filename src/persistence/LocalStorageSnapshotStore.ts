@@ -22,12 +22,22 @@ const DATA_PREFIX = '__agentonomous/data/';
 const LEGACY_INDEX_SUFFIX = '__agentonomous/index__';
 
 /**
- * Sentinel written once at the end of `migrateLegacyKeys` so subsequent
+ * Sentinel path written at the end of `migrateLegacyKeys` so subsequent
  * constructions short-circuit. Guarantees re-entrance safety without
  * having to disambiguate v1-user-key shapes that happen to match the
  * new `data/` layout.
  */
 const META_MIGRATED_KEY = '__agentonomous/meta/migrated';
+
+/**
+ * Sentinel VALUE written at `META_MIGRATED_KEY`. Check the value (not
+ * just presence) so a v1 user who happened to save under the exact
+ * sentinel path is still migrated — the value at their path is a JSON
+ * snapshot, which can never equal this string, so they fall through
+ * into the migration branch instead of being mistaken for an
+ * already-migrated store.
+ */
+const MIGRATED_MARKER_VALUE = '__agentonomous_v2_migrated__';
 
 /** Minimal storage contract; browser `Storage` satisfies this. */
 export interface StorageLike {
@@ -105,13 +115,25 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   save(key: string, snapshot: AgentSnapshot): Promise<void> {
-    this.storage.setItem(this.dataKey(key), JSON.stringify(snapshot));
+    let encoded: string;
+    try {
+      encoded = this.dataKey(key);
+    } catch (cause) {
+      return Promise.reject(cause as Error);
+    }
+    this.storage.setItem(encoded, JSON.stringify(snapshot));
     this.appendIndex(key);
     return Promise.resolve();
   }
 
   load(key: string): Promise<AgentSnapshot | null> {
-    const raw = this.storage.getItem(this.dataKey(key));
+    let encoded: string;
+    try {
+      encoded = this.dataKey(key);
+    } catch (cause) {
+      return Promise.reject(cause as Error);
+    }
+    const raw = this.storage.getItem(encoded);
     if (raw === null) return Promise.resolve(null);
     try {
       return Promise.resolve(JSON.parse(raw) as AgentSnapshot);
@@ -125,13 +147,30 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   delete(key: string): Promise<void> {
-    this.storage.removeItem(this.dataKey(key));
+    let encoded: string;
+    try {
+      encoded = this.dataKey(key);
+    } catch (cause) {
+      return Promise.reject(cause as Error);
+    }
+    this.storage.removeItem(encoded);
     this.removeFromIndex(key);
     return Promise.resolve();
   }
 
   private dataKey(key: string): string {
-    return this.prefix + DATA_PREFIX + encodeURIComponent(key);
+    // `encodeURIComponent` throws `URIError` on lone-surrogate inputs
+    // (malformed UTF-16). Re-raise with a message that points the
+    // consumer at the bad key instead of surfacing a bare runtime error
+    // from `save` / `load` / `delete`.
+    try {
+      return this.prefix + DATA_PREFIX + encodeURIComponent(key);
+    } catch (cause) {
+      throw new Error(
+        `LocalStorageSnapshotStore: snapshot key '${key}' is not a well-formed UTF-16 string (${String(cause)}).`,
+        { cause },
+      );
+    }
   }
 
   private indexKey(): string {
@@ -191,14 +230,23 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
    * loses data in one direction or the other.
    */
   private migrateLegacyKeys(): void {
-    // Re-entrance guard: once migration has run, the sentinel is set.
-    // Further constructions must not scan — the storage now contains
-    // new-layout entries written by this code that would be
-    // indistinguishable from v1 user keys of the same shape.
-    if (this.storage.getItem(this.prefix + META_MIGRATED_KEY) !== null) return;
+    // Re-entrance guard: once migration has run, the sentinel value is
+    // written at the marker path. Match on VALUE, not mere presence —
+    // a v1 user who happened to save under the sentinel path would
+    // otherwise be mistaken for an already-migrated store and have
+    // their snapshot left orphaned.
+    const rawAtMarker = this.storage.getItem(this.prefix + META_MIGRATED_KEY);
+    if (rawAtMarker === MIGRATED_MARKER_VALUE) return;
 
     const legacyKeys = new Set<string>();
     const legacyIndexRaw = this.storage.getItem(this.prefix + LEGACY_INDEX_SUFFIX);
+    // If the marker path holds something that ISN'T our sentinel value,
+    // it's v1 user data at a colliding path. Treat it as a legacy user
+    // key so the snapshot migrates instead of being overwritten when we
+    // stamp the sentinel at the end of this pass.
+    if (rawAtMarker !== null && rawAtMarker !== MIGRATED_MARKER_VALUE) {
+      legacyKeys.add(META_MIGRATED_KEY);
+    }
 
     if (legacyIndexRaw !== null) {
       try {
@@ -242,18 +290,30 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       }
     }
 
+    const migrated: string[] = [];
     for (const userKey of legacyKeys) {
       const raw = this.storage.getItem(this.prefix + userKey);
-      if (raw !== null) {
-        this.storage.setItem(this.dataKey(userKey), raw);
-        this.storage.removeItem(this.prefix + userKey);
+      if (raw === null) continue;
+      let encoded: string;
+      try {
+        encoded = this.dataKey(userKey);
+      } catch {
+        // Malformed UTF-16 key (lone surrogate) — can't round-trip
+        // through encodeURIComponent. Skip so migration doesn't crash
+        // store initialization for the other, well-formed entries. The
+        // payload stays at the legacy path; the consumer sees it
+        // missing from `list()` but storage isn't mutated.
+        continue;
       }
+      this.storage.setItem(encoded, raw);
+      this.storage.removeItem(this.prefix + userKey);
+      migrated.push(userKey);
     }
     if (legacyIndexRaw !== null) {
       this.storage.removeItem(this.prefix + LEGACY_INDEX_SUFFIX);
     }
 
-    const migratedIndex = new Set<string>(legacyKeys);
+    const migratedIndex = new Set<string>(migrated);
     const existingIndex = this.readIndex();
     for (const entry of existingIndex) migratedIndex.add(entry);
     if (migratedIndex.size > 0) {
@@ -264,7 +324,7 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
     // with no legacy data — so subsequent constructions short-circuit
     // the scan before it can misinterpret v2 `data/` entries as v1
     // user keys.
-    this.storage.setItem(this.prefix + META_MIGRATED_KEY, '1');
+    this.storage.setItem(this.prefix + META_MIGRATED_KEY, MIGRATED_MARKER_VALUE);
   }
 }
 

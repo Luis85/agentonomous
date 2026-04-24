@@ -332,6 +332,67 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(storage.getItem('p/__agentonomous/index__')).toBeNull();
   });
 
+  it('migrates v1 user data saved under the exact META_MIGRATED_KEY sentinel path', async () => {
+    // The re-entrance marker lives at `__agentonomous/meta/migrated`. A
+    // v1 user could legitimately have saved under that exact key before
+    // upgrade. Matching merely on the path's PRESENCE would treat their
+    // snapshot as "migrated already done" and leave it orphaned. The
+    // guard matches the VALUE instead (a distinctive sentinel string),
+    // so v1 payloads at that path fall through into the migration
+    // branch like any other legacy key.
+    const storage = new FakeStorage();
+    const collidingKey = '__agentonomous/meta/migrated';
+    storage.setItem(`p/${collidingKey}`, JSON.stringify(snap(collidingKey, 1)));
+    // Legacy index DELIBERATELY missing so we exercise the rawAtMarker
+    // path (not the legacy-index-parse path).
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    expect([...(await store.list())]).toEqual([collidingKey]);
+    expect(await store.load(collidingKey)).toMatchObject({ identity: { id: collidingKey } });
+    // The marker path now holds the sentinel value, not the old snapshot.
+    expect(storage.getItem(`p/${collidingKey}`)).not.toBeNull();
+    expect(storage.getItem(`p/${collidingKey}`)).not.toBe(JSON.stringify(snap(collidingKey, 1)));
+  });
+
+  it('save / load / delete report a clear error for lone-surrogate (malformed UTF-16) keys', async () => {
+    // encodeURIComponent throws URIError on lone surrogates. The pre-
+    // split layout accepted such strings verbatim because it wrote
+    // them to storage unchanged. After the split, callers that pass
+    // one get a store-specific error pointing at the offending key
+    // instead of a bare runtime URIError.
+    const storage = new FakeStorage();
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    const loneSurrogate = '\uD800'; // High surrogate with no matching low.
+
+    await expect(store.save(loneSurrogate, snap('x', 0))).rejects.toThrow(
+      /not a well-formed UTF-16 string/,
+    );
+    await expect(store.load(loneSurrogate)).rejects.toThrow(/not a well-formed UTF-16 string/);
+    await expect(store.delete(loneSurrogate)).rejects.toThrow(/not a well-formed UTF-16 string/);
+  });
+
+  it('migration skips malformed-UTF-16 legacy entries without crashing store init', async () => {
+    // A legacy index could theoretically list a key whose string
+    // representation is not well-formed UTF-16 (lone surrogate). Pre-
+    // fix, encodeURIComponent on such a string would throw from inside
+    // migration and block the whole constructor from succeeding. The
+    // store now skips those entries and migrates the rest.
+    const storage = new FakeStorage();
+    const loneSurrogate = '\uD800';
+    storage.setItem(`p/${loneSurrogate}`, JSON.stringify(snap('wellformed', 0)));
+    storage.setItem('p/good', JSON.stringify(snap('good', 0)));
+    storage.setItem('p/__agentonomous/index__', JSON.stringify([loneSurrogate, 'good']));
+
+    // Constructor must succeed.
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    // `good` migrated; the malformed key was skipped, not crashed on.
+    expect([...(await store.list())]).toEqual(['good']);
+    expect(await store.load('good')).toMatchObject({ identity: { id: 'good' } });
+  });
+
   it("rejects an empty prefix so migration can't match and nuke unrelated storage keys", () => {
     // A prefix of '' would make startsWith(prefix) true for every key in
     // the storage, so migration would rewrite and delete unrelated
