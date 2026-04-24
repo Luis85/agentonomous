@@ -50,6 +50,7 @@ function renderRoot(): HTMLElement {
     '<select id="cognition-mode-select"></select>' +
     '<span id="cognition-status" data-mode="heuristic">active</span>' +
     '<button id="train-network" type="button" hidden>Train</button>' +
+    '<button id="untrain-network" type="button" hidden>Untrain</button>' +
     '</div>' +
     '<button id="reset-button" type="button">Reset</button>';
   return document.querySelector<HTMLElement>('#cognition-switcher')!;
@@ -159,6 +160,50 @@ describe('Train button visibility', () => {
     await selectMode('bt');
     const btn = doc.getElementById('train-network')!;
     expect(btn.hasAttribute('hidden')).toBe(true);
+  });
+});
+
+describe('Untrain button', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  it('shares visibility with the Train button across mode switches', async () => {
+    const { document: doc, selectMode } = await mountDemo();
+    const untrain = doc.getElementById('untrain-network')!;
+    expect(untrain.hasAttribute('hidden')).toBe(true);
+
+    await selectMode('learning');
+    expect(untrain.hasAttribute('hidden')).toBe(false);
+
+    await selectMode('heuristic');
+    expect(untrain.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('clears the persisted tfjs snapshot and swaps in a fresh reasoner', async () => {
+    const agentId = 'test-pet';
+    localStorage.setItem(
+      `agentonomous/${agentId}/tfjs-network`,
+      JSON.stringify({ version: 1, topology: {}, weights: '', weightsShapes: [] }),
+    );
+
+    const { document: doc, selectMode, fakeAgent } = await mountDemo({ agentId });
+    await selectMode('learning');
+    const initialSetCount = fakeAgent.setReasoner.mock.calls.length;
+    const untrainBtn = doc.getElementById('untrain-network') as HTMLButtonElement;
+
+    untrainBtn.click();
+    await waitForTrainingFlush(untrainBtn);
+
+    expect(localStorage.getItem(`agentonomous/${agentId}/tfjs-network`)).toBeNull();
+    expect(fakeAgent.setReasoner.mock.calls.length).toBeGreaterThan(initialSetCount);
+    expect(untrainBtn.textContent).toBe('Untrain');
+    expect(untrainBtn.disabled).toBe(false);
   });
 });
 

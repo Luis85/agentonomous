@@ -12,11 +12,15 @@ const TRAINED_FLASH_MS = 1500;
  * heuristic/bdi/bt loads — any reasoner exposing these methods is
  * treated as trainable.
  */
+type TrainResultLike = {
+  finalLoss?: number;
+  history?: { loss?: readonly number[] };
+};
 type TrainableReasoner = {
   train: (
     pairs: Array<{ features: number[]; label: number[] }>,
     opts?: { epochs?: number; learningRate?: number; seed?: number; shuffle?: boolean },
-  ) => Promise<unknown>;
+  ) => Promise<TrainResultLike>;
   toJSON: () => unknown;
   dispose?: () => void;
 };
@@ -113,10 +117,17 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   }
 
   const trainBtn = document.getElementById('train-network') as HTMLButtonElement | null;
+  const untrainBtn = document.getElementById('untrain-network') as HTMLButtonElement | null;
   const setTrainVisibility = (modeId: CognitionModeSpec['id']): void => {
-    if (!trainBtn) return;
-    if (modeId === 'learning') trainBtn.removeAttribute('hidden');
-    else trainBtn.setAttribute('hidden', '');
+    const show = modeId === 'learning';
+    if (trainBtn) {
+      if (show) trainBtn.removeAttribute('hidden');
+      else trainBtn.setAttribute('hidden', '');
+    }
+    if (untrainBtn) {
+      if (show) untrainBtn.removeAttribute('hidden');
+      else untrainBtn.setAttribute('hidden', '');
+    }
   };
 
   let disposed = false;
@@ -224,7 +235,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         const urgency = 1 - min;
         return { features, label: [urgency] };
       });
-      await reasoner.train!(pairs, {
+      const result = await reasoner.train!(pairs, {
         epochs: TRAIN_EPOCHS,
         learningRate: 0.1,
         seed: Math.floor(trainRng() * 0x7fff_ffff),
@@ -238,7 +249,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       } catch {
         // localStorage unavailable — training still succeeds for this session.
       }
-      flashStatus(status, 'Trained ✓', TRAINED_FLASH_MS);
+      flashStatus(status, formatTrainedToast(result), TRAINED_FLASH_MS);
     };
 
     trainingReasoner = reasonerHandle;
@@ -259,6 +270,57 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     void onTrainClick();
   };
   if (trainBtn) trainBtn.addEventListener('click', onTrainClickWrapped);
+
+  const onUntrainClick = async (): Promise<void> => {
+    if (!untrainBtn || disposed) return;
+    if (activeModeId !== 'learning') return;
+    // Clear only the tfjs snapshot key — leave the rest of the agent's
+    // persisted state alone (this is not a full reset). A fresh
+    // `construct()` then rehydrates from the bundled baseline.
+    try {
+      globalThis.localStorage?.removeItem(`agentonomous/${agent.identity.id}/tfjs-network`);
+    } catch {
+      // localStorage unavailable — the next construct() falls back to
+      // the bundled baseline anyway.
+    }
+
+    const mode = COGNITION_MODES.find((m) => m.id === 'learning');
+    if (!mode) return;
+
+    const originalText = untrainBtn.textContent ?? 'Untrain';
+    untrainBtn.disabled = true;
+    untrainBtn.textContent = 'Resetting…';
+    if (trainBtn) trainBtn.disabled = true;
+    const myEpoch = ++changeEpoch;
+
+    try {
+      const reasoner = await mode.construct();
+      if (disposed || myEpoch !== changeEpoch) {
+        disposeIfOwned(reasoner);
+        return;
+      }
+      const previous = activeReasoner;
+      agent.setReasoner(reasoner);
+      activeReasoner = reasoner;
+      disposeIfOwned(previous);
+      flashStatus(status, 'Reset to baseline ✓', TRAINED_FLASH_MS);
+    } catch (err) {
+      if (disposed || myEpoch !== changeEpoch) return;
+      // eslint-disable-next-line no-console -- user-visible diagnostic.
+      console.error('cognitionSwitcher: untrain failed', err);
+      flashStatus(status, 'Untrain failed', TRAINED_FLASH_MS);
+    } finally {
+      if (!disposed) {
+        untrainBtn.disabled = false;
+        untrainBtn.textContent = originalText;
+        if (trainBtn) trainBtn.disabled = false;
+      }
+    }
+  };
+  const onUntrainClickWrapped = (): void => {
+    void onUntrainClick();
+  };
+  if (untrainBtn) untrainBtn.addEventListener('click', onUntrainClickWrapped);
 
   void Promise.all(
     COGNITION_MODES.map(async (mode: CognitionModeSpec) => {
@@ -282,10 +344,31 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       disposed = true;
       select.removeEventListener('change', onChangeWrapped);
       if (trainBtn) trainBtn.removeEventListener('click', onTrainClickWrapped);
+      if (untrainBtn) untrainBtn.removeEventListener('click', onUntrainClickWrapped);
       disposeIfOwned(activeReasoner);
       activeReasoner = null;
     },
   };
+}
+
+/**
+ * Render the post-train toast. Prefers the loss delta ("0.42 → 0.08")
+ * when both the initial-epoch loss and the final loss are reported; falls
+ * back to a bare checkmark if the training result is sparse.
+ */
+function formatTrainedToast(result: TrainResultLike): string {
+  const history = result.history?.loss;
+  const initialLoss = history && history.length > 0 ? history[0] : undefined;
+  const finalLoss = result.finalLoss ?? (history ? history[history.length - 1] : undefined);
+  if (
+    typeof initialLoss === 'number' &&
+    Number.isFinite(initialLoss) &&
+    typeof finalLoss === 'number' &&
+    Number.isFinite(finalLoss)
+  ) {
+    return `Trained ✓ — loss ${initialLoss.toFixed(2)} → ${finalLoss.toFixed(2)}`;
+  }
+  return 'Trained ✓';
 }
 
 /**
