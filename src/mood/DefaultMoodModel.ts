@@ -24,7 +24,7 @@ export class DefaultMoodModel implements MoodModel {
     const valence = 1 - avgUrgency;
 
     // Preserve updatedAt if category didn't change (important for event emission).
-    if (ctx.previous && ctx.previous.category === biased) {
+    if (ctx.previous?.category === biased) {
       return { category: biased, updatedAt: ctx.previous.updatedAt, valence };
     }
     return { category: biased, updatedAt: ctx.wallNowMs, valence };

@@ -83,7 +83,7 @@ export class Modifiers {
     const removed: Modifier[] = [];
     for (let i = this.entries.length - 1; i >= 0; i--) {
       const entry = this.entries[i];
-      if (entry && entry.mod.id === id) {
+      if (entry?.mod.id === id) {
         removed.unshift(entry.mod);
         this.entries.splice(i, 1);
       }

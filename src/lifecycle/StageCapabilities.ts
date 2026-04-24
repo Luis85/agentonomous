@@ -26,6 +26,6 @@ export function stageAllowsSkill(
   const rule = caps[stage];
   if (!rule) return true;
   if (rule.allow && !rule.allow.includes(skillId)) return false;
-  if (rule.deny && rule.deny.includes(skillId)) return false;
+  if (rule.deny?.includes(skillId)) return false;
   return true;
 }

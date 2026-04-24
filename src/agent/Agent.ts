@@ -1,22 +1,13 @@
 import type { DomainEvent } from '../events/DomainEvent.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
 import {
-  AGENT_DIED,
   AGENT_TICKED,
-  LIFE_STAGE_CHANGED,
   MODIFIER_APPLIED,
-  MODIFIER_EXPIRED,
   MODIFIER_REMOVED,
-  type AgentDiedEvent,
   type AgentTickedEvent,
-  type LifeStageChangedEvent,
   type ModifierAppliedEvent,
   type ModifierRemovedEvent,
 } from '../events/standardEvents.js';
-import {
-  ANIMATION_TRANSITION,
-  type AnimationTransitionEvent,
-} from '../animation/AnimationTransitionEvent.js';
 import {
   AnimationStateMachine,
   type AnimationStateMachineOptions,
@@ -39,23 +30,19 @@ import type { Mood } from '../mood/Mood.js';
 import type { MoodModel } from '../mood/MoodModel.js';
 import type { Needs } from '../needs/Needs.js';
 import type { AgentSnapshot, SnapshotPart } from '../persistence/AgentSnapshot.js';
-import { CURRENT_SNAPSHOT_VERSION } from '../persistence/AgentSnapshot.js';
 import {
   AutoSaveTracker,
   DEFAULT_AUTOSAVE_POLICY,
   type AutoSavePolicy,
 } from '../persistence/AutoSavePolicy.js';
-import { runCatchUp } from '../persistence/offlineCatchUp.js';
 import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
 import type { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
-import { InMemoryMemoryAdapter } from '../memory/InMemoryMemoryAdapter.js';
 import { SkillRegistry } from '../skills/SkillRegistry.js';
 import type { RemoteController } from './RemoteController.js';
 import type { ScriptedController } from './ScriptedController.js';
 import type { Rng } from '../ports/Rng.js';
 import type { WallClock } from '../ports/WallClock.js';
-import type { Logger } from '../ports/Logger.js';
-import { NullLogger } from '../ports/Logger.js';
+import { NullLogger, type Logger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
 import type { AgentState } from '../persistence/AgentState.js';
 import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.js';
@@ -72,6 +59,9 @@ import { NeedsTicker } from './internal/NeedsTicker.js';
 import { MoodReconciler } from './internal/MoodReconciler.js';
 import { AnimationReconciler } from './internal/AnimationReconciler.js';
 import { CognitionPipeline } from './internal/CognitionPipeline.js';
+import { runRestore } from './internal/RestoreCoordinator.js';
+import { runDeath } from './internal/DeathCoordinator.js';
+import { assembleSnapshot } from './internal/SnapshotAssembler.js';
 
 const DEFAULT_TIME_SCALE = 1;
 
@@ -297,6 +287,14 @@ export class Agent {
     this.die(cause, reason, at);
   }
 
+  /** @internal Invoked by `runRestore` to apply a lifecycle slice. */
+  applyLifecycleSnapshot(slice: { ageSeconds: number; stage: LifeStage }): void {
+    if (!this.ageModel) return;
+    this.ageModel.restore({ ageSeconds: slice.ageSeconds, stage: slice.stage });
+    this.virtualNowSeconds = slice.ageSeconds;
+    if (slice.stage === DECEASED_STAGE) this.halted = true;
+  }
+
   // =========================================================================
   // Public API
   // =========================================================================
@@ -497,48 +495,7 @@ export class Agent {
     reason: string | undefined,
     at: number,
   ): void {
-    if (this.halted) return;
-    this.halted = true;
-    const fromStage = this.ageModel?.stage ?? 'alive';
-    const transition = this.ageModel?.markDeceased() ?? null;
-    if (transition) {
-      const stageEvent: LifeStageChangedEvent = {
-        type: LIFE_STAGE_CHANGED,
-        at,
-        agentId: this.identity.id,
-        from: transition.from,
-        to: transition.to,
-        atAgeSeconds: transition.atAgeSeconds,
-      };
-      this.publish(stageEvent);
-    }
-    const died: AgentDiedEvent = {
-      type: AGENT_DIED,
-      at,
-      agentId: this.identity.id,
-      cause,
-      atAgeSeconds: this.ageModel?.ageSeconds ?? 0,
-      ...(reason !== undefined ? { reason } : {}),
-    };
-    this.publish(died);
-
-    // Force the animation into its 'dead' state so renderers update
-    // immediately; reconciliation is inert from now on since halted=true
-    // short-circuits future ticks.
-    const animationT = this.animation.transition('dead', at, DECEASED_STAGE);
-    if (animationT) {
-      const animEvent: AnimationTransitionEvent = {
-        type: ANIMATION_TRANSITION,
-        at,
-        agentId: this.identity.id,
-        from: animationT.from,
-        to: animationT.to,
-        reason: DECEASED_STAGE,
-      };
-      this.publish(animEvent);
-    }
-    // Suppress unused-var warning if stage wasn't needed.
-    void fromStage;
+    runDeath(this, cause, reason, at);
   }
 
   /** Public death trigger for narrative / event-driven deaths. */
@@ -626,39 +583,7 @@ export class Agent {
    * saved payload.
    */
   snapshot(opts: { include?: readonly SnapshotPart[] } = {}): AgentSnapshot {
-    const wanted = (part: SnapshotPart): boolean =>
-      opts.include === undefined || opts.include.includes(part);
-
-    const snap: AgentSnapshot = {
-      schemaVersion: CURRENT_SNAPSHOT_VERSION,
-      snapshotAt: this.clock.now(),
-      identity: this.identity,
-      timeScale: this.timeScale,
-    };
-    if (this.ageModel && wanted('lifecycle')) {
-      snap.lifecycle = this.ageModel.snapshot();
-    }
-    if (this.needs && wanted('needs')) {
-      snap.needs = this.needs.snapshot();
-    }
-    if (wanted('modifiers')) {
-      const list = this.modifiers.list();
-      if (list.length > 0) snap.modifiers = [...list];
-    }
-    if (this.currentMood && wanted('mood')) {
-      snap.mood = { ...this.currentMood };
-    }
-    if (wanted('animation')) {
-      snap.animation = {
-        state: this.animation.current(),
-        activeSkillId: this.currentActiveSkillId,
-      };
-    }
-    if (this.memory && wanted('memory') && isInMemoryMemoryAdapter(this.memory)) {
-      const records = this.memory.snapshot();
-      if (records.length > 0) snap.memory = [...records];
-    }
-    return snap;
+    return assembleSnapshot(this, opts);
   }
 
   /**
@@ -689,91 +614,7 @@ export class Agent {
     snapshot: AgentSnapshot,
     opts: { catchUp?: boolean | { chunkVirtualSeconds?: number } } = {},
   ): Promise<void> {
-    // Apply the snapshotted timeScale first so catch-up (below) and any
-    // subsequent ticks run at the cadence the snapshot was taken at, not
-    // the fresh agent's constructor value. Pre-v2 snapshots omit this
-    // field and keep the constructor value. Routed through
-    // `setTimeScale` so a corrupted snapshot (negative / NaN / Infinity)
-    // throws `InvalidTimeScaleError` instead of silently poisoning the
-    // tick loop.
-    if (snapshot.timeScale !== undefined) {
-      this.setTimeScale(snapshot.timeScale);
-    }
-    if (snapshot.lifecycle && this.ageModel) {
-      this.ageModel.restore({
-        ageSeconds: snapshot.lifecycle.ageSeconds,
-        stage: snapshot.lifecycle.stage,
-      });
-      this.virtualNowSeconds = snapshot.lifecycle.ageSeconds;
-      if (snapshot.lifecycle.stage === DECEASED_STAGE) {
-        this.halted = true;
-      }
-    }
-    if (snapshot.needs && this.needs) {
-      this.needs.restore(snapshot.needs);
-    }
-    if (snapshot.modifiers) {
-      // Restore replaces (not merges) modifier state — see restore()'s
-      // contract above. Clear any pre-existing modifiers on the target
-      // agent before re-applying the snapshot's. Gated on presence of the
-      // `modifiers` slice so partial snapshots (`include: [...]`) still
-      // leave unrelated slices untouched on the target.
-      for (const existingId of new Set(this.modifiers.list().map((m) => m.id))) {
-        this.modifiers.removeAll(existingId);
-      }
-      const nowMs = this.clock.now();
-      for (const mod of snapshot.modifiers) {
-        // Boundary case: modifiers whose expiresAt has already passed at
-        // the clock's current time are dropped on restore AND a
-        // `ModifierExpired` event fires exactly once so downstream
-        // consumers (stores, UIs, logs) see the expiration in the same
-        // shape they would from a normal tick.
-        if (mod.expiresAt !== undefined && mod.expiresAt <= nowMs) {
-          this.publish({
-            type: MODIFIER_EXPIRED,
-            at: nowMs,
-            agentId: this.identity.id,
-            modifierId: mod.id,
-            source: mod.source,
-            ...(mod.visual?.fxHint !== undefined ? { fxHint: mod.visual.fxHint } : {}),
-          });
-          continue;
-        }
-        this.modifiers.apply(mod);
-      }
-    }
-    if (snapshot.mood) {
-      this.currentMood = { ...snapshot.mood };
-    }
-    if (snapshot.animation) {
-      this.animation.restore({ state: snapshot.animation.state });
-      this.currentActiveSkillId = snapshot.animation.activeSkillId;
-    }
-    if (snapshot.memory && this.memory && isInMemoryMemoryAdapter(this.memory)) {
-      this.memory.restore(snapshot.memory);
-    }
-
-    if (opts.catchUp !== undefined && opts.catchUp !== false) {
-      const nowMs = this.clock.now();
-      const elapsedMs = Math.max(0, nowMs - snapshot.snapshotAt);
-      const elapsedSec = (elapsedMs / 1000) * this.timeScale;
-      const chunkOpts =
-        typeof opts.catchUp === 'object' && opts.catchUp.chunkVirtualSeconds !== undefined
-          ? { chunkVirtualSeconds: opts.catchUp.chunkVirtualSeconds }
-          : {};
-      await runCatchUp(
-        elapsedSec,
-        async (chunk) => {
-          // Feed virtual dt back through tick(). dt is in real seconds before
-          // timeScale; invert it here so total virtual advance matches.
-          const realDt = chunk / this.timeScale;
-          await this.tick(realDt);
-        },
-        chunkOpts,
-      );
-    }
-
-    this.reasoner.reset?.();
+    await runRestore(this, snapshot, opts);
   }
 
   /**
@@ -941,8 +782,4 @@ export class Agent {
       }
     }
   }
-}
-
-function isInMemoryMemoryAdapter(m: MemoryRepository): m is InMemoryMemoryAdapter {
-  return m instanceof InMemoryMemoryAdapter;
 }

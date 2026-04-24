@@ -78,10 +78,32 @@ jobs:
           fail_level: error
           reporter: github-check
 
+  docs:
+    name: API docs (typedoc)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      - name: Generate API docs (typedoc)
+        run: npm run docs
+      - name: Upload API docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: docs/api
+          retention-days: 14
+
   test:
     name: Test (Vitest + coverage)
     runs-on: ubuntu-latest
-    needs: [format-check, lint, typecheck, actionlint]
+    needs: [format-check, lint, typecheck, actionlint, docs]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

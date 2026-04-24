@@ -51,13 +51,13 @@ function toInputTensor(features: unknown): tf.Tensor {
   if (Array.isArray(features) || ArrayBuffer.isView(features)) {
     return tf.tensor([features as never]);
   }
+  const got = features === null ? 'null' : typeof features;
   throw new TypeError(
-    'TfjsReasoner.featuresOf must return a tf.Tensor, number[] (single ' +
-      'sample), number[][] (batch), or a TypedArray. Got ' +
-      (features === null ? 'null' : typeof features) +
-      '. Migrating from brain.js? Map the record to an ordered number[] ' +
-      'via an explicit key list — Object.values alone has no guaranteed ' +
-      'iteration order for non-integer keys across all JS engines.',
+    `TfjsReasoner.featuresOf must return a tf.Tensor, number[] (single ` +
+      `sample), number[][] (batch), or a TypedArray. Got ${got}. ` +
+      `Migrating from brain.js? Map the record to an ordered number[] ` +
+      `via an explicit key list — Object.values alone has no guaranteed ` +
+      `iteration order for non-integer keys across all JS engines.`,
   );
 }
 

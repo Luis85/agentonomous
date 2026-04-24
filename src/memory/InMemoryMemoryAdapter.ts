@@ -48,6 +48,15 @@ export class InMemoryMemoryAdapter implements MemoryRepository {
   }
 }
 
+/**
+ * Type guard for the in-memory memory adapter. Used by snapshot
+ * round-trip code (only the in-memory variant supports
+ * `snapshot()` / `restore()` directly).
+ */
+export function isInMemoryMemoryAdapter(m: MemoryRepository): m is InMemoryMemoryAdapter {
+  return m instanceof InMemoryMemoryAdapter;
+}
+
 function matchesFilter(r: MemoryRecord, f: MemoryFilter): boolean {
   if (f.kinds && !f.kinds.includes(r.kind)) return false;
   if (f.topics && !f.topics.some((t) => r.topics.includes(t))) return false;
