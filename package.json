@@ -178,7 +178,7 @@
       "name": "dist/cognition/adapters/tfjs/index.js (gzip)",
       "path": "dist/cognition/adapters/tfjs/index.js",
       "gzip": true,
-      "limit": "4 KB"
+      "limit": "5 KB"
     }
   ],
   "lint-staged": {

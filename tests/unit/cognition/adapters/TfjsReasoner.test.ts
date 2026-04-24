@@ -160,6 +160,34 @@ describe('TfjsReasoner — inference', () => {
     expect(err.suggestedPackage).toBe('@tensorflow/tfjs-backend-wasm');
     expect(err.message).toMatch(/tfjs-backend-wasm/);
   });
+
+  it('selectIntention throws a typed error when featuresOf returns an object map', () => {
+    const model = makeInferenceOnlyModel();
+    const reasoner = new TfjsReasoner<Record<string, number>, number[]>({
+      model,
+      // Simulates a naïve brain.js migration where features is Record<string,number>.
+      featuresOf: () => ({ hunger: 1, cleanliness: 0 }),
+      interpret: () => null,
+    });
+    expect(() => reasoner.selectIntention(ctx())).toThrow(TypeError);
+    expect(() => reasoner.selectIntention(ctx())).toThrow(/brain\.js|Object\.values|TypedArray/);
+    reasoner.dispose();
+  });
+
+  it('selectIntention does not leak input tensors when featuresOf returns a tf.Tensor', () => {
+    const model = makeInferenceOnlyModel();
+    const reasoner = new TfjsReasoner({
+      model,
+      featuresOf: () => tf.tensor2d([[0.5, 0.5]]),
+      interpret: () => null,
+    });
+    reasoner.selectIntention(ctx()); // warm-up to settle tfjs caches
+    const before = tf.memory().numTensors;
+    for (let i = 0; i < 20; i++) reasoner.selectIntention(ctx());
+    const after = tf.memory().numTensors;
+    expect(after - before).toBeLessThanOrEqual(2);
+    reasoner.dispose();
+  });
 });
 
 describe('TfjsReasoner — training', () => {

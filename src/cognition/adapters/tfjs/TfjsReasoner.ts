@@ -36,6 +36,32 @@ function seededShuffle<T>(arr: T[], rng: () => number): void {
 }
 
 /**
+ * Normalise whatever `featuresOf` returned into a 2D `tf.Tensor` suitable
+ * for `model.predict`. Accepts a `tf.Tensor` (passed through), a
+ * `number[]` (wrapped to shape `[1, N]`), a nested `number[][]` (treated
+ * as a batch), or any `TypedArray` subclass (wrapped to `[1, N]`).
+ *
+ * Throws a typed error for anything else — most commonly a
+ * `Record<string, number>` from a brain.js-era `featuresOf` migration,
+ * where the object's key order isn't a stable feature ordering. The
+ * message nudges migrators toward an explicit ordered projection.
+ */
+function toInputTensor(features: unknown): tf.Tensor {
+  if (features instanceof tf.Tensor) return features as tf.Tensor;
+  if (Array.isArray(features) || ArrayBuffer.isView(features)) {
+    return tf.tensor([features as never]);
+  }
+  throw new TypeError(
+    'TfjsReasoner.featuresOf must return a tf.Tensor, number[] (single ' +
+      'sample), number[][] (batch), or a TypedArray. Got ' +
+      (features === null ? 'null' : typeof features) +
+      '. Migrating from brain.js? Map the record to an ordered number[] ' +
+      'via an explicit key list — Object.values alone has no guaranteed ' +
+      'iteration order for non-integer keys across all JS engines.',
+  );
+}
+
+/**
  * Thrown when a `TfjsReasoner` is constructed with `backend: 'X'` but
  * tfjs's current global backend is something else. Carries the suggested
  * npm package to install so UIs can render a useful message.
@@ -168,9 +194,14 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
       },
     };
 
-    const features = this.featuresOf(ctx, helpers);
+    // `featuresOf` runs INSIDE `tf.tidy` so any `tf.Tensor` it allocates
+    // (fresh or returned directly) is tracked and disposed with the
+    // forward-pass scratch. Consumers must treat a returned tensor as
+    // single-use per tick — a long-lived cached tensor would be disposed
+    // on the first call and fail on the next.
     const flatArray = tf.tidy(() => {
-      const inputTensor = features instanceof tf.Tensor ? features : tf.tensor([features as never]);
+      const features = this.featuresOf(ctx, helpers);
+      const inputTensor = toInputTensor(features);
       const predictionTensor = this.model.predict(inputTensor) as tf.Tensor;
       return Array.from(predictionTensor.dataSync());
     });
