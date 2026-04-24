@@ -138,13 +138,21 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
    */
   async flush(): Promise<TrainResult | null> {
     if (this.disposed) return null;
-    if (this.inflight !== null) await this.inflight;
+    // Loop in case an earlier in-flight batch's drain-tail kicked off
+    // another `trainBackground()` while we were awaiting it. Each
+    // iteration must re-check `inflight`; otherwise `flush()` could
+    // start `runTrain()` in parallel with that newly-scheduled
+    // background batch — overlapping `model.fit` calls on the same
+    // reasoner are a nondeterminism / backend-error footgun.
+    while (this.inflight !== null) {
+      await this.inflight;
+      if (this.disposed) return null;
+    }
     if (this.buffer.length === 0) return null;
     // Mark as in-flight for the duration of the forced train so a
-    // concurrent `score()` can't fire `trainBackground()` in parallel
-    // on the same reasoner — overlapping `model.fit` calls are a
-    // nondeterminism / backend-error footgun. `isTraining()` also
-    // reports true here, matching the auto-batch path.
+    // concurrent `score()` can't fire `trainBackground()` either.
+    // `isTraining()` also reports true here, matching the auto-batch
+    // path.
     const promise = this.runTrain();
     this.inflight = promise.then(
       () => null,
@@ -198,10 +206,16 @@ export class TfjsLearner<In = unknown, Out = unknown> implements Learner {
   }
 
   private capacity(): number {
-    // Same NaN-safety as `batchSize()` + clamp to ≥ 0 so a negative
-    // `bufferCapacity` (or a negative derived default) can't turn the
-    // buffer-trim loop into a hang at `buffer.length > cap === -n`.
+    // Three-way coercion:
+    //  - `Infinity` is the documented escape hatch for "no cap" — keep
+    //    it as-is so the trim loop's `length > Infinity` is always
+    //    false and nothing ever drops.
+    //  - Any other non-finite value (NaN / -Infinity) falls back to
+    //    the derived default.
+    //  - Finite values are truncated and clamped to ≥ 0 so a negative
+    //    cap can't turn `length > -n` into a hang.
     const raw = this.opts.bufferCapacity;
+    if (raw === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;
     const n =
       typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : this.batchSize() * 4;
     return Math.max(0, n);
