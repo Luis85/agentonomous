@@ -158,4 +158,64 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     const listed = [...(await store.list())].sort();
     expect(listed).toEqual(['alpha', 'beta']);
   });
+
+  it('migration handles legacy user keys that look like reserved subpaths', async () => {
+    // v1 layout was `{prefix}{userKey}`, so a user could legitimately have
+    // saved under a key like `__agentonomous/data/foo` or
+    // `__agentonomous/meta/something`. The scan filter that keeps the
+    // migration re-entrant for new-layout entries would otherwise skip
+    // those legacy entries, leaving the data orphaned at the old path
+    // while the new index claimed it existed — `load()` would return
+    // null and the snapshot would be unreachable. The legacy index union
+    // ensures index-registered keys migrate regardless of their shape.
+    const storage = new FakeStorage();
+    const reservedDataKey = '__agentonomous/data/foo';
+    const reservedMetaKey = '__agentonomous/meta/dashboard';
+    storage.setItem(`p/${reservedDataKey}`, JSON.stringify(snap(reservedDataKey, 1)));
+    storage.setItem(`p/${reservedMetaKey}`, JSON.stringify(snap(reservedMetaKey, 2)));
+    storage.setItem('p/__agentonomous/index__', JSON.stringify([reservedDataKey, reservedMetaKey]));
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    const listed = [...(await store.list())].sort();
+    expect(listed).toEqual([reservedDataKey, reservedMetaKey].sort());
+
+    expect(await store.load(reservedDataKey)).toMatchObject({
+      identity: { id: reservedDataKey },
+    });
+    expect(await store.load(reservedMetaKey)).toMatchObject({
+      identity: { id: reservedMetaKey },
+    });
+
+    // Legacy paths cleared; data lives under encoded new-layout paths.
+    expect(storage.getItem(`p/${reservedDataKey}`)).toBeNull();
+    expect(storage.getItem(`p/${reservedMetaKey}`)).toBeNull();
+    expect(storage.getItem('p/__agentonomous/index__')).toBeNull();
+    expect(
+      storage.getItem(`p/__agentonomous/data/${encodeURIComponent(reservedDataKey)}`),
+    ).not.toBeNull();
+    expect(
+      storage.getItem(`p/__agentonomous/data/${encodeURIComponent(reservedMetaKey)}`),
+    ).not.toBeNull();
+  });
+
+  it('migration is idempotent — second construction does not re-process new-layout entries', async () => {
+    // Migration runs once on construction. A second construction over the
+    // same storage must NOT re-process the new-layout `data/` entries
+    // written by the first run as if they were legacy keys (which would
+    // double-encode them and corrupt the layout).
+    const storage = new FakeStorage();
+    storage.setItem('p/alpha', JSON.stringify(snap('alpha', 1)));
+    storage.setItem('p/__agentonomous/index__', JSON.stringify(['alpha']));
+
+    new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+    const rawAfterFirst = [...storage.rawKeys()].sort();
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+    const rawAfterSecond = [...storage.rawKeys()].sort();
+
+    expect(rawAfterSecond).toEqual(rawAfterFirst);
+    expect(await store.load('alpha')).toMatchObject({ identity: { id: 'alpha' } });
+    expect([...(await store.list())]).toEqual(['alpha']);
+  });
 });

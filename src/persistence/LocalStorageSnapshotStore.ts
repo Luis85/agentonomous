@@ -158,7 +158,22 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   private migrateLegacyKeys(): void {
     if (!isIterableStorage(this.storage)) return;
 
-    const legacyKeys: string[] = [];
+    // Two sources of "what counts as a legacy user key":
+    //
+    // 1. Scan: any `{prefix}{suffix}` entry whose suffix is NOT under the
+    //    new-layout `data/` or `meta/` subpaths. Picks up orphans the
+    //    legacy index may have lost (the original v1 collision bug).
+    //    Filter on the new-layout subpaths makes migration re-entrant —
+    //    on subsequent constructions the scan finds only post-split
+    //    entries and short-circuits.
+    //
+    // 2. Legacy index: user keys that v1 explicitly registered. This is
+    //    authoritative — a user who saved under a key that LOOKS like a
+    //    new-layout subpath (e.g. `__agentonomous/data/foo`) would be
+    //    skipped by the scan filter, so we union the index in so those
+    //    keys still migrate. Without this, such snapshots become
+    //    unreachable after upgrade.
+    const legacyKeys = new Set<string>();
     let legacyIndexRaw: string | null = null;
 
     for (let i = 0; i < this.storage.length; i++) {
@@ -170,32 +185,38 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
         continue;
       }
       if (suffix.startsWith(DATA_PREFIX) || suffix.startsWith('__agentonomous/meta/')) continue;
-      legacyKeys.push(suffix);
+      legacyKeys.add(suffix);
     }
 
-    if (legacyKeys.length === 0 && legacyIndexRaw === null) return;
-
-    for (const userKey of legacyKeys) {
-      const raw = this.storage.getItem(this.prefix + userKey);
-      if (raw !== null) this.storage.setItem(this.dataKey(userKey), raw);
-      this.storage.removeItem(this.prefix + userKey);
-    }
-
-    const migratedIndex = new Set<string>(legacyKeys);
     if (legacyIndexRaw !== null) {
       try {
         const parsed: unknown = JSON.parse(legacyIndexRaw);
         if (Array.isArray(parsed)) {
           for (const entry of parsed) {
-            if (typeof entry === 'string') migratedIndex.add(entry);
+            if (typeof entry === 'string') legacyKeys.add(entry);
           }
         }
       } catch {
-        // Corrupted legacy index — fall through; we still have legacyKeys.
+        // Corrupted legacy index — fall through with whatever the scan
+        // found. Best-effort recovery; can't synthesize keys we don't
+        // know about.
       }
+    }
+
+    if (legacyKeys.size === 0 && legacyIndexRaw === null) return;
+
+    for (const userKey of legacyKeys) {
+      const raw = this.storage.getItem(this.prefix + userKey);
+      if (raw !== null) {
+        this.storage.setItem(this.dataKey(userKey), raw);
+        this.storage.removeItem(this.prefix + userKey);
+      }
+    }
+    if (legacyIndexRaw !== null) {
       this.storage.removeItem(this.prefix + LEGACY_INDEX_SUFFIX);
     }
 
+    const migratedIndex = new Set<string>(legacyKeys);
     const existingIndex = this.readIndex();
     for (const entry of existingIndex) migratedIndex.add(entry);
     this.writeIndex([...migratedIndex]);
