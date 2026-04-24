@@ -280,6 +280,14 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   const onUntrainClick = async (): Promise<void> => {
     if (!untrainBtn || disposed) return;
     if (activeModeId !== 'learning') return;
+    // Hard gate: while Train is in flight the Untrain button is also
+    // disabled (see onTrainClick), so a user click can't reach here. If
+    // a programmatic caller or stale click slips past, refuse rather
+    // than interleave — Train's trailing `localStorage.setItem(...)`
+    // would otherwise re-persist trained weights after Untrain wipes
+    // them, and the user would see "Reset to baseline ✓" but a reload
+    // would hydrate the trained model.
+    if (pendingTrain) return;
 
     const originalText = untrainBtn.textContent ?? 'Untrain';
     untrainBtn.disabled = true;
@@ -287,19 +295,6 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     if (trainBtn) trainBtn.disabled = true;
     const myEpoch = ++changeEpoch;
 
-    // If Train is in flight, wait for it to finish before wiping the
-    // snapshot key. Otherwise the pending `localStorage.setItem(...)` at
-    // the tail of `onTrainClick` would re-persist trained weights after
-    // Untrain has cleared them — the user would see "Reset to baseline ✓"
-    // but a reload would still hydrate the trained model.
-    if (pendingTrain) {
-      try {
-        await pendingTrain;
-      } catch {
-        // Train rejections are already surfaced via the train-click
-        // handler; Untrain just needs the persist step to have settled.
-      }
-    }
     // Clear only the tfjs snapshot key — leave the rest of the agent's
     // persisted state alone (this is not a full reset). A fresh
     // `construct()` then rehydrates from the bundled baseline.
@@ -312,11 +307,9 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
 
     const mode = COGNITION_MODES.find((m) => m.id === 'learning');
     if (!mode) {
-      if (!disposed) {
-        untrainBtn.disabled = false;
-        untrainBtn.textContent = originalText;
-        if (trainBtn) trainBtn.disabled = false;
-      }
+      untrainBtn.disabled = false;
+      untrainBtn.textContent = originalText;
+      if (trainBtn) trainBtn.disabled = false;
       return;
     }
 
@@ -329,6 +322,16 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       const previous = activeReasoner;
       agent.setReasoner(reasoner);
       activeReasoner = reasoner;
+      activeModeId = 'learning';
+      // Re-sync the selector + status span: bumping `changeEpoch` above
+      // discarded any in-flight `onChange` work, so if the user had
+      // selected a non-learning mode and clicked Untrain before that
+      // `construct()` resolved, the dropdown could now show the old
+      // non-learning label while the agent is actually running
+      // learning. Snap both to the installed reasoner's reality.
+      if (select.value !== 'learning') select.value = 'learning';
+      status.dataset.mode = 'learning';
+      setTrainVisibility('learning');
       disposeIfOwned(previous);
       flashStatus(status, 'Reset to baseline ✓', TRAINED_FLASH_MS);
     } catch (err) {
