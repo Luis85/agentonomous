@@ -15,4 +15,4 @@ examples/**/node_modules
 .claude/.last-run
 
 graphify-out
-.graphifyignore
+

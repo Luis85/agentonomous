@@ -1,0 +1,10 @@
+node_modules
+graphify-out
+.claude
+.github
+.husky
+dist
+
+CLAUDE.md
+AGENTS.md
+
