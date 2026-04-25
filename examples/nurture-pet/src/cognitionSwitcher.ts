@@ -795,6 +795,12 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
   // the running reasoner picks up the upgraded backend).
   setLearningBackend('cpu');
   backendSelect.value = persisted ?? 'cpu';
+  // Probe-lock: disable the picker until the async startup probe
+  // finishes. Without this, a fast user pick during the probe window
+  // can fire `onBackendChange` against an unverified backend and
+  // (per Codex P1#4) the reconstruct path can disable Learning mode
+  // permanently for the session.
+  backendSelect.disabled = true;
 
   void (async (): Promise<void> => {
     try {
@@ -861,13 +867,52 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
       // enabled; if the user actually selects Learning mode, the mode's
       // own probe surfaces the missing dep. selectedBackend stays at
       // 'cpu' so Learning still has a viable activation path.
+    } finally {
+      // Release the probe-lock regardless of probe outcome — without
+      // this a thrown adapter import would leave the picker frozen
+      // for the session.
+      if (!hooks.isDisposed()) backendSelect.disabled = false;
     }
   })();
 
-  const onBackendChange = (): void => {
+  const onBackendChange = async (): Promise<void> => {
     if (hooks.isDisposed()) return;
     const value = backendSelect.value;
     if (!isBackend(value)) return;
+    // Verify activation BEFORE asking the cognition switcher to
+    // reconstruct. `probeBackend` (the registry-only probe used by
+    // mountBackendPicker's startup sweep) cannot detect runtime
+    // false-positives — `@tensorflow/tfjs-backend-wasm@4.22`
+    // registers its factory unconditionally, but the factory itself
+    // can throw at first use (no fetch shim, WebAssembly disabled).
+    // Without an activation check here, that bad pick would
+    // propagate to `mode.construct()`, `fromJSON` would reject with
+    // `TfjsBackendNotRegisteredError`, the existing `onChange` catch
+    // path would disable Learning mode for the rest of the session,
+    // and the user would have no way to recover short of a reload.
+    let activated = false;
+    try {
+      const tf = await import('@tensorflow/tfjs-core');
+      activated = await tf.setBackend(value);
+      if (activated) await tf.ready();
+    } catch {
+      activated = false;
+    }
+    if (hooks.isDisposed()) return;
+    if (!activated) {
+      // Mark the failing option disabled so a future pick can't hit
+      // the same path, revert the picker to whichever backend is
+      // still believed-good (the in-flight `selectedBackend`), and
+      // skip persistence — the bad value never reaches localStorage.
+      const failingOpt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${value}"]`);
+      if (failingOpt) {
+        failingOpt.disabled = true;
+        failingOpt.title = `${value.toUpperCase()} unavailable in this browser`;
+      }
+      const fallback = getLearningBackend();
+      backendSelect.value = isBackend(fallback) ? fallback : 'cpu';
+      return;
+    }
     setLearningBackend(value);
     try {
       globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, value);
@@ -878,11 +923,14 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
       hooks.triggerReconstruct();
     }
   };
-  backendSelect.addEventListener('change', onBackendChange);
+  const onBackendChangeWrapped = (): void => {
+    void onBackendChange();
+  };
+  backendSelect.addEventListener('change', onBackendChangeWrapped);
 
   return {
     dispose(): void {
-      backendSelect.removeEventListener('change', onBackendChange);
+      backendSelect.removeEventListener('change', onBackendChangeWrapped);
     },
   };
 }
