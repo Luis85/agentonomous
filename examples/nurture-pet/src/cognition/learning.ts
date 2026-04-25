@@ -109,29 +109,48 @@ let currentTick = 0;
 type RecentEventKind = 'completed' | 'failed' | 'critical';
 let recentEvents: Array<{ tick: number; kind: RecentEventKind }> = [];
 let unsubscribers: Array<() => void> = [];
+
 /**
- * Per-tick dedupe set keyed by `${kind}:${skillId | needId}`. Default
- * skills that emit `SkillCompleted` from inside `execute()` (e.g.
- * `FeedSkill`) cause a second emission from
- * `CognitionPipeline.invokeSkillAction` — without dedupe the
- * `recent:SkillCompleted` count doubles for those skills and biases
- * the network toward emitter quirks rather than true completion
- * frequency. Cleared on every `AgentTicked` event.
+ * Record one completion / failure outcome into the recent-event window.
+ * Called by `buildLearningLearner`'s `toTrainingPair` wrapper AFTER
+ * `projectLearningOutcome` finishes — that ordering keeps the projection
+ * looking at pre-this-outcome counts (the kernel's own emission is
+ * scored once, not double-counted via the SkillCompleted bus).
+ *
+ * Counting via the learner's own outcome stream rather than via
+ * `agent.subscribe('SkillCompleted')` sidesteps two failure modes the
+ * earlier event-subscription approach had:
+ * 1. Default skills that emit `SkillCompleted` from `execute()` (e.g.
+ *    `FeedSkill`) PLUS the kernel's emission from
+ *    `CognitionPipeline.invokeSkillAction` would double-count.
+ * 2. `Agent.dispatchReactiveHandlers` can process two queued
+ *    `InteractionRequested` events in one tick, legitimately invoking
+ *    the same skill twice; per-tick `${kind}:${skillId}` dedupe would
+ *    drop the second. Counting via outcomes captures BOTH (one outcome
+ *    is scored per kernel invocation).
  */
-let processedThisTick = new Set<string>();
+export function recordOutcomeForFeatureWindow(kind: 'completed' | 'failed'): void {
+  recentEvents.push({ tick: currentTick, kind });
+}
 
 /**
  * Wire the learning mode to `agent`: store its id for the persisted-
  * network localStorage scope AND subscribe to the standard event bus
- * to feed the mood / modifier-count / event-count dims of
- * `featuresFromNeeds`. Pass `null` to tear down (idempotent).
+ * to feed the mood + tick-window state of `featuresFromNeeds`. Pass
+ * `null` to tear down (idempotent).
  *
  * The subscription tracks:
  * - `MoodChanged` → `currentMood` (collapsed to one-hot via `MOOD_KEYS`)
  * - `AgentTicked` → `currentTick` and prunes events older than
  *   `EVENT_WINDOW_TICKS`
- * - `SkillCompleted` / `SkillFailed` / `NeedCritical` → push into
- *   `recentEvents`
+ * - `NeedCritical` → push into `recentEvents` (single-source emission
+ *   from `NeedsTicker`, no dedupe needed)
+ *
+ * `SkillCompleted` / `SkillFailed` are NOT subscribed here — they're
+ * counted via `recordOutcomeForFeatureWindow` from the learner's
+ * outcome stream so kernel + skill double-emits and reactive-handler
+ * back-to-back invocations both produce exactly one count per
+ * invocation.
  */
 export function setLearningAgent(
   agent: {
@@ -144,7 +163,6 @@ export function setLearningAgent(
   currentMood = null;
   currentTick = 0;
   recentEvents = [];
-  processedThisTick = new Set<string>();
   agentIdForHydration = agent?.identity.id ?? null;
   if (agent === null) return;
   unsubscribers.push(
@@ -164,35 +182,9 @@ export function setLearningAgent(
             // a per-tick scan is O(window) and stable.
             recentEvents = recentEvents.filter((r) => r.tick > cutoff);
           }
-          // Reset per-tick dedupe set so the next tick's emissions can
-          // count once each (per skillId / needId).
-          processedThisTick = new Set<string>();
-          return;
-        }
-        case 'SkillCompleted': {
-          // Dedupe within a tick: default skills that emit
-          // `SkillCompleted` from `execute()` (e.g. `FeedSkill`) plus
-          // the kernel's own emission would otherwise double-count.
-          const e = event as { skillId?: string };
-          const key = `completed:${e.skillId ?? '?'}`;
-          if (processedThisTick.has(key)) return;
-          processedThisTick.add(key);
-          recentEvents.push({ tick: currentTick, kind: 'completed' });
-          return;
-        }
-        case 'SkillFailed': {
-          const e = event as { skillId?: string };
-          const key = `failed:${e.skillId ?? '?'}`;
-          if (processedThisTick.has(key)) return;
-          processedThisTick.add(key);
-          recentEvents.push({ tick: currentTick, kind: 'failed' });
           return;
         }
         case 'NeedCritical': {
-          const e = event as { needId?: string };
-          const key = `critical:${e.needId ?? '?'}`;
-          if (processedThisTick.has(key)) return;
-          processedThisTick.add(key);
           recentEvents.push({ tick: currentTick, kind: 'critical' });
           return;
         }
@@ -419,11 +411,10 @@ export const learningMode: CognitionModeSpec = {
  *   `CleanSkill` removes `dirty`). Falls back to current state only
  *   when the outcome arrived without the snapshot (e.g. a consumer-
  *   emitted outcome from outside the kernel).
- * - Event-count dims = current `recentEvents` window MINUS the
- *   matching kind by 1 to compensate for THIS outcome's own emission.
- *   The dedupe set in `setLearningAgent` ensures the kernel + skill
- *   double-emit only counts once per `(kind, skillId|needId, tick)`,
- *   so the -1 compensation reverses exactly one self-increment.
+ * - Event-count dims = current `recentEvents` window. THIS outcome's
+ *   own completion is NOT yet recorded — `buildLearningLearner`'s
+ *   `toTrainingPair` wrapper increments AFTER `projectLearningOutcome`
+ *   returns, so the projection always sees pre-this-outcome counts.
  * - Label = one-hot 7-vector for SUCCESSFUL outcomes only. Successes
  *   for skill `id` set `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`.
  *
@@ -480,13 +471,6 @@ function projectLearningOutcome(
     else if (e.kind === 'failed') failedCount += 1;
     else critical += 1;
   }
-  // Successful outcomes for active-care skills reach this branch only
-  // when the kernel emitted SkillCompleted for THIS skill — that
-  // emission already pushed one entry into `recentEvents` (deduped via
-  // `processedThisTick`). Subtract it to recover the pre-skill window.
-  // Failures are filtered out earlier in this function, so we only
-  // compensate the `completed` slot.
-  completed = Math.max(0, completed - 1);
   const norm = (n: number): number => Math.min(n, COUNT_NORM_CAP) / COUNT_NORM_CAP;
   const features = [
     levels.hunger ?? 0,
@@ -532,7 +516,19 @@ export async function buildLearningLearner(
   >[0]['reasoner'];
   return new TfjsLearner<number[], number[]>({
     reasoner: trainable,
-    toTrainingPair: (outcome) => projectLearningOutcome(agent, outcome),
+    toTrainingPair: (outcome) => {
+      // Project FIRST so the recent-event window seen by this outcome's
+      // training pair represents pre-this-outcome state. THEN record
+      // the outcome into the window so the next call (and the next
+      // tick's `featuresFromNeeds`) sees the bumped count.
+      const pair = projectLearningOutcome(agent, outcome);
+      const intentionType = outcome.intention.type;
+      if (typeof intentionType === 'string') {
+        const failed = (outcome.details as { failed?: unknown } | undefined)?.failed === true;
+        recordOutcomeForFeatureWindow(failed ? 'failed' : 'completed');
+      }
+      return pair;
+    },
     batchSize: LEARNER_BATCH_SIZE,
     onTrainError: (err) => {
       // eslint-disable-next-line no-console -- background-train diagnostics.
