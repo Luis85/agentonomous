@@ -32,7 +32,7 @@
  */
 import '@tensorflow/tfjs-backend-cpu';
 import * as tf from '@tensorflow/tfjs-core';
-import { layers, sequential, type Sequential } from '@tensorflow/tfjs-layers';
+import { initializers, layers, sequential, type Sequential } from '@tensorflow/tfjs-layers';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -94,12 +94,16 @@ function encodeWeights(weights: readonly Float32Array[]): string {
  */
 function buildModel(): Sequential {
   const model = sequential();
+  // `glorotNormal` defaults to an unseeded `Math.random()` draw —
+  // running this script repeatedly would produce different baselines
+  // even with the data + fit loop seeded. Pass an explicit seed per
+  // layer so regeneration is byte-stable.
   model.add(
     layers.dense({
       units: 16,
       activation: 'sigmoid',
       inputShape: [5],
-      kernelInitializer: 'glorotNormal',
+      kernelInitializer: initializers.glorotNormal({ seed: SEED }),
       biasInitializer: 'zeros',
     }),
   );
@@ -107,7 +111,7 @@ function buildModel(): Sequential {
     layers.dense({
       units: SKILL_IDS.length,
       activation: 'softmax',
-      kernelInitializer: 'glorotNormal',
+      kernelInitializer: initializers.glorotNormal({ seed: SEED + 1 }),
       biasInitializer: 'zeros',
     }),
   );

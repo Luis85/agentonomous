@@ -17,7 +17,7 @@
                 "scale": 1,
                 "mode": "fan_avg",
                 "distribution": "normal",
-                "seed": null
+                "seed": 6221079
               }
             },
             "bias_initializer": {
@@ -47,7 +47,7 @@
                 "scale": 1,
                 "mode": "fan_avg",
                 "distribution": "normal",
-                "seed": null
+                "seed": 6221080
               }
             },
             "bias_initializer": {
@@ -68,7 +68,7 @@
     "keras_version": "tfjs-layers 4.22.0",
     "backend": "tensor_flow.js"
   },
-  "weights": "1LrGvrfZhz8HBdA/izGEPyR7DL/NkDQ/M30IwOFhHz/YS4i++7UQwH9lzT8pSRw/Vlkfv/NAu77MPb6+IEZYvVqBxz3qYHm/bV9oPsfTKL/wE6u//X1Lv1OUfL/pTmk+132QPt/yjT+G0Is/WNabPxZczT9BGYY/X+52v+CZJcBlBqs/sN3PvtwaGMAEw5U/1wiZP9mVnL++Feg9RcYgP4RBA0C2aRHAZuoAv9BQND+l8QrAShkYPTBc1D6OC5k/MMCjv+TyO77ooRtARnEIwJipsT+3Jc4/ruNWPlru9j2oEbq/FFcQvryfQ7/6Yyi+l0cjv7LD5z+Lp6I/cRetvvIRuj3LgMu9oHaHvomV1L8bvsC/7+eEP+ZHsD8/SQM/Wli+P74vgD9ZPPM+OAnWv8FrHL+Hfta+7QQZwOZ3rz2SpwK+OoMavWrs4L4w3ms/hAuJPmrttb40a7o+O0MJv/DUab/NHHk/pldIv73c7b6r4oQ/On1kv/soMT90ytA+EZwZPject756u5u/26A0PwWhqb44qQC/OzaUPzC3Vb9yhGw/GOmyPhj3SD4V14O+whKBvak3l73oXIe/kmQeP77JFkBtCpu/lAHKP3HbfD8VAAvAwfTFvzJD1T7PVI6/hRa8P/nxAsB3pj8/KabBP7cOjD7errA/7AKTv0QPz790nF2/m9OnPwLDrz7RoQ6++hqDPxgugD8/tFW/3gtyP957Br+Z18W/3h8VQNavHz/Z8qC+juSxvX6Zgb+ccb+/61p1vqwg274nXy49L/XcvvyVmbzVoI4/vsMnvz9oFT7Hhhc/+q6cvoPY378DrKc/M6KiP7+25b9nr6o/s70TQLnCtr9SzQ9A7rUFPl5fwL93ji6/80BOv2hvqr+/9mi/XNbpPt3xkD/CxLA/wAbjvuRhwr6j24q/kCOPv1U2Y7/2hRY+SEycPnM7tT/yNMk+bSIgP6rR779lWwFAl2JXP0wjuL+7qkI/X2IGv6TtAz+WfmG/47IwvwfEmL96VaM/WSFEP40Sm7/ndy89xdlhP0EVzL7elL+/KbTQv35rA0C0174+KoqavhzA+j9o7YC/BWwLv8Utzb/tdYa/A9xpPw1qhz6c5tu9zlPvPRJkuj4tTbW+rYibvgbGojw=",
+  "weights": "0/4VP80SvT6blus9frflvROSfr/eNgm/mP5BPpKkJj8SFoG/zamxP8s35j2s4dS/rx2uv+YsJD7KeYy+67/AP84bOb9Lz4s/M4E6Puk6uz3zz3s+G5m9v+Jlxz/RHs6+ZWewvWMBEkAhzK+9XZ/GvZu20r01fOq/myQXvx0/VL+RCis/GXzqv/h/+76z1BnAlJFDvzhWIT1xXeS/U0HOP4BNIL322L2/1Dfgvz2s6D7iDJ8/7xdjP7EBTT+++bk/UtUrvp0gez+zBYy/uk5FP3lXe78gp5S/u4bLP8IMi7/Sveg+lh2Mv/OxsT/G1a2+JD78v22MDkCCEdg//En3vhtz6r8Klnu/iWgEQNzt8b5SGEM/bie5PkMk8j6p2sq+jifsPwBLej/yYlC/oBlMvyOphL4S+sM+h96RPuk8CD+/vwM/ndWHPegDe770wio/DMS8PrakkT+E7Em/7W8Hvm2fAb84KG6/zIC8PofDaT8Ao14/aNNCv/oWFr8sAl6/+YF4vxi5Oj/WqRW/1Em7vaIRm7/0lrw/BfdYPzjaxr7+FHK/EHGxP0B47b5fEEe+yCOyPxYfrL+vLJY+0VSKvuZVIT/6Ho8/fC0cPzW87r+logM+SMUPPuUdKr71+AdAxDIYv0hpmr9A/zY/CgN0vwvFgz/0Vg2/lokeP2ZwZz9ofHu/JNL3vsmEsL36oaw+bzOAP4mMdD5DPyw/tHsJwGSAKL+7JlE/nAaVPqxbiL+XsbE/bRIcv5780D/XuP0+RIrhvyVPZL/icr8+Dj3Jv0pHUT/HoCe+rI2KPcaDkD8Yn8g/eVOOPpL2+zz98yW9O2t/P2eBk7+DcpS+DhWNv+4wB8Bd8ok/J+7iP9uqxT+KKsu+riVsv606+b14Pgg+zCu0P9Aek7/wcUO/icmGPwH5jb/9uZ8/K+3PvkwT/74jynO+EPHxv/4JHj+GxjA/8khnP2nM1r5XbHW/452AP2Xo8r8CUue95lnuP0KTaL4qcPE/jvqfv1l9B8CbBmI/QYWvvszeJL8gsKA+ZokyPwlYZb/wl8W/6VODP5orUj2QCIO+WHPDv9uLTj/p+se/cL+lPik5iT+121S/USPcPlu1Aj4eFnO9HhThvqme1D3Lfvu+N2X+PiEOhj4=",
   "weightsShapes": [[5, 16], [16], [16, 7], [7]],
   "inputKeys": ["hunger", "cleanliness", "happiness", "energy", "health"],
   "outputKeys": ["feed", "clean", "play", "rest", "pet", "medicate", "scold"]

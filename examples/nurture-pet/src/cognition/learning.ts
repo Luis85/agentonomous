@@ -190,6 +190,12 @@ export const learningMode: CognitionModeSpec = {
       const outShape = r.getModel().outputs[0]?.shape;
       const lastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
       if (lastDim !== SOFTMAX_DIM) {
+        // Free the rebuilt-but-incompatible model's tensors before the
+        // catch path constructs the bundled baseline. Without this,
+        // re-entering Learning mode with an incompatible persisted
+        // snapshot would leak one tfjs model + its weight tensors per
+        // attempt.
+        r.dispose();
         throw new Error(
           `learning: persisted snapshot has output dim ${String(lastDim)}, expected ${SOFTMAX_DIM} — rebuilding from bundled baseline.`,
         );
