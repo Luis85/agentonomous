@@ -212,6 +212,31 @@
         stroke-linejoin: round;
         stroke-linecap: round;
       }
+      .prediction-strip {
+        display: block;
+        margin-top: 4px;
+        opacity: 0.95;
+      }
+      .prediction-strip .threshold {
+        stroke: currentColor;
+        stroke-opacity: 0.45;
+        stroke-width: 1;
+        stroke-dasharray: 3 3;
+      }
+      .prediction-strip .prediction-bar {
+        fill: #38bdf8;
+        opacity: 0.75;
+      }
+      .prediction-strip .prediction-bar.selected {
+        fill: #16a34a;
+        opacity: 1;
+      }
+      .prediction-strip .prediction-label {
+        fill: currentColor;
+        font-size: 9px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        opacity: 0.7;
+      }
       .speed-label {
         font-size: 12px;
         opacity: 0.7;
@@ -519,6 +544,16 @@
           height="32"
           viewBox="0 0 120 32"
           aria-label="Training loss curve"
+          role="img"
+          hidden
+        ></svg>
+        <svg
+          id="prediction-strip"
+          class="prediction-strip"
+          width="200"
+          height="60"
+          viewBox="0 0 200 60"
+          aria-label="Softmax prediction strip"
           role="img"
           hidden
         ></svg>
