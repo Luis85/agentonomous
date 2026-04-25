@@ -13,7 +13,7 @@ import type { WallClock } from '../ports/WallClock.js';
  * More verbs land as later milestones add subsystems: M10 will add
  * `addMemory(record)`.
  */
-export interface SkillContext {
+export type SkillContext = {
   readonly identity: AgentIdentity;
   readonly clock: WallClock;
   readonly rng: Rng;
@@ -35,4 +35,4 @@ export interface SkillContext {
 
   /** Return the current virtual age in seconds (0 if no lifecycle). */
   ageSeconds(): number;
-}
+};

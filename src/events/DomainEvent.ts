@@ -6,7 +6,7 @@
  * The `fxHint` field is an optional decoration renderers consume to trigger
  * sound/particle/camera effects — see the plan's FX hints refinement.
  */
-export interface DomainEvent {
+export type DomainEvent = {
   /** Discriminator. Concrete events set this as a string literal. */
   type: string;
   /** Wall-clock ms at which the event was created; populated by publishers. */
@@ -17,4 +17,4 @@ export interface DomainEvent {
   fxHint?: string;
   /** Free-form payload for concrete event types to extend. */
   [extra: string]: unknown;
-}
+};

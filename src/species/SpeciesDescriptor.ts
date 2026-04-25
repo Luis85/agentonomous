@@ -15,7 +15,7 @@ import type { Persona } from '../agent/Persona.js';
  * … })` or load JSON (matching `species.schema.json`) and feed the
  * descriptor to `createAgent({ species: catDescriptor })`.
  */
-export interface SpeciesDescriptor {
+export type SpeciesDescriptor = {
   /** Stable identifier (used as `AgentIdentity.species`). */
   id: string;
   /** Human-readable label for UI. Defaults to `id`. */
@@ -48,4 +48,4 @@ export interface SpeciesDescriptor {
   tags?: readonly string[];
   /** Schema version for migrations. Defaults to 1. */
   version?: number;
-}
+};

@@ -7,11 +7,11 @@ import { identityTransform, type Transform } from './Transform.js';
  * style. Deliberately minimal — no physics, no collision, no animation state.
  * Hosts add those concerns on top.
  */
-export interface Embodiment {
+export type Embodiment = {
   transform: Transform;
   appearance: Appearance;
   locomotion: LocomotionMode;
-}
+};
 
 /**
  * Build an `Embodiment` with sensible defaults, optionally overriding any

@@ -14,7 +14,7 @@ import type { ActorLike } from './types.js';
  * The bridge returns an `unsubscribe()` handle so it can be torn down
  * cleanly on scene transitions.
  */
-export interface ExcaliburAnimationBridgeOptions {
+export type ExcaliburAnimationBridgeOptions = {
   agent: Agent;
   actor: ActorLike;
   /**
@@ -28,7 +28,7 @@ export interface ExcaliburAnimationBridgeOptions {
    * when omitted the bridge leaves the current graphic in place.
    */
   fallback?: unknown;
-}
+};
 
 export class ExcaliburAnimationBridge {
   private readonly agent: Agent;

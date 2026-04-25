@@ -11,7 +11,7 @@
  */
 export type MemoryKind = 'semantic' | 'episodic' | 'working' | (string & {});
 
-export interface MemoryRecord {
+export type MemoryRecord = {
   id: string;
   kind: MemoryKind;
   agentId: string;
@@ -25,4 +25,4 @@ export interface MemoryRecord {
   topics: readonly string[];
   /** Markdown body. */
   body: string;
-}
+};

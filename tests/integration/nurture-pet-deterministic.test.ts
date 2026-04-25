@@ -83,11 +83,11 @@ function buildPet(): { agent: Agent; clock: ManualClock; events: DomainEvent[] }
   return { agent, clock, events };
 }
 
-interface ReplayResult {
+type ReplayResult = {
   traces: DecisionTrace[];
   events: DomainEvent[];
   finalState: ReturnType<Agent['getState']>;
-}
+};
 
 async function runScriptedReplay(): Promise<ReplayResult> {
   const { agent, clock, events } = buildPet();

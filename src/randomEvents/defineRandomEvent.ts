@@ -10,12 +10,12 @@ import type { Rng } from '../ports/Rng.js';
  * inspect the live `Needs` / `Modifiers` / `LifeStage` snapshot for the agent
  * and use the seeded `Rng` port for any sub-rolls.
  */
-export interface RandomEventContext {
+export type RandomEventContext = {
   needs: Needs | undefined;
   modifiers: Modifiers;
   stage: LifeStage | undefined;
   rng: Rng;
-}
+};
 
 /**
  * Data-driven random event descriptor. Consumers declare an event as a plain
@@ -23,7 +23,7 @@ export interface RandomEventContext {
  * the constructor) — the ticker drives probability scaling, cooldowns, and
  * guard evaluation.
  */
-export interface RandomEventDef {
+export type RandomEventDef = {
   id: string;
   /** Per-second probability. Scaled by virtualDt inside the ticker. */
   probabilityPerSecond: number;
@@ -33,7 +33,7 @@ export interface RandomEventDef {
   guard?: (ctx: RandomEventContext) => boolean;
   /** Builder that returns the concrete DomainEvent to publish. */
   emit: (ctx: RandomEventContext) => DomainEvent;
-}
+};
 
 /**
  * Trivial passthrough for consistency with `defineModifier` / `defineLifecycle`.

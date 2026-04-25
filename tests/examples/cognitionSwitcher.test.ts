@@ -15,9 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 // resolution.
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
 
-interface FakeAgent {
+type FakeAgent = {
   setReasoner: Mock<(r: unknown) => void>;
-}
+};
 
 function renderRoot(): HTMLElement {
   document.body.innerHTML =
