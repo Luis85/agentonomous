@@ -6,6 +6,7 @@ import {
   getIdleThreshold,
   getLastPrediction,
   getLearningBackend,
+  serializeTfActivation,
   setLearningBackend,
   SOFTMAX_SKILL_IDS,
 } from './cognition/learning.js';
@@ -836,24 +837,34 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
       // caught and treated as unavailable.
       const probeResults: { readonly name: Backend; readonly ok: boolean }[] = [];
       for (const name of VALID_BACKENDS) {
-        let ok = false;
-        try {
-          switch (name) {
-            case 'cpu':
-              await import('@tensorflow/tfjs-backend-cpu');
-              break;
-            case 'wasm':
-              await import('@tensorflow/tfjs-backend-wasm');
-              break;
-            case 'webgl':
-              await import('@tensorflow/tfjs-backend-webgl');
-              break;
+        // Serialize each iteration's `tf.setBackend` through the
+        // shared mutex so a `learningMode.construct()` triggered by
+        // a fast user click on Learning can't interleave with the
+        // probe sweep — without this, the probe loop can flip
+        // `tf.backend` between `fromJSON`'s internal `tf.setBackend`
+        // and `new TfjsReasoner`'s constructor check, which throws
+        // `TfjsBackendNotRegisteredError` and disables Learning for
+        // the session (Codex P1 round 9).
+        const ok = await serializeTfActivation(async (): Promise<boolean> => {
+          try {
+            switch (name) {
+              case 'cpu':
+                await import('@tensorflow/tfjs-backend-cpu');
+                break;
+              case 'wasm':
+                await import('@tensorflow/tfjs-backend-wasm');
+                break;
+              case 'webgl':
+                await import('@tensorflow/tfjs-backend-webgl');
+                break;
+            }
+            const result = await tf.setBackend(name);
+            if (result) await tf.ready();
+            return result;
+          } catch {
+            return false;
           }
-          ok = await tf.setBackend(name);
-          if (ok) await tf.ready();
-        } catch {
-          ok = false;
-        }
+        });
         if (hooks.isDisposed()) return;
         probeResults.push({ name, ok });
       }
@@ -904,13 +915,15 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
       // consistent with the picker's reported selection between mount
       // and the next mode change.
       if (tf.getBackend() !== finalBackend) {
-        try {
-          await tf.setBackend(finalBackend);
-          await tf.ready();
-        } catch {
-          // cpu commit shouldn't fail; if it does we leave tf wherever
-          // the loop ended and let learningMode.construct() retry.
-        }
+        await serializeTfActivation(async (): Promise<void> => {
+          try {
+            await tf.setBackend(finalBackend);
+            await tf.ready();
+          } catch {
+            // cpu commit shouldn't fail; if it does we leave tf wherever
+            // the loop ended and let learningMode.construct() retry.
+          }
+        });
       }
       if (getLearningBackend() !== finalBackend) {
         setLearningBackend(finalBackend);
@@ -948,35 +961,25 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
   // Mirrors the `changeEpoch` pattern in the cognition-mode
   // `onChange` handler above.
   let backendChangeEpoch = 0;
-  // Serialization mutex for `tf.setBackend` calls. The epoch guard
-  // alone can't prevent a stale handler from MUTATING global tfjs
-  // state — by the time we re-check epoch post-await, the older
-  // `setBackend(A)` has already fired and may have completed AFTER
-  // a newer `setBackend(B)`, leaving runtime on A while picker
-  // state/localStorage/`selectedBackend` track B (Codex P1 round
-  // 8). Awaiting the prior pending activation before invoking our
-  // own serialises the calls — only one `setBackend` is in flight
-  // at a time, and a stale handler that ran AFTER a newer commit
-  // will see `myEpoch !== backendChangeEpoch` BEFORE its setBackend
-  // and bail without mutating tf state.
-  let pendingActivation: Promise<unknown> = Promise.resolve();
+  // The shared `serializeTfActivation` mutex (in `cognition/learning.ts`)
+  // already coordinates `onBackendChange`'s `tf.setBackend` with the
+  // startup probe sweep AND `learningMode.construct()`. Any stale
+  // handler that woke up AFTER a newer change will see
+  // `myEpoch !== backendChangeEpoch` BEFORE its `setBackend` and
+  // bail without mutating tf state, eliminating the out-of-order
+  // race Codex flagged in round 8 — and the round-9 race between
+  // this handler and `mode.construct()`.
   const onBackendChange = async (): Promise<void> => {
     if (hooks.isDisposed()) return;
     const value = backendSelect.value;
     if (!isBackend(value)) return;
     const myEpoch = ++backendChangeEpoch;
-    // Wait for any prior in-flight activation to finish before
-    // touching tf state. `.catch(() => undefined)` so a thrown prior
-    // attempt doesn't poison this one.
-    const prevPending = pendingActivation;
-    let activated = false;
-    const myActivation = (async (): Promise<void> => {
-      await prevPending.catch(() => undefined);
+    const activated = await serializeTfActivation(async (): Promise<boolean> => {
       // Re-check epoch + dispose AFTER the serialization wait. A
       // newer change may have arrived while we queued; if so, bail
       // before any tf mutation rather than executing a stale
       // `setBackend` that the next handler would have to undo.
-      if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return;
+      if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return false;
       // Verify activation BEFORE asking the cognition switcher to
       // reconstruct. `probeBackend` (the registry-only probe used by
       // mountBackendPicker's startup sweep) cannot detect runtime
@@ -991,17 +994,13 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
       // recover short of a reload.
       try {
         const tf = await import('@tensorflow/tfjs-core');
-        activated = await tf.setBackend(value);
-        if (activated) await tf.ready();
+        const ok = await tf.setBackend(value);
+        if (ok) await tf.ready();
+        return ok;
       } catch {
-        activated = false;
+        return false;
       }
-    })();
-    pendingActivation = myActivation;
-    await myActivation;
-    // Clear the slot only if no newer activation has overwritten it
-    // (it's a chain — successive handlers each await the previous).
-    if (pendingActivation === myActivation) pendingActivation = Promise.resolve();
+    });
     // Post-activation stale guard: even with serialization, a
     // newer change can arrive between our setBackend completing
     // and our commit running. The newer handler will own the

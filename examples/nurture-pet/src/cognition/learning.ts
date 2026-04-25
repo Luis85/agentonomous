@@ -139,6 +139,45 @@ export function getLearningBackend(): 'cpu' | 'wasm' | 'webgl' {
 }
 
 /**
+ * Module-scoped serialization mutex for tfjs state mutations. Three
+ * call sites compete for `tf.setBackend`:
+ *
+ * 1. `learningMode.construct()` — sets the backend during model
+ *    rebuild + reasoner construction.
+ * 2. The cognition switcher's startup backend-probe sweep — calls
+ *    `tf.setBackend(name)` once per candidate to test activation.
+ * 3. The cognition switcher's `onBackendChange` handler — sets the
+ *    backend on user pick.
+ *
+ * Without serialization, a probe sweep iteration can flip `tf.backend`
+ * between `learningMode.construct()`'s internal `tf.setBackend(...)`
+ * (inside `TfjsReasoner.fromJSON`) and the `new TfjsReasoner(...)`
+ * call that checks `tf.getBackend() === requestedBackend`. The
+ * constructor then throws `TfjsBackendNotRegisteredError` and the
+ * existing `onChange` catch path disables Learning for the session
+ * (Codex P1 round 9).
+ *
+ * `serializeTfActivation` chains all callers through a single
+ * promise. Only one tf-mutating section runs at a time; subsequent
+ * sections wait for the prior to complete (success or failure) before
+ * starting.
+ */
+let pendingTfActivation: Promise<unknown> = Promise.resolve();
+export async function serializeTfActivation<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = pendingTfActivation;
+  const next = (async (): Promise<T> => {
+    await prev.catch(() => undefined);
+    return fn();
+  })();
+  pendingTfActivation = next;
+  try {
+    return await next;
+  } finally {
+    if (pendingTfActivation === next) pendingTfActivation = Promise.resolve();
+  }
+}
+
+/**
  * Module-scoped recent state used by `featuresFromNeeds` to build the
  * mood / modifier-count / event-count dims. Populated via the agent
  * subscription wired up in `setLearningAgent`. Kept module-scoped so
@@ -427,95 +466,107 @@ export const learningMode: CognitionModeSpec = {
     // session. Holding the snapshot for the full construct keeps
     // import + activation aligned to one backend.
     const backend = selectedBackend;
-    // Side-effect-import the package matching the snapshotted
-    // backend. Each branch uses a literal string so Vite's static
-    // analysis can emit a per-backend async chunk; passing
-    // `backend` to a computed `import()` would inline all three
-    // packages into the learning chunk (or fail at build time).
-    switch (backend) {
-      case 'cpu':
-        await import('@tensorflow/tfjs-backend-cpu');
-        break;
-      case 'wasm':
-        await import('@tensorflow/tfjs-backend-wasm');
-        break;
-      case 'webgl':
-        await import('@tensorflow/tfjs-backend-webgl');
-        break;
-    }
-    const tf = await import('@tensorflow/tfjs-core');
-    const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
-    type Snapshot = Parameters<typeof TfjsReasoner.fromJSON>[0];
-
-    const persisted = loadPersistedSnapshot(agentIdForHydration);
-    const seed: Snapshot = (persisted ?? networkJson) as Snapshot;
-
-    const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
-      const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
-        backend,
-        featuresOf: featuresFromNeeds,
-        interpret: (output) => {
-          // Side-effect: snapshot the per-tick distribution + chosen
-          // column so the demo's prediction strip can render the same
-          // numbers `interpretSoftmax` argmaxed without re-running a
-          // forward pass. `interpretSoftmax` returns `null` for both
-          // shape mismatches and below-threshold idles; pair the
-          // capture with an explicit argmax pass so the strip can
-          // distinguish "idle because below threshold" (output is
-          // valid, selected is null) from "idle because invalid"
-          // (output stays null).
-          if (output.length === SOFTMAX_DIM) {
-            lastPrediction = [...output];
-            const intent = interpretSoftmax(output);
-            lastSelectedIdx = intent === null ? null : argmaxIndex(output);
-            return intent;
-          }
-          lastPrediction = null;
-          lastSelectedIdx = null;
-          return interpretSoftmax(output);
-        },
-      });
-      // Reject snapshots whose output OR input dimension doesn't match
-      // the bundled topology. A pre-row-17 snapshot (single sigmoid
-      // output, length 1) loads fine through `fromJSON` but its scalar
-      // urgency bears no resemblance to a 7-way softmax — silently
-      // treating `output[0]` as the `feed` probability would produce a
-      // "trained" pet that always feeds whenever the old scalar
-      // exceeded the idle floor. Likewise an output-7 snapshot whose
-      // input layer expects a different last-dim would only blow up at
-      // runtime when `featuresFromNeeds` first hands it a 5-element
-      // vector — Learning mode would then throw on every intention
-      // selection instead of falling back to the baseline. Throw on
-      // either mismatch so the caller falls back to the bundled
-      // baseline.
-      const model = r.getModel();
-      const outShape = model.outputs[0]?.shape;
-      const outLastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
-      const inShape = model.inputs[0]?.shape;
-      const inLastDim = inShape && inShape.length > 0 ? inShape[inShape.length - 1] : null;
-      if (outLastDim !== SOFTMAX_DIM || inLastDim !== FEATURE_DIM) {
-        // Free the rebuilt-but-incompatible model's tensors before the
-        // catch path constructs the bundled baseline. Without this,
-        // re-entering Learning mode with an incompatible persisted
-        // snapshot would leak one tfjs model + its weight tensors per
-        // attempt.
-        r.dispose();
-        throw new Error(
-          `learning: persisted snapshot has shape [${String(inLastDim)}, ${String(outLastDim)}], expected [${FEATURE_DIM}, ${SOFTMAX_DIM}] — rebuilding from bundled baseline.`,
-        );
+    // Run the whole construct (backend-package import → fromJSON's
+    // `tf.setBackend` → `new TfjsReasoner` constructor check →
+    // model.compile) inside the shared tfjs activation mutex. Without
+    // this, the cognition switcher's startup probe sweep can flip
+    // `tf.backend` between `fromJSON`'s internal `tf.setBackend`
+    // call and the constructor's `tf.getBackend() === requestedBackend`
+    // check, throwing `TfjsBackendNotRegisteredError` (Codex P1 round
+    // 9). The probe sweep, the picker's onBackendChange handler, and
+    // this construct all share `pendingTfActivation` so only one tf-
+    // mutating section runs at a time.
+    return serializeTfActivation(async (): Promise<Reasoner> => {
+      // Side-effect-import the package matching the snapshotted
+      // backend. Each branch uses a literal string so Vite's static
+      // analysis can emit a per-backend async chunk; passing
+      // `backend` to a computed `import()` would inline all three
+      // packages into the learning chunk (or fail at build time).
+      switch (backend) {
+        case 'cpu':
+          await import('@tensorflow/tfjs-backend-cpu');
+          break;
+        case 'wasm':
+          await import('@tensorflow/tfjs-backend-wasm');
+          break;
+        case 'webgl':
+          await import('@tensorflow/tfjs-backend-webgl');
+          break;
       }
-      // The rebuilt Sequential ships uncompiled; compile with a default
-      // SGD + categoricalCrossentropy pair so the Train button can call
-      // `r.train(...)` over the 7-way softmax output.
-      r.getModel().compile({ optimizer: tf.train.sgd(0.1), loss: 'categoricalCrossentropy' });
-      return r;
-    };
+      const tf = await import('@tensorflow/tfjs-core');
+      const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
+      type Snapshot = Parameters<typeof TfjsReasoner.fromJSON>[0];
 
-    try {
-      return await hydrate(seed);
-    } catch {
-      return hydrate(networkJson as Snapshot);
-    }
+      const persisted = loadPersistedSnapshot(agentIdForHydration);
+      const seed: Snapshot = (persisted ?? networkJson) as Snapshot;
+
+      const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
+        const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
+          backend,
+          featuresOf: featuresFromNeeds,
+          interpret: (output) => {
+            // Side-effect: snapshot the per-tick distribution + chosen
+            // column so the demo's prediction strip can render the same
+            // numbers `interpretSoftmax` argmaxed without re-running a
+            // forward pass. `interpretSoftmax` returns `null` for both
+            // shape mismatches and below-threshold idles; pair the
+            // capture with an explicit argmax pass so the strip can
+            // distinguish "idle because below threshold" (output is
+            // valid, selected is null) from "idle because invalid"
+            // (output stays null).
+            if (output.length === SOFTMAX_DIM) {
+              lastPrediction = [...output];
+              const intent = interpretSoftmax(output);
+              lastSelectedIdx = intent === null ? null : argmaxIndex(output);
+              return intent;
+            }
+            lastPrediction = null;
+            lastSelectedIdx = null;
+            return interpretSoftmax(output);
+          },
+        });
+        // Reject snapshots whose output OR input dimension doesn't match
+        // the bundled topology. A pre-row-17 snapshot (single sigmoid
+        // output, length 1) loads fine through `fromJSON` but its scalar
+        // urgency bears no resemblance to a 7-way softmax — silently
+        // treating `output[0]` as the `feed` probability would produce a
+        // "trained" pet that always feeds whenever the old scalar
+        // exceeded the idle floor. Likewise an output-7 snapshot whose
+        // input layer expects a different last-dim would only blow up at
+        // runtime when `featuresFromNeeds` first hands it a 5-element
+        // vector — Learning mode would then throw on every intention
+        // selection instead of falling back to the baseline. Throw on
+        // either mismatch so the caller falls back to the bundled
+        // baseline.
+        const model = r.getModel();
+        const outShape = model.outputs[0]?.shape;
+        const outLastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
+        const inShape = model.inputs[0]?.shape;
+        const inLastDim = inShape && inShape.length > 0 ? inShape[inShape.length - 1] : null;
+        if (outLastDim !== SOFTMAX_DIM || inLastDim !== FEATURE_DIM) {
+          // Free the rebuilt-but-incompatible model's tensors before the
+          // catch path constructs the bundled baseline. Without this,
+          // re-entering Learning mode with an incompatible persisted
+          // snapshot would leak one tfjs model + its weight tensors per
+          // attempt.
+          r.dispose();
+          throw new Error(
+            `learning: persisted snapshot has shape [${String(inLastDim)}, ${String(outLastDim)}], expected [${FEATURE_DIM}, ${SOFTMAX_DIM}] — rebuilding from bundled baseline.`,
+          );
+        }
+        // The rebuilt Sequential ships uncompiled; compile with a default
+        // SGD + categoricalCrossentropy pair so the Train button can call
+        // `r.train(...)` over the 7-way softmax output.
+        r.getModel().compile({ optimizer: tf.train.sgd(0.1), loss: 'categoricalCrossentropy' });
+        return r;
+      };
+
+      try {
+        return await hydrate(seed);
+      } catch {
+        return hydrate(networkJson as Snapshot);
+      }
+    });
   },
 };
 
