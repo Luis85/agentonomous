@@ -64,17 +64,21 @@ gh api "/repos/${REPO}/issues/87/comments" --paginate \
 If no match: hard-fail with `Finding ${ID} not found in #87 comments`.
 
 **Sweep mode (no argument).** Pull only the latest comment, then
-extract every finding ID from it. Use `--paginate --slurp` together so
-`gh api` flattens every page into one JSON array before `jq` sees it
-— without `--slurp`, `gh api --paginate --jq '... | last'` runs the
-filter per page and returns one row per page (i.e. last-of-each-page,
-not the global latest comment):
+extract every finding ID from it. Two pagination subtleties matter:
+
+1. Without `--slurp`, `gh api --paginate --jq '... | last'` runs the
+   filter once per page and returns one row per page (last-of-each-
+   page, not the global latest comment).
+2. With `--slurp`, `gh api` returns an array of pages (one entry per
+   page) rather than a flat list of comments, so `sort_by(.created_at)`
+   would be operating on an array-of-arrays. Pipe through `add` first
+   to concatenate the pages into a single flat array.
 
 ```bash
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 LAST_COMMENT="$(gh api "repos/${REPO}/issues/87/comments" \
   --paginate --slurp \
-  --jq 'sort_by(.created_at) | last | {id, body}')"
+  --jq 'add | sort_by(.created_at) | last | {id, body}')"
 echo "${LAST_COMMENT}" | jq -r '.body' \
   | grep -oE '<!-- f:[^ ]+ -->' \
   | sed -E 's/<!-- f:(.+) -->/\1/'
