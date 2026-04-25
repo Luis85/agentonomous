@@ -9,7 +9,12 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: review-fix-shipped-${{ github.event.pull_request.number }}
+  # Global group across all PRs: every job in this workflow reads + rewrites
+  # the same tracker comment body. Keying by PR number would let two merged
+  # PRs run in parallel, both read a pre-flip body, and the later write
+  # would silently revert the earlier flip. cancel-in-progress: false
+  # preserves the earlier run; the later run queues until it finishes.
+  group: review-fix-shipped
   cancel-in-progress: false
 
 jobs:
