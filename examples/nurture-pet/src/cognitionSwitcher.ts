@@ -948,35 +948,64 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
   // Mirrors the `changeEpoch` pattern in the cognition-mode
   // `onChange` handler above.
   let backendChangeEpoch = 0;
+  // Serialization mutex for `tf.setBackend` calls. The epoch guard
+  // alone can't prevent a stale handler from MUTATING global tfjs
+  // state — by the time we re-check epoch post-await, the older
+  // `setBackend(A)` has already fired and may have completed AFTER
+  // a newer `setBackend(B)`, leaving runtime on A while picker
+  // state/localStorage/`selectedBackend` track B (Codex P1 round
+  // 8). Awaiting the prior pending activation before invoking our
+  // own serialises the calls — only one `setBackend` is in flight
+  // at a time, and a stale handler that ran AFTER a newer commit
+  // will see `myEpoch !== backendChangeEpoch` BEFORE its setBackend
+  // and bail without mutating tf state.
+  let pendingActivation: Promise<unknown> = Promise.resolve();
   const onBackendChange = async (): Promise<void> => {
     if (hooks.isDisposed()) return;
     const value = backendSelect.value;
     if (!isBackend(value)) return;
     const myEpoch = ++backendChangeEpoch;
-    // Verify activation BEFORE asking the cognition switcher to
-    // reconstruct. `probeBackend` (the registry-only probe used by
-    // mountBackendPicker's startup sweep) cannot detect runtime
-    // false-positives — `@tensorflow/tfjs-backend-wasm@4.22`
-    // registers its factory unconditionally, but the factory itself
-    // can throw at first use (no fetch shim, WebAssembly disabled).
-    // Without an activation check here, that bad pick would
-    // propagate to `mode.construct()`, `fromJSON` would reject with
-    // `TfjsBackendNotRegisteredError`, the existing `onChange` catch
-    // path would disable Learning mode for the rest of the session,
-    // and the user would have no way to recover short of a reload.
+    // Wait for any prior in-flight activation to finish before
+    // touching tf state. `.catch(() => undefined)` so a thrown prior
+    // attempt doesn't poison this one.
+    const prevPending = pendingActivation;
     let activated = false;
-    try {
-      const tf = await import('@tensorflow/tfjs-core');
-      activated = await tf.setBackend(value);
-      if (activated) await tf.ready();
-    } catch {
-      activated = false;
-    }
-    // Stale completion guard: a newer change has fired since we
-    // started. Drop everything — let the newest in-flight invocation
-    // own the commit. No revert UI: the live `<select>` already
-    // reflects the newer pick, and `setLearningBackend` / localStorage
-    // are exactly the writes we're skipping.
+    const myActivation = (async (): Promise<void> => {
+      await prevPending.catch(() => undefined);
+      // Re-check epoch + dispose AFTER the serialization wait. A
+      // newer change may have arrived while we queued; if so, bail
+      // before any tf mutation rather than executing a stale
+      // `setBackend` that the next handler would have to undo.
+      if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return;
+      // Verify activation BEFORE asking the cognition switcher to
+      // reconstruct. `probeBackend` (the registry-only probe used by
+      // mountBackendPicker's startup sweep) cannot detect runtime
+      // false-positives — `@tensorflow/tfjs-backend-wasm@4.22`
+      // registers its factory unconditionally, but the factory
+      // itself can throw at first use (no fetch shim, WebAssembly
+      // disabled). Without an activation check here, that bad pick
+      // would propagate to `mode.construct()`, `fromJSON` would
+      // reject with `TfjsBackendNotRegisteredError`, the existing
+      // `onChange` catch path would disable Learning mode for the
+      // rest of the session, and the user would have no way to
+      // recover short of a reload.
+      try {
+        const tf = await import('@tensorflow/tfjs-core');
+        activated = await tf.setBackend(value);
+        if (activated) await tf.ready();
+      } catch {
+        activated = false;
+      }
+    })();
+    pendingActivation = myActivation;
+    await myActivation;
+    // Clear the slot only if no newer activation has overwritten it
+    // (it's a chain — successive handlers each await the previous).
+    if (pendingActivation === myActivation) pendingActivation = Promise.resolve();
+    // Post-activation stale guard: even with serialization, a
+    // newer change can arrive between our setBackend completing
+    // and our commit running. The newer handler will own the
+    // commit; we bail.
     if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return;
     if (!activated) {
       // Mark the failing option disabled so a future pick can't hit
