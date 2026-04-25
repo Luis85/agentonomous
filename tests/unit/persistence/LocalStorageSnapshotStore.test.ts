@@ -580,6 +580,76 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(storage.removals).toBe(0);
   });
 
+  it('save and delete reject when migration aborted so unresolved legacy data is preserved', async () => {
+    // Non-iterable + unparseable legacy index = migrateLegacyKeys
+    // aborts. Allowing save() to proceed would stamp the marker and
+    // permanently close the recovery path — a later iterable
+    // construction would short-circuit the scan and lose the legacy
+    // payloads. save and delete refuse to mutate in that state.
+    const storage = new NonIterableStorage();
+    storage.seed('p/__agentonomous/index__', '{"corrupt":true}');
+    storage.seed('p/alpha', JSON.stringify(snap('alpha', 1)));
+
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    await expect(store.save('beta', snap('beta', 2))).rejects.toThrow(
+      /legacy migration could not finalize/,
+    );
+    await expect(store.delete('alpha')).rejects.toThrow(/legacy migration could not finalize/);
+
+    // No marker stamped; legacy artifacts preserved for a later retry.
+    expect(storage.has('p/__agentonomous/meta/migrated')).toBe(false);
+    expect(storage.has('p/alpha')).toBe(true);
+    expect(storage.has('p/__agentonomous/index__')).toBe(true);
+  });
+
+  it('save stamps marker before writing data so partial failures never leave data without marker', async () => {
+    // Codex P2 ordering concern: if the data write or appendIndex
+    // throws (quota exhaustion), a prior ordering where the marker
+    // was written last could leave `data/alpha` persisted without
+    // the marker — next construction mis-migrates it. Verify the
+    // marker lands in storage BEFORE the data and index writes.
+    const writeOrder: string[] = [];
+    class OrderCapturingStorage implements StorageLike {
+      private readonly data = new Map<string, string>();
+
+      get length(): number {
+        return this.data.size;
+      }
+
+      key(index: number): string | null {
+        return [...this.data.keys()][index] ?? null;
+      }
+
+      getItem(key: string): string | null {
+        return this.data.get(key) ?? null;
+      }
+
+      setItem(key: string, value: string): void {
+        writeOrder.push(key);
+        this.data.set(key, value);
+      }
+
+      removeItem(key: string): void {
+        this.data.delete(key);
+      }
+    }
+
+    const storage = new OrderCapturingStorage();
+    const store = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+
+    await store.save('alpha', snap('alpha', 1));
+
+    // First write observed should be the marker stamp, before the
+    // data and index writes.
+    expect(writeOrder[0]).toBe('p/__agentonomous/meta/migrated');
+    expect(writeOrder).toContain('p/__agentonomous/data/alpha');
+    expect(writeOrder).toContain('p/__agentonomous/meta/index');
+    expect(writeOrder.indexOf('p/__agentonomous/meta/migrated')).toBeLessThan(
+      writeOrder.indexOf('p/__agentonomous/data/alpha'),
+    );
+  });
+
   it("rejects an empty prefix so migration can't match and nuke unrelated storage keys", () => {
     // A prefix of '' would make startsWith(prefix) true for every key in
     // the storage, so migration would rewrite and delete unrelated

@@ -90,6 +90,14 @@ export interface LocalStorageSnapshotStoreOptions {
 export class LocalStorageSnapshotStore implements SnapshotStorePort {
   private readonly prefix: string;
   private readonly storage: StorageLike;
+  /**
+   * True when `migrateLegacyKeys` returned without being able to safely
+   * finalize — legacy artifacts exist but this backend couldn't
+   * enumerate them. Writes are refused in that state so a later
+   * construction on an iterable backend still has a chance to recover
+   * the legacy payloads.
+   */
+  private migrationAborted = false;
 
   constructor(opts: LocalStorageSnapshotStoreOptions = {}) {
     const prefix = opts.prefix ?? 'agentonomous/';
@@ -115,22 +123,28 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   save(key: string, snapshot: AgentSnapshot): Promise<void> {
+    if (this.migrationAborted) {
+      return Promise.reject(
+        new Error(
+          'LocalStorageSnapshotStore: refusing to save — legacy migration could not finalize on this backend; reconstruct on an iterable backend (one exposing `length` + `key(i)`) to recover legacy payloads before writing new data.',
+        ),
+      );
+    }
     let encoded: string;
     try {
       encoded = this.dataKey(key);
     } catch (cause) {
       return Promise.reject(cause as Error);
     }
+    // Stamp the re-entrance sentinel BEFORE the data/index writes. A
+    // partial-failure path (quota exhaustion between the data and
+    // index writes) must never leave new-layout entries on storage
+    // without the marker — that state would trick the next
+    // construction's orphan scan into treating them as v1 user keys.
+    // Idempotent: skipped if the marker is already stamped.
+    this.ensureMigrationMarker();
     this.storage.setItem(encoded, JSON.stringify(snapshot));
     this.appendIndex(key);
-    // Lazily stamp the re-entrance sentinel on the first write. The
-    // constructor deliberately skips this for empty stores so
-    // read-only / quota-exceeded backends can still construct a load-
-    // only store. Once the consumer does write, we have to record
-    // that the store is in v2 shape — otherwise a subsequent
-    // construction would scan the new-layout entries we just wrote
-    // and mis-migrate them as v1 user keys.
-    this.ensureMigrationMarker();
     return Promise.resolve();
   }
 
@@ -155,6 +169,13 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   delete(key: string): Promise<void> {
+    if (this.migrationAborted) {
+      return Promise.reject(
+        new Error(
+          'LocalStorageSnapshotStore: refusing to delete — legacy migration could not finalize on this backend; reconstruct on an iterable backend (one exposing `length` + `key(i)`) to recover legacy payloads before mutating data.',
+        ),
+      );
+    }
     let encoded: string;
     try {
       encoded = this.dataKey(key);
@@ -335,6 +356,20 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
       plan.push({ userKey, encoded, raw });
     }
 
+    // Early exit when nothing to migrate AND no legacy index to clean
+    // up — a fresh install on any backend should not perform a
+    // `setItem` for the marker (which could throw on a read-only /
+    // quota-exceeded store and turn a no-op upgrade path into a
+    // startup failure). Subsequent constructions re-enter this
+    // function, find nothing again, and short-circuit at zero cost.
+    // Crucially, this check precedes the `safeToFinalize` gate so
+    // an empty non-iterable store isn't classified as "aborted"
+    // (there's no unresolved legacy data to protect).
+    const hasLegacyArtifacts = plan.length > 0 || legacyIndexRaw !== null;
+    if (!hasLegacyArtifacts) {
+      return;
+    }
+
     // Phase 2: decide whether to finalize. Conditions:
     //
     //   - Iterable backend: the orphan scan observed every key under
@@ -345,26 +380,15 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
     //     have updated the index so ghosts are rare and don't
     //     indicate lost data.
     //
-    // Anything else (non-iterable + no index; non-iterable + unparseable
-    // index) leaves the legacy artifacts intact. A later construction
-    // on an iterable backend, or after the index is restored, can
-    // still recover orphans.
+    // Anything else (non-iterable + unparseable index) leaves the
+    // legacy artifacts intact AND flags the store as aborted so
+    // `save` / `delete` refuse to mutate — otherwise a write path
+    // would stamp the marker and strand the legacy payloads.
     const iterable = isIterableStorage(this.storage);
     const safeToFinalize = iterable || legacyIndexParseable;
 
     if (!safeToFinalize) {
-      return;
-    }
-
-    // Phase 3: commit the plan. Skip entirely when there's nothing
-    // to migrate AND no legacy index to clean up — a fresh install
-    // on any backend should not perform a `setItem` for the marker
-    // (which could throw on a read-only / quota-exceeded store and
-    // turn a no-op upgrade path into a startup failure). Subsequent
-    // constructions will re-enter this function, find nothing again,
-    // and short-circuit at zero cost.
-    const hasLegacyArtifacts = plan.length > 0 || legacyIndexRaw !== null;
-    if (!hasLegacyArtifacts) {
+      this.migrationAborted = true;
       return;
     }
 
