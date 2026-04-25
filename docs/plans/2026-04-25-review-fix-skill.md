@@ -16,6 +16,33 @@ A one-time `gh api` PATCH retrofits the existing `#87` comment to the new format
 
 ---
 
+## Preconditions (run once before any chunk)
+
+- [ ] **P1: Confirm working directory and branch.**
+
+```bash
+pwd                # expect: .../.worktrees/feat-review-fix-skill
+git rev-parse --abbrev-ref HEAD  # expect: feat/review-fix-skill
+git log --oneline -3
+# expect the two prior spec commits at the top:
+#   docs(specs): address spec-reviewer recommendations
+#   docs(specs): review-fix skill design
+```
+
+If any check fails, stop. The plan must run inside the worktree on
+the topic branch, not on `develop` directly.
+
+- [ ] **P2: Confirm tools available.**
+
+```bash
+gh --version           # gh CLI present (used in Tasks 5 + 6)
+jq --version           # jq present (used in Task 5)
+node --version         # for the workflow's `actions/github-script` semantics during local mental-checks
+actionlint --version   # optional locally; required green via CI
+```
+
+---
+
 ## Chunk 1: Bot prompt + README
 
 ### Task 1: Update bot prompt output format + persistence sink
@@ -304,13 +331,18 @@ Confirm with the user:
 
 ### 1. Locate the finding
 
+Substitute the user-provided finding ID (e.g. `682b557.3`) for `${ID}`
+below before running:
+
 ```bash
-# Stream comments until one matches the marker.
-gh api "/repos/{owner}/{repo}/issues/87/comments" --paginate \
-  --jq '.[] | select(.body | contains("<!-- f:<sha7>.<idx> -->")) | {id, body}'
+ID="<sha7>.<idx>"            # e.g. 682b557.3
+MARKER="<!-- f:${ID} -->"
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+gh api "/repos/${REPO}/issues/87/comments" --paginate \
+  --jq ".[] | select(.body | contains(\"${MARKER}\")) | {id, body}"
 ```
 
-If no match: hard-fail with `Finding <id> not found in #87 comments`.
+If no match: hard-fail with `Finding ${ID} not found in #87 comments`.
 
 ### 2. Extract finding fields
 
@@ -489,6 +521,10 @@ permissions:
   issues: write
   pull-requests: read
 
+concurrency:
+  group: review-fix-shipped-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   flip-tracker-checkbox:
     if: github.event.pull_request.merged == true
@@ -538,24 +574,28 @@ jobs:
                 continue;
               }
 
-              const lineRe = new RegExp(
-                `^- \\[ \\] (.+?) ${marker.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}$`,
-                'm',
-              );
-              const lineMatch = hit.body.match(lineRe);
+              // Locate the line containing the marker by string ops (no
+              // regex escaping needed). Markers are unique per finding ID,
+              // so a single substring search is sufficient.
+              const markerIdx = hit.body.indexOf(marker);
+              const lineStart = hit.body.lastIndexOf('\n', markerIdx) + 1;
+              const lineEndRaw = hit.body.indexOf('\n', markerIdx);
+              const lineEnd = lineEndRaw === -1 ? hit.body.length : lineEndRaw;
+              const line = hit.body.slice(lineStart, lineEnd);
 
-              if (!lineMatch) {
-                if (hit.body.includes(`- [x]`) && hit.body.includes(marker)) {
-                  core.warning(`Finding ${findingId} already shipped. Skipping.`);
-                } else {
-                  core.warning(`Marker ${marker} found but checklist line shape unexpected. Skipping.`);
-                }
+              if (line.startsWith('- [x] ')) {
+                core.warning(`Finding ${findingId} already shipped. Skipping.`);
+                continue;
+              }
+              if (!line.startsWith('- [ ] ')) {
+                core.warning(`Marker ${marker} found but checklist line shape unexpected: ${line.slice(0, 40)}... Skipping.`);
                 continue;
               }
 
-              const newLine =
-                `- [x] ${lineMatch[1]} (shipped in #${prNumber}) ${marker}`;
-              const newBody = hit.body.replace(lineMatch[0], newLine);
+              const newLine = line
+                .replace('- [ ] ', '- [x] ')
+                .replace(` ${marker}`, ` (shipped in #${prNumber}) ${marker}`);
+              const newBody = hit.body.slice(0, lineStart) + newLine + hit.body.slice(lineEnd);
 
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -631,6 +671,12 @@ findings the spec calls out (BLOCKER `interface`/`type`; MINOR
 
 - [ ] **Step 5.2: Hand-write the migrated body**
 
+Open `/tmp/issue87-last-comment.json`. Copy the `body` field
+verbatim. Each `<details>` block below MUST contain the bot's
+finding body byte-for-byte — no paraphrasing, no reflowing, no
+cosmetic edits. The point of the migration is structural (add
+checklist + ID markers) only; content stays as the bot wrote it.
+
 In a scratch file `/tmp/issue87-new-body.md`, paste the original
 header (`## YYYY-MM-DD — <head-sha>` + `Reviewed:` + counts), then
 rewrite the two findings as checklist items:
@@ -657,13 +703,18 @@ Counter-argument check / Not reviewed / Last reviewed SHA).
 - [ ] **Step 5.3: PATCH the comment**
 
 Extract the comment ID from `/tmp/issue87-last-comment.json` (`.id`
-field), then:
+field). `gh api --field body=@file` is unreliable across `gh` versions
+for free-form Markdown bodies (newlines, backticks, dollar signs);
+build the JSON payload explicitly via `jq`:
 
 ```bash
 COMMENT_ID=$(jq -r .id /tmp/issue87-last-comment.json)
-gh api --method PATCH \
-  "/repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/issues/comments/${COMMENT_ID}" \
-  --field body=@/tmp/issue87-new-body.md
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+
+jq -Rs '{body: .}' < /tmp/issue87-new-body.md \
+  | gh api --method PATCH \
+      "/repos/${REPO}/issues/comments/${COMMENT_ID}" \
+      --input -
 ```
 
 Expected: 200 OK with the new body echoed.
@@ -767,7 +818,10 @@ EOF
 )"
 ```
 
-**Critical:** the PR body contains `Refs #87` (intentional, for cross-linking) and **does not** contain `Closes #87` or `Fixes #87`. The tracker stays open.
+**Critical:**
+- The PR body contains `Refs #87` (intentional, for cross-linking) and **does not** contain `Closes #87` or `Fixes #87`. The tracker stays open.
+- The placeholders `\`<COMMENT_ID>\`` inside the PR body heredoc are NOT literals — substitute the actual edited comment ID (from `/tmp/issue87-last-comment.json`) before running `gh pr create`.
+- The magic line `Refs #87 finding:<id>` belongs in the **PR body only**, not in commit messages. The Action reads `pull_request.body`, not commit messages, so a misplaced line will silently fail to flip.
 
 - [ ] **Step 6.5: Wait for Codex review**
 
