@@ -318,6 +318,44 @@ describe('learningMode.construct() hydration order', () => {
     const reasoner = fakeAgent.setReasoner.mock.calls[0]?.[0] as { selectIntention?: unknown };
     expect(typeof reasoner?.selectIntention).toBe('function');
   });
+
+  it('construct() rebuilds from baseline when a pre-row-17 single-output snapshot is persisted', async () => {
+    // Codex P1 finding on PR #94 (learning.ts:121) — a pre-row-17 [5, ?, 1]
+    // sigmoid snapshot is structurally compatible with `TfjsReasoner.fromJSON`,
+    // so without a dim-mismatch guard `interpret()` would silently treat
+    // the scalar urgency as the `feed`-column probability of a 7-way
+    // softmax. Build such a snapshot here, persist it, then verify the
+    // rebuilt reasoner's model emits the expected 7-dim output (i.e. the
+    // guard fired and the bundled baseline took over).
+    const agentId = 'test-pet';
+    const layers = await import('@tensorflow/tfjs-layers');
+    const { TfjsReasoner } = await import('../../src/cognition/adapters/tfjs/index.js');
+
+    // Build a [5, 4, 1] sigmoid model directly so we can snapshot it.
+    const oldModel = layers.sequential();
+    oldModel.add(layers.layers.dense({ units: 4, activation: 'sigmoid', inputShape: [5] }));
+    oldModel.add(layers.layers.dense({ units: 1, activation: 'sigmoid' }));
+    const oldReasoner = new TfjsReasoner<number[], number[]>({
+      model: oldModel,
+      featuresOf: () => [0, 0, 0, 0, 0],
+      interpret: () => null,
+    });
+    const oldSnapshot = oldReasoner.toJSON();
+    oldReasoner.dispose();
+    localStorage.setItem(`agentonomous/${agentId}/tfjs-network`, JSON.stringify(oldSnapshot));
+
+    const { fakeAgent, selectMode } = await mountDemo({ agentId });
+    await selectMode('learning');
+    const reasoner = fakeAgent.setReasoner.mock.calls.at(-1)?.[0] as {
+      getModel?: () => { outputs?: ReadonlyArray<{ shape?: ReadonlyArray<number | null> }> };
+      selectIntention?: unknown;
+    };
+    expect(typeof reasoner?.selectIntention).toBe('function');
+
+    const outShape = reasoner.getModel?.().outputs?.[0]?.shape;
+    const lastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
+    expect(lastDim).toBe(7);
+  });
 });
 
 describe('Learner wiring (setLearner)', () => {
@@ -437,7 +475,12 @@ describe('projectLearningOutcome (via buildLearningLearner)', () => {
     expect(learner.bufferedCount()).toBe(1);
   });
 
-  it('labels SkillFailed outcomes as an all-zero 7-vector (negative sample)', async () => {
+  it('skips SkillFailed outcomes (avoids zero-vector labels under categoricalCrossentropy)', async () => {
+    // Under categoricalCrossentropy, an all-zero target yields zero loss
+    // and zero gradient — failed outcomes would silently no-op a buffer
+    // slot. Drop them at the projection layer instead. Codex P1 finding
+    // on PR #94 (learning.ts:235); revisit when row 18 lifts negative
+    // signal into a proper reward field.
     const { fakeAgent, selectMode } = await mountDemo();
     await selectMode('learning');
     const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
@@ -449,7 +492,7 @@ describe('projectLearningOutcome (via buildLearningLearner)', () => {
       actions: [],
       details: { failed: true, code: 'execution-threw', message: 'boom' },
     });
-    expect(learner.bufferedCount()).toBe(1);
+    expect(learner.bufferedCount()).toBe(0);
   });
 
   it('skips outcomes with neither failed flag nor effectiveness', async () => {

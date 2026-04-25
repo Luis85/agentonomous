@@ -115,6 +115,12 @@ function featuresFromNeeds(
  * that documenting it via a test is cheaper than re-deriving it.
  */
 export function interpretSoftmax(output: number[]): import('agentonomous').Intention | null {
+  // Defensive width check: a snapshot whose model emits a different
+  // output dimension is rejected at `construct()` (see hydrate below),
+  // so this branch is only reachable if the adapter contract drifts in
+  // the future. Idle rather than `?? 0`-pad: a silent pad biases the
+  // argmax toward column 0 (`feed`).
+  if (output.length !== SOFTMAX_DIM) return null;
   let maxIdx = 0;
   let maxVal = output[0] ?? 0;
   for (let i = 1; i < SOFTMAX_DIM; i++) {
@@ -173,6 +179,21 @@ export const learningMode: CognitionModeSpec = {
         featuresOf: featuresFromNeeds,
         interpret: (output) => interpretSoftmax(output),
       });
+      // Reject snapshots whose output dimension doesn't match the
+      // bundled topology. A pre-row-17 snapshot (single sigmoid output,
+      // length 1) loads fine through `fromJSON` but its scalar urgency
+      // bears no resemblance to a 7-way softmax — silently treating
+      // `output[0]` as the `feed` probability would produce a "trained"
+      // pet that always feeds whenever the old scalar exceeded the
+      // idle floor. Throw so the caller falls back to the bundled
+      // baseline.
+      const outShape = r.getModel().outputs[0]?.shape;
+      const lastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
+      if (lastDim !== SOFTMAX_DIM) {
+        throw new Error(
+          `learning: persisted snapshot has output dim ${String(lastDim)}, expected ${SOFTMAX_DIM} — rebuilding from bundled baseline.`,
+        );
+      }
       // The rebuilt Sequential ships uncompiled; compile with a default
       // SGD + categoricalCrossentropy pair so the Train button can call
       // `r.train(...)` over the 7-way softmax output.
@@ -197,18 +218,19 @@ export const learningMode: CognitionModeSpec = {
  *   energy, health). Read at score-time, so the snapshot reflects the
  *   post-skill levels — that's the input the network would have to
  *   classify against on the *next* tick.
- * - Label = one-hot 7-vector. Successful outcomes for skill `id` set
- *   `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`; failure outcomes use an
- *   all-zero vector — the network learns "this combination of needs
- *   doesn't reliably yield this skill" without actively pointing at any
- *   alternative. This matches the loss landscape of the
- *   `categoricalCrossentropy` compile; a uniform zero label sums to
- *   zero loss for the success column it's nudging away from.
+ * - Label = one-hot 7-vector for SUCCESSFUL outcomes only. Successes
+ *   for skill `id` set `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`.
  *
- * Returns `null` for outcomes whose intention is outside the 7-skill
- * softmax index (e.g. an `express` intention emitted by the heuristic-
- * reactive layer) or that carry no usable signal (no `failed` flag, no
- * positive `effectiveness`).
+ * Returns `null` for:
+ * - Outcomes whose intention is outside the 7-skill softmax index
+ *   (e.g. an `express` intention from the heuristic-reactive layer).
+ * - **Failed outcomes.** An all-zero target under
+ *   `categoricalCrossentropy` (`-Σ y_i log p_i`) yields zero loss and
+ *   zero gradient — the network would silently ignore failure samples,
+ *   so the buffer slot is wasted. Skipping them keeps the loss honest;
+ *   when row 18 lifts the failure signal into a richer feature set
+ *   (negative `reward` field) we can revisit.
+ * - Successes with non-positive or non-finite `effectiveness`.
  */
 function projectLearningOutcome(
   agent: Agent,
@@ -219,6 +241,15 @@ function projectLearningOutcome(
   const skillIdx = SOFTMAX_SKILL_IDS.indexOf(intentionType as (typeof SOFTMAX_SKILL_IDS)[number]);
   if (skillIdx < 0) return null;
 
+  const details = outcome.details ?? {};
+  const failed = (details as { failed?: unknown }).failed === true;
+  // Skip failed outcomes — see JSDoc above for the categoricalCrossentropy
+  // zero-loss reasoning.
+  if (failed) return null;
+
+  const eff = (details as { effectiveness?: unknown }).effectiveness;
+  if (typeof eff !== 'number' || !Number.isFinite(eff) || eff <= 0) return null;
+
   const levels = agent.getState().needs;
   const features = [
     levels.hunger ?? 0,
@@ -227,20 +258,9 @@ function projectLearningOutcome(
     levels.energy ?? 0,
     levels.health ?? 0,
   ];
-  const details = outcome.details ?? {};
-  const failed = (details as { failed?: unknown }).failed === true;
-  if (failed) {
-    // All-zero label: pulls the success-column probability down without
-    // implying any other skill was the right call.
-    return { features, label: new Array<number>(SOFTMAX_DIM).fill(0) };
-  }
-  const eff = (details as { effectiveness?: unknown }).effectiveness;
-  if (typeof eff === 'number' && Number.isFinite(eff) && eff > 0) {
-    const label = new Array<number>(SOFTMAX_DIM).fill(0);
-    label[skillIdx] = 1;
-    return { features, label };
-  }
-  return null;
+  const label = new Array<number>(SOFTMAX_DIM).fill(0);
+  label[skillIdx] = 1;
+  return { features, label };
 }
 
 /**
