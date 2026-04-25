@@ -47,7 +47,14 @@ const provider: LlmProviderPort = new MockLlmProvider({
 // a structured-output schema. Here we just route plain text → intention
 // to keep the wiring legible.
 class LlmReasoner implements Reasoner {
-  constructor(private readonly provider: LlmProviderPort) {}
+  // Manual field + assignment instead of a parameter property: Node's
+  // `--experimental-strip-types` mode (used by `npm run start`) parses
+  // TS-only syntax with a strip-only path that cannot handle parameter
+  // properties. See https://nodejs.org/api/typescript.html.
+  readonly provider: LlmProviderPort;
+  constructor(provider: LlmProviderPort) {
+    this.provider = provider;
+  }
 
   selectIntention(_ctx: ReasonerContext): Intention | null {
     // Reasoner.selectIntention is sync; the LLM is async. For a real
