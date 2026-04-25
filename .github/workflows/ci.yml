@@ -72,6 +72,9 @@ jobs:
   actionlint:
     name: Lint workflows (actionlint)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -142,7 +145,15 @@ jobs:
   size-limit-comment:
     name: Size-limit PR comment (gzip delta)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    needs: build
+    # Run after build for ordering, but post the delta comment
+    # regardless of build outcome — the size-budget failure is exactly
+    # when the reviewer needs to see which bytes regressed.
+    if: |
+      always()
+      && github.event_name == 'pull_request'
+      && needs.build.result != 'cancelled'
+      && needs.build.result != 'skipped'
     permissions:
       contents: read
       pull-requests: write
