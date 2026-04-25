@@ -992,14 +992,36 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
       // `onChange` catch path would disable Learning mode for the
       // rest of the session, and the user would have no way to
       // recover short of a reload.
+      const tf = await import('@tensorflow/tfjs-core');
+      // Snapshot the prior backend INSIDE the mutex so it can't shift
+      // between this read and the restore below. A failed
+      // `tf.setBackend(value)` can leave tfjs without a usable active
+      // backend (Codex P1 round 11) — restore the snapshot in the
+      // failure branch so a Learning-mode reasoner that was happily
+      // running on the prior backend doesn't start failing on the
+      // next tick. Mirrors the all-failed restore in
+      // `TfjsReasoner.detectBestBackend`.
+      const prior = tf.getBackend();
       try {
-        const tf = await import('@tensorflow/tfjs-core');
         const ok = await tf.setBackend(value);
-        if (ok) await tf.ready();
-        return ok;
+        if (ok) {
+          await tf.ready();
+          return true;
+        }
       } catch {
-        return false;
+        // Fall through to restore.
       }
+      if (prior !== '' && prior !== value) {
+        try {
+          await tf.setBackend(prior);
+          await tf.ready();
+        } catch {
+          // Best-effort — surfacing as a separate error here would
+          // mask the more useful "this backend is unavailable" UX
+          // signal the caller already handles below.
+        }
+      }
+      return false;
     });
     // Post-activation stale guard: even with serialization, a
     // newer change can arrive between our setBackend completing
