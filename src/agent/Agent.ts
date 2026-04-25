@@ -49,7 +49,6 @@ import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.
 import type { AgentFacade } from './AgentFacade.js';
 import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
-import { isInvokeSkillAction } from './AgentAction.js';
 import type { ControlMode } from './ControlMode.js';
 import type { DecisionTrace } from './DecisionTrace.js';
 import { InvalidTimeScaleError, MissingDependencyError } from './errors.js';
@@ -60,6 +59,11 @@ import { MoodReconciler } from './internal/MoodReconciler.js';
 import { AnimationReconciler } from './internal/AnimationReconciler.js';
 import { CognitionPipeline } from './internal/CognitionPipeline.js';
 import { runRestore } from './internal/RestoreCoordinator.js';
+import {
+  buildHaltedTrace,
+  buildTickDeltas,
+  summarizeSelectedAction,
+} from './internal/tickHelpers.js';
 import { runDeath } from './internal/DeathCoordinator.js';
 import { assembleSnapshot } from './internal/SnapshotAssembler.js';
 
@@ -318,17 +322,14 @@ export class Agent {
 
     // Stage -1: halted short-circuit.
     if (this.halted) {
-      return {
+      return buildHaltedTrace({
         agentId: this.identity.id,
         tickStartedAt,
         virtualDtSeconds,
         controlMode: this.controlMode,
-        stage: DECEASED_STAGE,
-        halted: true,
         perceived: [],
-        actions: [],
         emitted: [],
-      };
+      });
     }
 
     this.emittedThisTick = [];
@@ -365,17 +366,14 @@ export class Agent {
     // If health just hit 0 during decay we die here and short-circuit.
     const needsDeltas = this.needsTicker.run(virtualDtSeconds, tickStartedAt);
     if (this.halted) {
-      return {
+      return buildHaltedTrace({
         agentId: this.identity.id,
         tickStartedAt,
         virtualDtSeconds,
         controlMode: this.controlMode,
-        stage: DECEASED_STAGE,
-        halted: true,
         perceived,
-        actions: [],
         emitted: [...this.emittedThisTick],
-      };
+      });
     }
 
     // Stage 2.7: mood evaluate. Skipped at scale 0.
@@ -405,18 +403,15 @@ export class Agent {
     }
 
     // Stage 10: return trace.
-    const deltasRecord: Record<string, unknown> = {};
-    if (needsDeltas.length > 0) deltasRecord.needs = needsDeltas;
-    if (expired.length > 0) deltasRecord.modifiersExpired = expired.map((r) => r.modifier.id);
-    const activeModifierIds = this.modifiers.list().map((m) => m.id);
-    if (activeModifierIds.length > 0) deltasRecord.activeModifiers = activeModifierIds;
-    if (stageTransitions.length > 0) {
-      deltasRecord.stageTransitions = stageTransitions;
-    }
-    if (moodChange) deltasRecord.mood = moodChange;
-    if (animationTransition) deltasRecord.animation = animationTransition;
-    if (candidates.length > 0) deltasRecord.candidates = candidates;
-    const deltas = Object.keys(deltasRecord).length > 0 ? deltasRecord : undefined;
+    const deltas = buildTickDeltas({
+      needsDeltas,
+      expired,
+      activeModifierIds: this.modifiers.list().map((m) => m.id),
+      stageTransitions,
+      moodChange,
+      animationTransition,
+      candidates,
+    });
 
     const stage: LifeStage = this.ageModel?.stage ?? 'alive';
     const trace: DecisionTrace = {
@@ -438,13 +433,7 @@ export class Agent {
     // flows through `this.publish(...)` so subscribers receive it via
     // `agent.subscribe` like any other event.
     this.ticksEmitted += 1;
-    const firstAction = actions[0];
-    const selectedAction =
-      firstAction === undefined
-        ? null
-        : isInvokeSkillAction(firstAction)
-          ? { type: firstAction.type, skillId: firstAction.skillId }
-          : { type: firstAction.type };
+    const selectedAction = summarizeSelectedAction(actions);
     this.publish({
       type: AGENT_TICKED,
       at: tickStartedAt,
