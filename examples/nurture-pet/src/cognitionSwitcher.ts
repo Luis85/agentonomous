@@ -701,7 +701,20 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   );
 
   const backendPicker = mountBackendPicker(rootEl, {
-    isLearningActive: () => activeModeId === 'learning',
+    // Returns true while Learning is the user's intent — covers
+    // both the committed-active case (`activeModeId === 'learning'`)
+    // AND the still-loading case where the user has clicked Learning
+    // but `mode.construct()` hasn't yet flipped `activeModeId`. Per
+    // Codex round 7: a backend change between the click and the
+    // construct's settle was previously skipped by this guard, leaving
+    // the freshly-constructed reasoner on the snapshotted-at-entry
+    // backend (`const backend = selectedBackend` in `learningMode.
+    // construct()`) while `setLearningBackend` + localStorage tracked
+    // the new pick — picker UI and runtime drift apart until a
+    // manual toggle. Triggering reconstruct on the loading case
+    // funnels through the existing `changeEpoch` machinery, which
+    // discards the stale in-flight construct cleanly.
+    isLearningActive: () => activeModeId === 'learning' || select.value === 'learning',
     isDisposed: () => disposed,
     triggerReconstruct: () => {
       void onChange();
