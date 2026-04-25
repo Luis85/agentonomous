@@ -154,7 +154,7 @@
       "name": "dist/index.js (gzip)",
       "path": "dist/index.js",
       "gzip": true,
-      "limit": "50 KB"
+      "limit": "35 KB"
     },
     {
       "name": "dist/integrations/excalibur/index.js (gzip)",
