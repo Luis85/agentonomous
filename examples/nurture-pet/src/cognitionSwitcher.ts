@@ -819,28 +819,42 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
         }
       }
 
-      // Promote the persisted selection to `selectedBackend` ONLY
-      // if its probe succeeded. Otherwise keep `cpu` and re-persist
-      // `'cpu'` so a future reload doesn't keep choosing the broken
-      // option.
-      const persistedOk =
-        persisted !== null && persisted !== 'cpu'
-          ? (probeResults.find((r) => r.name === persisted)?.ok ?? false)
-          : true;
-      if (persistedOk && persisted !== null && persisted !== 'cpu') {
-        setLearningBackend(persisted);
-        backendSelect.value = persisted;
-        // If Learning was selected during the probe window, force a
-        // same-mode reconstruct so the in-flight reasoner picks up
-        // the upgraded backend.
+      // Validate the LIVE selection — not just the persisted value.
+      // Two distinct races live here:
+      //
+      // 1. Persisted-but-broken (e.g. `'webgl'` from a previous
+      //    session on a device that no longer has GL). Pre-probe we
+      //    seeded `selectedBackend = 'cpu'` synchronously, so any
+      //    Learning activation that races the probe is safe.
+      // 2. User picks a backend during the probe window. The
+      //    `onBackendChange` listener has already called
+      //    `setLearningBackend(...)` + persisted it, but the probe
+      //    may now report that pick as unavailable. The earlier
+      //    "persisted-only" check here would miss this — `persisted`
+      //    is null and the post-probe path leaves
+      //    `selectedBackend` pointing at the broken pick.
+      //
+      // The live `<select>` value reflects BOTH cases (it carries
+      // the user's intent if changed, or the pre-probe seed
+      // otherwise). Validating it post-probe + reverting to `cpu`
+      // on failure handles both races uniformly.
+      const liveRaw = backendSelect.value;
+      const liveValue: Backend = isBackend(liveRaw) ? liveRaw : 'cpu';
+      const liveOk =
+        liveValue === 'cpu' || (probeResults.find((r) => r.name === liveValue)?.ok ?? false);
+      const finalBackend: Backend = liveOk ? liveValue : 'cpu';
+      if (backendSelect.value !== finalBackend) backendSelect.value = finalBackend;
+      if (getLearningBackend() !== finalBackend) {
+        setLearningBackend(finalBackend);
+        // If Learning was already selected during the probe window,
+        // force a same-mode reconstruct so the in-flight reasoner
+        // picks up the corrected (or upgraded) backend.
         if (hooks.isLearningActive()) hooks.triggerReconstruct();
-      } else if (!persistedOk && persisted !== null) {
-        backendSelect.value = 'cpu';
-        try {
-          globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, 'cpu');
-        } catch {
-          // localStorage unavailable — selection still applied for this session.
-        }
+      }
+      try {
+        globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, finalBackend);
+      } catch {
+        // localStorage unavailable — selection still applied for this session.
       }
     } catch {
       // Adapter import failed (peer dep missing). Leave all options

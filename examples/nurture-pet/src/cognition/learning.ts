@@ -416,12 +416,23 @@ export const learningMode: CognitionModeSpec = {
     }
   },
   async construct(): Promise<Reasoner> {
-    // Side-effect-import the package matching the user-selected backend.
-    // Each branch uses a literal string so Vite's static analysis can
-    // emit a per-backend async chunk; passing `selectedBackend` to a
-    // computed `import()` would inline all three packages into the
-    // learning chunk (or fail at build time).
-    switch (selectedBackend) {
+    // Snapshot `selectedBackend` at entry: the picker (running on
+    // a different microtask via its `change` listener) can flip
+    // module-scoped `selectedBackend` between any two `await`s
+    // below, so a naïve re-read at `fromJSON` time could ask for
+    // backend B when this function imported the package for
+    // backend A — `fromJSON` would then reject with
+    // `TfjsBackendNotRegisteredError` and `cognitionSwitcher`'s
+    // catch path would disable Learning mode for the rest of the
+    // session. Holding the snapshot for the full construct keeps
+    // import + activation aligned to one backend.
+    const backend = selectedBackend;
+    // Side-effect-import the package matching the snapshotted
+    // backend. Each branch uses a literal string so Vite's static
+    // analysis can emit a per-backend async chunk; passing
+    // `backend` to a computed `import()` would inline all three
+    // packages into the learning chunk (or fail at build time).
+    switch (backend) {
       case 'cpu':
         await import('@tensorflow/tfjs-backend-cpu');
         break;
@@ -441,7 +452,7 @@ export const learningMode: CognitionModeSpec = {
 
     const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
       const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
-        backend: selectedBackend,
+        backend,
         featuresOf: featuresFromNeeds,
         interpret: (output) => {
           // Side-effect: snapshot the per-tick distribution + chosen
