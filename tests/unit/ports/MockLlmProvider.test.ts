@@ -172,6 +172,33 @@ describe('MockLlmProvider', () => {
     await expect(provider.complete(ASK)).rejects.toThrow(/2 scripts matched/);
   });
 
+  it('match-or-error dispatch: rejects construction when any script lacks a match predicate', () => {
+    expect(
+      () =>
+        new MockLlmProvider({
+          dispatch: 'match-or-error',
+          scripts: [{ text: 'has match', match: () => true }, { text: 'no match' }],
+        }),
+    ).toThrow(/script\[1\].*no 'match' predicate.*match-or-error/s);
+  });
+
+  it('match-or-error dispatch: accepts construction when every script has a match predicate', () => {
+    expect(
+      () =>
+        new MockLlmProvider({
+          dispatch: 'match-or-error',
+          scripts: [
+            { text: 'a', match: () => false },
+            { text: 'b', match: () => true },
+          ],
+        }),
+    ).not.toThrow();
+  });
+
+  it('queue dispatch: still allows scripts without a match predicate', () => {
+    expect(() => new MockLlmProvider({ scripts: [{ text: 'a' }, { text: 'b' }] })).not.toThrow();
+  });
+
   it('counts empty content as 0 tokens (no floor)', async () => {
     const provider = new MockLlmProvider({ scripts: [{ text: '' }] });
     const completion = await provider.complete([{ role: 'user', content: '' }]);
