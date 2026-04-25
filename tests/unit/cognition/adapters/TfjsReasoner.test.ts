@@ -258,6 +258,42 @@ describe('TfjsReasoner — training', () => {
     r1.dispose();
     r2.dispose();
   });
+
+  it('onEpochEnd fires once per epoch with monotonic 0-indexed epoch + numeric loss', async () => {
+    const pairs = makeConvergingPairs();
+    const r = new TfjsReasoner({
+      model: makeLinearModel(),
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    const calls: Array<{ epoch: number; loss: number }> = [];
+    const result = await r.train(pairs, {
+      epochs: 5,
+      learningRate: 0.1,
+      seed: 42,
+      onEpochEnd: (epoch, loss) => {
+        calls.push({ epoch, loss });
+      },
+    });
+    expect(calls).toHaveLength(5);
+    expect(calls.map((c) => c.epoch)).toEqual([0, 1, 2, 3, 4]);
+    for (const c of calls) expect(Number.isFinite(c.loss)).toBe(true);
+    // Last callback's loss matches the result's final loss exactly.
+    expect(calls[4]!.loss).toBeCloseTo(result.finalLoss, 5);
+    r.dispose();
+  });
+
+  it('train without onEpochEnd does not throw (callback is optional)', async () => {
+    const r = new TfjsReasoner({
+      model: makeLinearModel(),
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+    });
+    await expect(
+      r.train(makeConvergingPairs(), { epochs: 2, learningRate: 0.1, seed: 0 }),
+    ).resolves.toBeDefined();
+    r.dispose();
+  });
 });
 
 describe('TfjsReasoner — persistence', () => {
