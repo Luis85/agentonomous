@@ -17,6 +17,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   format-check:
     name: Format (Prettier)
@@ -135,6 +139,29 @@ jobs:
         run: npm run build
       - name: Enforce bundle-size budget
         run: npx size-limit
+
+  size-limit-comment:
+    name: Size-limit PR comment (gzip delta)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: build
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Size Limit (sticky PR comment with gzip delta)
+        uses: andresz1/size-limit-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          script: size-limit --json
+          package_manager: npm
 
   demo-build:
     name: Demo build (examples/nurture-pet)
