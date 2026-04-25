@@ -804,14 +804,46 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
 
   void (async (): Promise<void> => {
     try {
-      const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
-      const probeResults = await Promise.all(
-        VALID_BACKENDS.map(async (name) => ({
-          name,
-          ok: await TfjsReasoner.probeBackend(name),
-        })),
-      );
-      if (hooks.isDisposed()) return;
+      const tf = await import('@tensorflow/tfjs-core');
+      // Real activation sweep — sequential because `tf.setBackend` is a
+      // global-state mutex. `TfjsReasoner.probeBackend` (registry-only)
+      // can't tell us whether `@tensorflow/tfjs-backend-wasm@4.22` will
+      // actually initialize on this device — its factory registers
+      // unconditionally but throws at first use under runtime
+      // constraints. Per Codex P1 round 6, deciding `finalBackend` from
+      // a registry-only result lets a stale `'wasm'` persist through to
+      // `learningMode.construct()`, which then fails and disables
+      // Learning for the session. Doing the activation here, while no
+      // reasoner exists, makes the disabled-option UX accurate AND
+      // gates the persisted-promotion on real availability.
+      //
+      // Each iteration: side-effect-import the matching backend
+      // package (literal-string `import()` so Vite can code-split),
+      // try `tf.setBackend(name)`, record the boolean. Throws are
+      // caught and treated as unavailable.
+      const probeResults: { readonly name: Backend; readonly ok: boolean }[] = [];
+      for (const name of VALID_BACKENDS) {
+        let ok = false;
+        try {
+          switch (name) {
+            case 'cpu':
+              await import('@tensorflow/tfjs-backend-cpu');
+              break;
+            case 'wasm':
+              await import('@tensorflow/tfjs-backend-wasm');
+              break;
+            case 'webgl':
+              await import('@tensorflow/tfjs-backend-webgl');
+              break;
+          }
+          ok = await tf.setBackend(name);
+          if (ok) await tf.ready();
+        } catch {
+          ok = false;
+        }
+        if (hooks.isDisposed()) return;
+        probeResults.push({ name, ok });
+      }
 
       for (const { name, ok } of probeResults) {
         const opt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${name}"]`);
@@ -850,6 +882,23 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
         liveValue === 'cpu' || (probeResults.find((r) => r.name === liveValue)?.ok ?? false);
       const finalBackend: Backend = liveOk ? liveValue : 'cpu';
       if (backendSelect.value !== finalBackend) backendSelect.value = finalBackend;
+      // Commit `finalBackend` as the active tf backend. The probe loop
+      // above leaves tf on whichever name was last successful (last in
+      // iteration order — typically `webgl` in browsers), which may
+      // differ from what the user actually wants. A subsequent
+      // `learningMode.construct()` would self-commit via
+      // `fromJSON({ backend })`, but doing it here keeps tf state
+      // consistent with the picker's reported selection between mount
+      // and the next mode change.
+      if (tf.getBackend() !== finalBackend) {
+        try {
+          await tf.setBackend(finalBackend);
+          await tf.ready();
+        } catch {
+          // cpu commit shouldn't fail; if it does we leave tf wherever
+          // the loop ended and let learningMode.construct() retry.
+        }
+      }
       if (getLearningBackend() !== finalBackend) {
         setLearningBackend(finalBackend);
         // If Learning was already selected during the probe window,
