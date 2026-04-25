@@ -85,8 +85,9 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     const keys = ['a/b', 'c:d', 'with space', 'café', '🐱-pet', '%20preencoded'];
     for (const k of keys) await store.save(k, snap(k, 0));
 
-    const listed = [...(await store.list())].sort();
-    expect(listed).toEqual([...keys].sort());
+    const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+    const listed = [...(await store.list())].sort(byCodePoint);
+    expect(listed).toEqual([...keys].sort(byCodePoint));
     for (const k of keys) {
       expect(await store.load(k)).toMatchObject({ identity: { id: k } });
     }
