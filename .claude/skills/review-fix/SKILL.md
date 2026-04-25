@@ -23,8 +23,9 @@ description: Ingests one or all open findings from the rolling daily-code-review
 - **Single-finding mode** — user supplies a finding ID (`682b557.3`).
   Runs steps 1 → 6 once for that ID. Default and primary path.
 - **Sweep mode** — user invokes the skill with no argument. Pull the
-  latest comment on `#87`, parse every `<!-- f:<id> -->` marker, skip
-  ones already rendered `- [x]`, and run steps 2 → 5 once per remaining
+  most recent comment on `#87` that contains finding markers (skip
+  no-op comments), parse every `<!-- f:<id> -->` marker, skip ones
+  already rendered `- [x]`, and run steps 2 → 5 once per remaining
   finding. Each finding still gets its own worktree + branch + plan
   (one finding = one branch = one PR — sweep just batches the _setup_,
   not the findings themselves). At the end, print a single hand-off
@@ -63,8 +64,11 @@ gh api "/repos/${REPO}/issues/87/comments" --paginate \
 
 If no match: hard-fail with `Finding ${ID} not found in #87 comments`.
 
-**Sweep mode (no argument).** Pull only the latest comment, then
-extract every finding ID from it. Two pagination subtleties matter:
+**Sweep mode (no argument).** Pull the most recent comment that
+actually contains finding markers (the review bot is allowed to post
+no-op comments like `YYYY-MM-DD — no-op …` with zero findings; those
+must be skipped, not picked), then extract every finding ID from it.
+Three pagination / shape subtleties matter:
 
 1. Without `--slurp`, `gh api --paginate --jq '... | last'` runs the
    filter once per page and returns one row per page (last-of-each-
@@ -73,12 +77,19 @@ extract every finding ID from it. Two pagination subtleties matter:
    page) rather than a flat list of comments, so `sort_by(.created_at)`
    would be operating on an array-of-arrays. Pipe through `add` first
    to concatenate the pages into a single flat array.
+3. The newest comment may be a no-op summary with no findings. Filter
+   to comments whose body contains `<!-- f:` _before_ taking `last`,
+   so sweep mode picks the most recent comment that has work to do.
 
 ```bash
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 LAST_COMMENT="$(gh api "repos/${REPO}/issues/87/comments" \
   --paginate --slurp \
-  --jq 'add | sort_by(.created_at) | last | {id, body}')"
+  --jq 'add
+        | map(select(.body | contains("<!-- f:")))
+        | sort_by(.created_at)
+        | last
+        | {id, body}')"
 echo "${LAST_COMMENT}" | jq -r '.body' \
   | grep -oE '<!-- f:[^ ]+ -->' \
   | sed -E 's/<!-- f:(.+) -->/\1/'
@@ -93,8 +104,9 @@ For each ID returned:
   `Skipping <id> (worktree exists at <path>)` and continue).
 - Otherwise, run steps 2 → 5 for that finding.
 
-If the comment contains zero findings, hard-fail with
-`Last comment on #87 has no findings — nothing to sweep`.
+If `LAST_COMMENT` is empty / `null` (every comment on `#87` is a
+no-op or the issue has no comments at all), hard-fail with
+`No comment on #87 contains findings — nothing to sweep`.
 
 ### 2. Extract finding fields
 
