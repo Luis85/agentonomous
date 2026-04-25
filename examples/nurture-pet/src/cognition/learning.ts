@@ -119,15 +119,6 @@ let unsubscribers: Array<() => void> = [];
  * frequency. Cleared on every `AgentTicked` event.
  */
 let processedThisTick = new Set<string>();
-/**
- * 8-dim rich-feature suffix (mood one-hot + modifier-count + event
- * counts) snapshotted during `featuresFromNeeds` (Stage 4). Reused at
- * outcome-time projection (Stage 8) so training inputs encode the same
- * pre-skill state inference saw, not post-skill state mutated by the
- * skill's `applyModifier` / `removeModifier` calls. `null` until the
- * first `featuresFromNeeds` call.
- */
-let lastRichFeatureSuffix: number[] | null = null;
 
 /**
  * Wire the learning mode to `agent`: store its id for the persisted-
@@ -154,7 +145,6 @@ export function setLearningAgent(
   currentTick = 0;
   recentEvents = [];
   processedThisTick = new Set<string>();
-  lastRichFeatureSuffix = null;
   agentIdForHydration = agent?.identity.id ?? null;
   if (agent === null) return;
   unsubscribers.push(
@@ -260,19 +250,17 @@ function featuresFromNeeds(
     else critical += 1;
   }
   const norm = (n: number): number => Math.min(n, COUNT_NORM_CAP) / COUNT_NORM_CAP;
-  // Snapshot the 8-dim rich-feature suffix so `projectLearningOutcome`
-  // (Stage 8) can pair the SAME pre-skill state with the action label,
-  // avoiding the post-skill leak Codex flagged on PR #96 (default
-  // skills like `FeedSkill` mutate `modifiers` mid-execute).
-  const suffix = [...moodOneHot, modCount, norm(completed), norm(failed), norm(critical)];
-  lastRichFeatureSuffix = suffix;
   return [
     levels.hunger ?? 0,
     levels.cleanliness ?? 0,
     levels.happiness ?? 0,
     levels.energy ?? 0,
     levels.health ?? 0,
-    ...suffix,
+    ...moodOneHot,
+    modCount,
+    norm(completed),
+    norm(failed),
+    norm(critical),
   ];
 }
 
@@ -420,17 +408,22 @@ export const learningMode: CognitionModeSpec = {
  *   arrived without a `preNeeds` snapshot, for defensive compatibility
  *   with consumer-emitted outcomes (the library's own pipeline always
  *   populates it).
- * - Mood / modifier-count / event-count dims = the 8-dim suffix
- *   `featuresFromNeeds` snapshotted into `lastRichFeatureSuffix` at
- *   Stage 4 of THIS tick (BEFORE the skill ran). Reusing the
- *   pre-skill snapshot keeps training inputs aligned with what
- *   inference saw — recomputing from `agent.getState()` here would
- *   leak post-skill modifier mutations (e.g. `FeedSkill` adds
- *   `well-fed`, `CleanSkill` removes `dirty`) and inflate the
- *   recent-event count with the outcome's own emission. Falls back
- *   to a from-state recompute only if no `featuresFromNeeds` call
- *   has run yet (typically a test harness scoring outcomes without
- *   driving the reasoner first).
+ * - Mood dim = current `agent.getState().mood?.category`. `MoodModel`
+ *   reconciles at Stage 2.7 of every tick, BEFORE Stage 7 skill
+ *   execution and Stage 8 scoring, so mood at outcome time still
+ *   reflects pre-skill state for any single-skill invocation.
+ * - Modifier-count dim = `details.preModifierCount` (snapshotted by
+ *   `CognitionPipeline.invokeSkillAction` BEFORE skill execution).
+ *   Reading `agent.getState().modifiers.length` here would leak
+ *   skill-applied mutations (e.g. `FeedSkill` adds `well-fed`,
+ *   `CleanSkill` removes `dirty`). Falls back to current state only
+ *   when the outcome arrived without the snapshot (e.g. a consumer-
+ *   emitted outcome from outside the kernel).
+ * - Event-count dims = current `recentEvents` window MINUS the
+ *   matching kind by 1 to compensate for THIS outcome's own emission.
+ *   The dedupe set in `setLearningAgent` ensures the kernel + skill
+ *   double-emit only counts once per `(kind, skillId|needId, tick)`,
+ *   so the -1 compensation reverses exactly one self-increment.
  * - Label = one-hot 7-vector for SUCCESSFUL outcomes only. Successes
  *   for skill `id` set `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`.
  *
@@ -467,44 +460,18 @@ function projectLearningOutcome(
   // would invert the training direction.
   const preNeeds = (details as { preNeeds?: Record<string, number> }).preNeeds;
   const levels = preNeeds ?? agent.getState().needs;
-  // Reuse the rich-feature suffix `featuresFromNeeds` snapshotted at
-  // Stage 4 of THIS tick. Computing from `agent.getState()` here would
-  // capture POST-skill modifier counts (e.g. `FeedSkill` adds
-  // `well-fed`, `CleanSkill` removes `dirty`), causing inputs to
-  // encode action effects — Codex P1 finding on PR #96. Falls back to
-  // a recomputed-from-current-state suffix only when the outcome
-  // arrived before any `featuresFromNeeds` call (e.g. the consumer's
-  // first invocation of `learner.score` happens without a tick
-  // boundary, like the demo's test harness).
-  const suffix = lastRichFeatureSuffix ?? recomputeRichFeatureSuffixFromAgent(agent);
-  const features = [
-    levels.hunger ?? 0,
-    levels.cleanliness ?? 0,
-    levels.happiness ?? 0,
-    levels.energy ?? 0,
-    levels.health ?? 0,
-    ...suffix,
-  ];
-  const label = new Array<number>(SOFTMAX_DIM).fill(0);
-  label[skillIdx] = 1;
-  return { features, label };
-}
-
-/**
- * Build the 8-dim rich-feature suffix from the agent's current state
- * + the module-scoped event window. Used as a fallback by
- * `projectLearningOutcome` when no `featuresFromNeeds` call has
- * snapshotted a pre-skill suffix yet (typically only the first
- * outcome in a session, or test harnesses that score outcomes without
- * driving the reasoner). Production traffic always reuses the
- * pre-skill snapshot, so this fallback's post-skill leak is a
- * one-pair edge case.
- */
-function recomputeRichFeatureSuffixFromAgent(agent: Agent): number[] {
   const state = agent.getState();
   const moodCategory = state.mood?.category;
   const moodOneHot = MOOD_KEYS.map((key) => (moodCategory === key ? 1 : 0));
-  const modCount = Math.min(state.modifiers.length, COUNT_NORM_CAP) / COUNT_NORM_CAP;
+  // Prefer the kernel-supplied pre-skill modifier count; fall back to
+  // current state only for consumer-emitted outcomes that bypass the
+  // pipeline's snapshot.
+  const preModCountRaw = (details as { preModifierCount?: unknown }).preModifierCount;
+  const preModCount =
+    typeof preModCountRaw === 'number' && Number.isFinite(preModCountRaw)
+      ? preModCountRaw
+      : state.modifiers.length;
+  const modCount = Math.min(preModCount, COUNT_NORM_CAP) / COUNT_NORM_CAP;
   let completed = 0;
   let failedCount = 0;
   let critical = 0;
@@ -513,8 +480,29 @@ function recomputeRichFeatureSuffixFromAgent(agent: Agent): number[] {
     else if (e.kind === 'failed') failedCount += 1;
     else critical += 1;
   }
+  // Successful outcomes for active-care skills reach this branch only
+  // when the kernel emitted SkillCompleted for THIS skill — that
+  // emission already pushed one entry into `recentEvents` (deduped via
+  // `processedThisTick`). Subtract it to recover the pre-skill window.
+  // Failures are filtered out earlier in this function, so we only
+  // compensate the `completed` slot.
+  completed = Math.max(0, completed - 1);
   const norm = (n: number): number => Math.min(n, COUNT_NORM_CAP) / COUNT_NORM_CAP;
-  return [...moodOneHot, modCount, norm(completed), norm(failedCount), norm(critical)];
+  const features = [
+    levels.hunger ?? 0,
+    levels.cleanliness ?? 0,
+    levels.happiness ?? 0,
+    levels.energy ?? 0,
+    levels.health ?? 0,
+    ...moodOneHot,
+    modCount,
+    norm(completed),
+    norm(failedCount),
+    norm(critical),
+  ];
+  const label = new Array<number>(SOFTMAX_DIM).fill(0);
+  label[skillIdx] = 1;
+  return { features, label };
 }
 
 /**

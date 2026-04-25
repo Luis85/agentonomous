@@ -563,9 +563,17 @@ layer stays reactive.
   dims (PR #94 P2); the upgrade to `FEATURE_DIM = 13` lets old
   5-input snapshots fail fast and fall back to the new baseline.
 
-**Library impact:** none — `featuresOf` is consumer-supplied.
+**Library impact:** small additive — `CognitionPipeline.invokeSkillAction`
+now snapshots `agent.modifiers.list().length` alongside `preNeeds`
+and includes it on every `LearningOutcome.details` payload as
+`preModifierCount`. Pulled in after Codex's PR #96 P1 review surfaced
+the same direction-inversion concern that drove the existing
+`preNeeds` snapshot — without a kernel-supplied snapshot the demo
+projection couldn't recover pre-skill modifier count for player-click
+paths.
 
-**Cost:** S. **No changeset** — demo + script only.
+**Cost:** S. **Minor changeset** — `preModifierCount` is additive on
+the `LearningOutcome.details` shape.
 
 ### 19 — Live prediction strip
 
