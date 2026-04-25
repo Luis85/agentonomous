@@ -26,6 +26,18 @@ const TRAIN_EPOCHS = 100;
 const TRAINED_FLASH_MS = 1500;
 
 /**
+ * Number of mood + modifier + event dims appended to the 5 need-level
+ * features. Must stay in lockstep with `learning.ts`'s `FEATURE_DIM`
+ * (5 + MOOD_KEYS.length + 1 modifier + 3 events = 13). The synthetic
+ * Train-button data leaves these 8 dims as uniform `[0, 1]` noise —
+ * the labels don't condition on them, so the network learns to ignore
+ * them under the synthetic regime. Real in-game data flowing through
+ * the `TfjsLearner` reinforcement loop is what teaches the network
+ * which of those dims actually predict the right action.
+ */
+const RICH_FEATURE_DIM_COUNT = 8;
+
+/**
  * Build a synthetic feature vector from the archetype distribution for
  * `skillIdx` (an index into `SOFTMAX_SKILL_IDS`). The Train button uses
  * stratified sampling rather than uniform-random draws so every class
@@ -45,16 +57,37 @@ const TRAINED_FLASH_MS = 1500;
  * - scold: happiness ∈ [0.85, 1.0], energy ∈ [0.0, 0.35], others ∈
  *   [0.4, 0.7] so the `happiness > 0.8 ∧ energy < 0.4` clause fires
  *   before the `min > 0.7` (impossible here) and lowest-need rules.
+ *
+ * The 8 trailing dims (mood / modifier-count / event-counts) are
+ * uniform `[0, 1]` noise — see `RICH_FEATURE_DIM_COUNT` JSDoc.
  */
 function generateArchetypeFeatures(rng: () => number, skillIdx: number): number[] {
   const range = (lo: number, hi: number): number => lo + rng() * (hi - lo);
+  // Append uniform-noise dims for mood / modifier / event counts. See
+  // `RICH_FEATURE_DIM_COUNT` JSDoc for why noise is the right choice
+  // for synthetic training pairs.
+  const richTail = (): number[] => Array.from({ length: RICH_FEATURE_DIM_COUNT }, () => rng());
   // `pet` — all needs comfortably high.
   if (skillIdx === SOFTMAX_SKILL_IDS.indexOf('pet')) {
-    return [range(0.75, 1), range(0.75, 1), range(0.75, 1), range(0.75, 1), range(0.75, 1)];
+    return [
+      range(0.75, 1),
+      range(0.75, 1),
+      range(0.75, 1),
+      range(0.75, 1),
+      range(0.75, 1),
+      ...richTail(),
+    ];
   }
   // `scold` — happy + tired.
   if (skillIdx === SOFTMAX_SKILL_IDS.indexOf('scold')) {
-    return [range(0.4, 0.7), range(0.4, 0.7), range(0.85, 1), range(0, 0.35), range(0.4, 0.7)];
+    return [
+      range(0.4, 0.7),
+      range(0.4, 0.7),
+      range(0.85, 1),
+      range(0, 0.35),
+      range(0.4, 0.7),
+      ...richTail(),
+    ];
   }
   // Maintenance archetypes: target need low, others mid-high.
   const needIdxBySkill: Partial<Record<(typeof SOFTMAX_SKILL_IDS)[number], number>> = {
@@ -70,6 +103,7 @@ function generateArchetypeFeatures(rng: () => number, skillIdx: number): number[
   for (let i = 0; i < NEED_IDS.length; i++) {
     features.push(i === targetNeedIdx ? range(0, 0.3) : range(0.4, 0.95));
   }
+  features.push(...richTail());
   return features;
 }
 

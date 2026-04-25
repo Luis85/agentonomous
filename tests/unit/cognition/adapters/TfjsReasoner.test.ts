@@ -380,7 +380,9 @@ describe('TfjsReasoner — bundled demo baseline', () => {
 
     // Topology contract — keep this in lockstep with the seed script
     // (`scripts/seed-learning-network.ts`) and `SOFTMAX_SKILL_IDS`.
-    expect(snapshot.weightsShapes).toEqual([[5, 16], [16], [16, 7], [7]]);
+    // 13 = 5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event
+    // counts (row 18).
+    expect(snapshot.weightsShapes).toEqual([[13, 16], [16], [16, 7], [7]]);
 
     // Feed a "very hungry" feature vector — the seed script's archetype
     // distribution leans toward `feed` (index 0 in SOFTMAX_SKILL_IDS) for
@@ -388,7 +390,10 @@ describe('TfjsReasoner — bundled demo baseline', () => {
     // snapshot is regenerated on tfjs minor bumps and the post-train
     // weights drift — but we DO assert (a) seven outputs, (b) all in
     // [0, 1], and (c) sum to ~1, which is the softmax invariant.
-    const featureVec = [0.05, 0.6, 0.6, 0.6, 0.6];
+    // The 8 trailing dims (mood / modifier-count / event-counts) are
+    // fed neutral zeros — the seed dataset trains them to be
+    // uninformative, so the column ordering still favors `feed` here.
+    const featureVec = [0.05, 0.6, 0.6, 0.6, 0.6, 0, 0, 0, 0, 0, 0, 0, 0];
     let captured: number[] | null = null;
     const reasoner = await TfjsReasoner.fromJSON<number[], number[]>(snapshot, {
       featuresOf: () => featureVec,

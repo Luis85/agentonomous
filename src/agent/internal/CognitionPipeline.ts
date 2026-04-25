@@ -124,6 +124,13 @@ export class CognitionPipeline {
     // returns would capture post-effect levels (e.g. `feed` raises hunger
     // from low → high), inverting the policy direction.
     const preNeeds = this.snapshotNeeds();
+    // Snapshot the pre-skill active-modifier count for the same reason —
+    // skills like `FeedSkill` add buffs and `CleanSkill` removes debuffs
+    // during `execute()`, so reading `agent.modifiers.list().length` at
+    // outcome time would leak skill-applied mutations into training
+    // inputs. Consumers that include a "modifier count" feature should
+    // read this snapshot from `details.preModifierCount`.
+    const preModifierCount = agent.modifiers.list().length;
     // Stage capability gate.
     if (agent.ageModel && agent.stageCapabilities) {
       if (!stageAllowsSkill(agent.stageCapabilities, agent.ageModel.stage, skillId)) {
@@ -136,7 +143,14 @@ export class CognitionPipeline {
           message: `Skill '${skillId}' is blocked at stage '${agent.ageModel.stage}'.`,
         };
         agent.publishEvent(event);
-        this.scoreFailure(skillId, params, 'stage-blocked', event.message, preNeeds);
+        this.scoreFailure(
+          skillId,
+          params,
+          'stage-blocked',
+          event.message,
+          preNeeds,
+          preModifierCount,
+        );
         return;
       }
     }
@@ -150,7 +164,14 @@ export class CognitionPipeline {
         message: `No skill registered with id '${skillId}'.`,
       };
       agent.publishEvent(event);
-      this.scoreFailure(skillId, params, 'not-registered', event.message, preNeeds);
+      this.scoreFailure(
+        skillId,
+        params,
+        'not-registered',
+        event.message,
+        preNeeds,
+        preModifierCount,
+      );
       return;
     }
     // Expose the running skill to the animation reconciler. Scoped to this
@@ -178,7 +199,7 @@ export class CognitionPipeline {
         details: { cause: message },
       };
       agent.publishEvent(event);
-      this.scoreFailure(skillId, params, 'execution-threw', message, preNeeds);
+      this.scoreFailure(skillId, params, 'execution-threw', message, preNeeds, preModifierCount);
       return;
     }
     agent.currentActiveSkillId = previousActive;
@@ -203,6 +224,7 @@ export class CognitionPipeline {
         details: {
           effectiveness,
           ...(preNeeds !== undefined ? { preNeeds } : {}),
+          preModifierCount,
         },
       });
     } else {
@@ -216,7 +238,14 @@ export class CognitionPipeline {
         ...(result.error.details !== undefined ? { details: result.error.details } : {}),
       };
       agent.publishEvent(event);
-      this.scoreFailure(skillId, params, result.error.code, result.error.message, preNeeds);
+      this.scoreFailure(
+        skillId,
+        params,
+        result.error.code,
+        result.error.message,
+        preNeeds,
+        preModifierCount,
+      );
     }
   }
 
@@ -239,8 +268,9 @@ export class CognitionPipeline {
    * Common Stage-8 hook for every SkillFailed branch. Mirrors the
    * success-side `score` call shape so consumers can switch on
    * `details.failed` to label the outcome (negative reward, one-hot
-   * `[0]`, or skip entirely depending on policy). `preNeeds` is the
-   * pre-skill snapshot captured at the top of `invokeSkillAction`.
+   * `[0]`, or skip entirely depending on policy). `preNeeds` and
+   * `preModifierCount` are the pre-skill snapshots captured at the top
+   * of `invokeSkillAction`.
    */
   private scoreFailure(
     skillId: string,
@@ -248,6 +278,7 @@ export class CognitionPipeline {
     code: string,
     message: string,
     preNeeds: Record<string, number> | undefined,
+    preModifierCount: number,
   ): void {
     this.agent.learner.score({
       intention: { kind: 'satisfy', type: skillId },
@@ -257,6 +288,7 @@ export class CognitionPipeline {
         code,
         message,
         ...(preNeeds !== undefined ? { preNeeds } : {}),
+        preModifierCount,
       },
     });
   }

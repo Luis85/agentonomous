@@ -1,11 +1,17 @@
 /**
  * One-shot seed script for `examples/nurture-pet/src/cognition/learning.network.json`.
  *
- * Builds a `[5, 16, 7]` Sequential (5 need-level inputs → 16 sigmoid hidden →
- * 7 softmax outputs over the active-care skills), trains it briefly on a
- * hand-crafted dataset that maps each lowest-level need to its corresponding
- * skill, and writes the resulting plain-JSON snapshot — matching the
- * `TfjsSnapshot` shape that `TfjsReasoner.fromJSON(...)` rebuilds — to disk.
+ * Builds a `[13, 16, 7]` Sequential (13 input feature dims = 5 needs + 4
+ * mood one-hot + 1 modifier-count + 3 recent-event counts → 16 sigmoid
+ * hidden → 7 softmax outputs over the active-care skills), trains it
+ * briefly on a hand-crafted dataset that maps each lowest-level need to
+ * its corresponding skill, and writes the resulting plain-JSON snapshot
+ * — matching the `TfjsSnapshot` shape that `TfjsReasoner.fromJSON(...)`
+ * rebuilds — to disk. The 8 non-need dims are uniform `[0, 1]` noise in
+ * the seed dataset so the baseline network learns the lowest-need rule
+ * over the 5 need dims while staying neutral on the richer signals;
+ * those richer dims acquire predictive weight only via the in-game
+ * `TfjsLearner` reinforcement loop.
  *
  * The output mapping is deliberate — the bundled baseline should give an
  * untrained user a network that already "knows" the obvious heuristic
@@ -49,6 +55,24 @@ const NEED_TO_SKILL_INDEX: ReadonlyArray<number> = [
   5, // health      → medicate
 ];
 
+/**
+ * Mood keys appended after the 5 need dims as a one-hot block. Must
+ * match `MOOD_KEYS` in `examples/nurture-pet/src/cognition/learning.ts`.
+ */
+const MOOD_KEYS = ['happy', 'sad', 'sleepy', 'playful'] as const;
+
+/**
+ * Total input feature width = 5 needs + 4 mood one-hot + 1
+ * modifier-count + 3 recent-event counts. Matches `FEATURE_DIM` in
+ * `learning.ts`. The seed dataset fills the 8 non-need dims with
+ * uniform-`[0, 1]` noise so the lowest-need rule still drives the
+ * gradient.
+ */
+const FEATURE_DIM = 5 + MOOD_KEYS.length + 1 + 3;
+
+/** Number of trailing noise dims appended after the 5 need samples. */
+const RICH_NOISE_DIM_COUNT = FEATURE_DIM - 5;
+
 /** LCG seed used for both training-pair generation and tfjs init. */
 const SEED = 0x5eed_17;
 
@@ -87,10 +111,10 @@ function encodeWeights(weights: readonly Float32Array[]): string {
 }
 
 /**
- * Build a `[5, 16, 7]` Sequential with sigmoid hidden + softmax output.
- * The kernel initializer is seeded so the pre-train weights are stable;
- * post-train weights then depend only on the deterministic data + fit
- * loop.
+ * Build a `[FEATURE_DIM, 16, 7]` Sequential with sigmoid hidden +
+ * softmax output. The kernel initializer is seeded so the pre-train
+ * weights are stable; post-train weights then depend only on the
+ * deterministic data + fit loop.
  */
 function buildModel(): Sequential {
   const model = sequential();
@@ -102,7 +126,7 @@ function buildModel(): Sequential {
     layers.dense({
       units: 16,
       activation: 'sigmoid',
-      inputShape: [5],
+      inputShape: [FEATURE_DIM],
       kernelInitializer: initializers.glorotNormal({ seed: SEED }),
       biasInitializer: 'zeros',
     }),
@@ -170,6 +194,10 @@ function generateTrainingPairs(rng: () => number): {
       const mapped = NEED_TO_SKILL_INDEX[minIdx];
       skillIdx = mapped ?? 0;
     }
+    // Append uniform-`[0, 1]` noise for the 8 mood / modifier / event
+    // dims. Labels don't condition on these, so the network learns to
+    // ignore them under the synthetic baseline regime.
+    for (let j = 0; j < RICH_NOISE_DIM_COUNT; j++) sample.push(rng());
     const oneHot = new Array<number>(SKILL_IDS.length).fill(0);
     oneHot[skillIdx] = 1;
     features.push(sample);
@@ -187,7 +215,7 @@ async function main(): Promise<void> {
   const { features, labels } = generateTrainingPairs(rng);
 
   console.log(
-    `Training [5, 16, ${SKILL_IDS.length}] softmax baseline on ${features.length} pairs ` +
+    `Training [${FEATURE_DIM}, 16, ${SKILL_IDS.length}] softmax baseline on ${features.length} pairs ` +
       `for ${EPOCHS} epochs (CPU backend)…`,
   );
 
@@ -227,7 +255,18 @@ async function main(): Promise<void> {
     topology,
     weights: encodeWeights(weightsArrays),
     weightsShapes,
-    inputKeys: ['hunger', 'cleanliness', 'happiness', 'energy', 'health'],
+    inputKeys: [
+      'hunger',
+      'cleanliness',
+      'happiness',
+      'energy',
+      'health',
+      ...MOOD_KEYS.map((k) => `mood:${k}`),
+      'modifierCount',
+      'recent:SkillCompleted',
+      'recent:SkillFailed',
+      'recent:NeedCritical',
+    ],
     outputKeys: [...SKILL_IDS],
   };
 

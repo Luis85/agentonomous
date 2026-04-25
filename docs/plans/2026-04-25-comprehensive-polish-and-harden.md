@@ -78,8 +78,9 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 14  | #84 | `feat/demo-train-epoch-progress`             | `TfjsReasoner.train` `onEpochEnd` callback (minor bump); demo HUD goes live mid-fit.   |
 | 15  | #85 | `feat/llm-port-example-and-readme`           | README LLM section, `examples/llm-mock/` deterministic playback example, vision spec status update. |
 | 16  | TBD | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner` with `Buffered: N/50` HUD. |
-| 17  | TBD | `feat/tfjs-multi-output-softmax`             | 7-way softmax over active-care skills; bundled baseline rebuilt; `TfjsReasoner` JSDoc example (minor bump). |
-| 23–25 | TBD | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
+| 17  | #94 | `feat/tfjs-multi-output-softmax`             | 7-way softmax over active-care skills; bundled baseline rebuilt; `TfjsReasoner` JSDoc example (minor bump). |
+| 23–25 | #93 | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
+| 18  | TBD | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; demo-only. |
 
 ---
 
@@ -525,31 +526,54 @@ learning-mode argmax over them would conflict with the always-on
 heuristic emission. The softmax stays consequentialist; the heuristic
 layer stays reactive.
 
-### 18 — Richer feature vector
+### 18 — Richer feature vector — **shipped**
 
 **Branch:** `feat/demo-richer-feature-vector`
 
-Today's feature vector is the 5 need levels. Grow it to:
+**As shipped:**
 
-- 5 need levels (existing)
-- Mood category one-hot (4 dims: happy / sad / sleepy / playful)
-- Active modifier count (1 dim, normalized to [0, 1] via min(count,
-  5) / 5)
-- Recent-event counts in the last 30 ticks per `SkillCompleted` /
-  `SkillFailed` / `NeedCritical` (3 dims)
+- `examples/nurture-pet/src/cognition/learning.ts` grew the feature
+  vector from 5 need levels to 13 dims:
+  - 5 need levels (hunger / cleanliness / happiness / energy / health)
+  - 4 mood one-hot dims indexed by `MOOD_KEYS = ['happy', 'sad',
+    'sleepy', 'playful']` (off-roster moods → all-zero on this section)
+  - 1 active-modifier count, normalized via
+    `min(count, COUNT_NORM_CAP=5) / COUNT_NORM_CAP`
+  - 3 recent-event counts (`SkillCompleted` / `SkillFailed` /
+    `NeedCritical`) in the last 30 `AgentTicked` ticks, each normalized
+    via the same cap
+- `setLearningAgentId(id)` was renamed to `setLearningAgent(agent)` —
+  pre-1.0 clean break, no compat shim. The new function subscribes to
+  the standard event bus to populate module-scoped mood + recent-event
+  state without widening the adapter's `helpers` shape.
+- `projectLearningOutcome` now produces 13-dim features at outcome
+  time (mood + modifier-count + event-counts come from
+  `agent.getState()` + the same module-scoped event window).
+- `cognitionSwitcher.ts`'s synthetic Train-button generator appends 8
+  uniform-`[0, 1]` noise dims to each archetype sample so labels stay
+  conditioned on the 5 need dims; the network learns to ignore the
+  trailing dims under the synthetic regime, leaving the in-game
+  `TfjsLearner` reinforcement loop to teach predictive weight on those
+  dims from real outcomes.
+- `scripts/seed-learning-network.ts` now builds a `[13, 16, 7]`
+  Sequential and pads training pairs with the same uniform-noise tail.
+  The bundled `examples/nurture-pet/src/cognition/learning.network.json`
+  was regenerated at the new shape.
+- Hydration guard in `learning.ts` already validated input + output
+  dims (PR #94 P2); the upgrade to `FEATURE_DIM = 13` lets old
+  5-input snapshots fail fast and fall back to the new baseline.
 
-Total = 13 dims (was 5).
+**Library impact:** small additive — `CognitionPipeline.invokeSkillAction`
+now snapshots `agent.modifiers.list().length` alongside `preNeeds`
+and includes it on every `LearningOutcome.details` payload as
+`preModifierCount`. Pulled in after Codex's PR #96 P1 review surfaced
+the same direction-inversion concern that drove the existing
+`preNeeds` snapshot — without a kernel-supplied snapshot the demo
+projection couldn't recover pre-skill modifier count for player-click
+paths.
 
-**Library impact:** none — `featuresOf` is consumer-supplied.
-
-**Breaking for old saves:** the bundled `learning.network.json`
-baseline must be re-authored at the new shape. Old saved snapshots
-become schema-invalid; the demo's `learning.ts` `hydrate()` already
-falls back to the baseline on shape mismatch.
-
-**Sequence:** after row 16 — once the learner reinforces observed
-outcomes, richer features actually matter for visible behavior
-divergence.
+**Cost:** S. **Minor changeset** — `preModifierCount` is additive on
+the `LearningOutcome.details` shape.
 
 ### 19 — Live prediction strip
 
