@@ -78,6 +78,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 14  | #84 | `feat/demo-train-epoch-progress`             | `TfjsReasoner.train` `onEpochEnd` callback (minor bump); demo HUD goes live mid-fit.   |
 | 15  | #85 | `feat/llm-port-example-and-readme`           | README LLM section, `examples/llm-mock/` deterministic playback example, vision spec status update. |
 | 16  | TBD | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner` with `Buffered: N/50` HUD. |
+| 23–25 | TBD | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
 
 ---
 
@@ -261,17 +262,30 @@ counting).
 
 **Cost:** XS.
 
-### 23 / 24 / 25 — JSDoc gaps (bundle as one PR)
+### 23 / 24 / 25 — JSDoc gaps (bundle as one PR) — **shipped**
 
-**Branch:** `docs/result-and-cognition-jsdoc`
+**Branch:** `docs/worktrees-and-jsdoc` (renamed from
+`docs/result-and-cognition-jsdoc` to bundle the new CLAUDE.md
+worktree non-negotiable in the same diff).
 
-- `src/agent/result.ts:14-37` — one-sentence JSDoc on `isOk`,
-  `isErr`, `map`, `mapErr`, `andThen`, `unwrap`. Used widely in
-  skills.
-- `src/cognition/IntentionCandidate.ts` — describe `discriminant`
-  (`[0, 1]` range, tie-break intent).
-- `src/skills/SkillRegistry.ts` — `invoke()` JSDoc `@throws` clause
-  (actual code throws on unregistered).
+**As shipped:**
+
+- `src/agent/result.ts` — one-sentence JSDoc added on `isOk`, `isErr`,
+  `map`, `mapErr`, `andThen`, `unwrap` per STYLE_GUIDE.md's "JSDoc on
+  every exported symbol" rule. Pre-existing module-level JSDoc on the
+  `Result<T, E>` type and on `ok` / `err` was left untouched.
+- `src/cognition/IntentionCandidate.ts` — `score` field's JSDoc now
+  documents the `[0, 1]` range, urgency-alignment, and the tie-break
+  intent (equal scores → policy source order wins, since the
+  `JsSonReasoner` scan uses strict `>` so the first contributor keeps
+  the slot). The original review note's `discriminant` name referred
+  conceptually to `score`; no field was renamed or added.
+- `src/skills/SkillRegistry.ts` — `invoke()` JSDoc gained an explicit
+  `@throws {SkillInvocationError}` clause documenting that an
+  unregistered `id` is a wiring bug surfaced as a typed `AgentError`,
+  not a domain `err(...)`.
+
+No library behavior change. No changeset.
 
 **Cost:** XS combined.
 
