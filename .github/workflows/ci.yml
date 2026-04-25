@@ -31,25 +31,32 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      # Inline path filter via the GitHub API. Replaces
+      # `dorny/paths-filter@v3` (still pinned to Node 20 — emits a
+      # deprecation annotation on every run with no Node 24 release
+      # available). For non-PR events (push to main/develop/demo) we
+      # always treat the change as code-touching and run the full gate.
       - name: Filter paths (code vs docs-only)
         id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            code:
-              - 'src/**'
-              - 'tests/**'
-              - 'examples/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'tsconfig*.json'
-              - 'vite.config.*'
-              - 'vitest.config.*'
-              - 'eslint.config.*'
-              - 'typedoc.json'
-              - '.github/workflows/**'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "Non-PR event ($GITHUB_EVENT_NAME) — defaulting code=true."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pr_number="${{ github.event.pull_request.number }}"
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr_number/files" --jq '.[].filename')
+          echo "Changed files in PR #$pr_number:"
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -E '^(src/|tests/|examples/|\.github/workflows/|package(-lock)?\.json|tsconfig[^/]*\.json|vite\.config\.|vitest\.config\.|eslint\.config\.|typedoc\.json)' >/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
 
   format-check:
     name: Format (Prettier)
@@ -149,14 +156,12 @@ jobs:
           cache: npm
       - name: Install dependencies (npm ci)
         run: npm ci
+      # Typedoc runs as a wiring/coverage check — a clean generation
+      # proves every exported symbol is reachable and documented.
+      # The generated `docs/api/` is regenerated on demand locally; we
+      # do not consume the artifact in CI, so skip the upload step.
       - name: Generate API docs (typedoc)
         run: npm run docs
-      - name: Upload API docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-docs
-          path: docs/api
-          retention-days: 14
 
   test:
     name: Test (Vitest + coverage)
@@ -222,12 +227,19 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # andresz1/size-limit-action@v1 is the only remaining Node 20
+      # action in this workflow — no Node 24 fork exists yet, and the
+      # sticky-comment delta UX is high value, so we accept the single
+      # residual deprecation annotation until upstream cuts a Node 24
+      # release. Path-filter has been inlined; this is the only one left.
       - name: Size Limit (sticky PR comment with gzip delta)
         uses: andresz1/size-limit-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          script: npx size-limit --json
-          package_manager: npm
+          # Action runs `npm run <build_script>` then `npx size-limit --json`
+          # internally. Older `script` / `package_manager` inputs were
+          # removed upstream and now trigger schema warnings.
+          build_script: build
 
   demo-build:
     name: Demo build (examples/nurture-pet)

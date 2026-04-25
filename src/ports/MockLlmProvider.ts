@@ -102,43 +102,18 @@ export class MockLlmProvider implements LlmProviderPort {
     const requestInputTokens = estimateTokens(messages);
     const reportedInputTokens = script.usage?.inputTokens ?? requestInputTokens;
     const outputTokens = script.usage?.outputTokens ?? estimateTokensFor(script.text);
-
-    const budget = options.budget;
-    if (budget?.maxInputTokens !== undefined && requestInputTokens > budget.maxInputTokens) {
-      throw new BudgetExceededError(
-        `MockLlmProvider: input ${requestInputTokens} tokens exceeds maxInputTokens ${budget.maxInputTokens}.`,
-      );
-    }
-    if (budget?.maxOutputTokens !== undefined && outputTokens > budget.maxOutputTokens) {
-      throw new BudgetExceededError(
-        `MockLlmProvider: output ${outputTokens} tokens exceeds maxOutputTokens ${budget.maxOutputTokens}.`,
-      );
-    }
     const costCents = script.usage?.costCents;
-    if (
-      budget?.maxCostCents !== undefined &&
-      costCents !== undefined &&
-      costCents > budget.maxCostCents
-    ) {
-      throw new BudgetExceededError(
-        `MockLlmProvider: cost ${costCents}¢ exceeds maxCostCents ${budget.maxCostCents}¢.`,
-      );
-    }
+
+    enforceBudget(options.budget, requestInputTokens, outputTokens, costCents);
 
     // Only commit the queue cursor once budget checks have passed —
     // otherwise a budget-rejected request would consume a scripted
     // entry and make retries non-deterministic.
     picked.commit();
 
-    const usage: LlmUsage = {
-      inputTokens: reportedInputTokens,
-      outputTokens,
-      ...(costCents !== undefined ? { costCents } : {}),
-      ...(script.usage?.cached !== undefined ? { cached: script.usage.cached } : {}),
-    };
     return {
       text: script.text,
-      usage,
+      usage: buildUsage(reportedInputTokens, outputTokens, costCents, script.usage?.cached),
       model,
       stopReason: script.stopReason ?? 'stop',
     };
@@ -163,14 +138,17 @@ export class MockLlmProvider implements LlmProviderPort {
         );
       }
       // match-or-error has no queue state to advance; commit is a no-op.
-      return { script: hits[0]!, commit: () => undefined };
+      const [only] = hits;
+      if (!only) throw new Error('MockLlmProvider: no script matched the request.');
+      return { script: only, commit: () => undefined };
     }
     // Queue mode: honour a `match` predicate if it's set; otherwise take
     // the next positional script. Exhausted queue throws. The returned
     // `commit` advances the queue cursor; callers defer it until after
     // budget checks so a rejected request doesn't consume an entry.
     for (let i = this.cursor; i < this.scripts.length; i++) {
-      const candidate = this.scripts[i]!;
+      const candidate = this.scripts[i];
+      if (!candidate) continue;
       if (candidate.match === undefined || candidate.match(messages, options)) {
         const advanceTo = i + 1;
         return {
@@ -183,6 +161,48 @@ export class MockLlmProvider implements LlmProviderPort {
     }
     throw new Error('MockLlmProvider: script queue exhausted.');
   }
+}
+
+function enforceBudget(
+  budget: LlmCompleteOptions['budget'],
+  inputTokens: number,
+  outputTokens: number,
+  costCents: number | undefined,
+): void {
+  if (!budget) return;
+  if (budget.maxInputTokens !== undefined && inputTokens > budget.maxInputTokens) {
+    throw new BudgetExceededError(
+      `MockLlmProvider: input ${inputTokens} tokens exceeds maxInputTokens ${budget.maxInputTokens}.`,
+    );
+  }
+  if (budget.maxOutputTokens !== undefined && outputTokens > budget.maxOutputTokens) {
+    throw new BudgetExceededError(
+      `MockLlmProvider: output ${outputTokens} tokens exceeds maxOutputTokens ${budget.maxOutputTokens}.`,
+    );
+  }
+  if (
+    budget.maxCostCents !== undefined &&
+    costCents !== undefined &&
+    costCents > budget.maxCostCents
+  ) {
+    throw new BudgetExceededError(
+      `MockLlmProvider: cost ${costCents}¢ exceeds maxCostCents ${budget.maxCostCents}¢.`,
+    );
+  }
+}
+
+function buildUsage(
+  inputTokens: number,
+  outputTokens: number,
+  costCents: number | undefined,
+  cached: boolean | undefined,
+): LlmUsage {
+  return {
+    inputTokens,
+    outputTokens,
+    ...(costCents !== undefined ? { costCents } : {}),
+    ...(cached !== undefined ? { cached } : {}),
+  };
 }
 
 /**
