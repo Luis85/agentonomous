@@ -39,6 +39,17 @@ export async function runCatchUp(
   const chunkSize = opts.chunkVirtualSeconds ?? OFFLINE_CATCHUP_DEFAULTS.chunkVirtualSeconds;
   const maxChunks = opts.maxChunks ?? OFFLINE_CATCHUP_DEFAULTS.maxChunks;
 
+  if (!Number.isFinite(chunkSize) || chunkSize <= 0) {
+    throw new RangeError(
+      `runCatchUp: chunkVirtualSeconds must be a positive finite number, got ${String(chunkSize)}`,
+    );
+  }
+  if (!Number.isInteger(maxChunks) || maxChunks <= 0) {
+    throw new RangeError(
+      `runCatchUp: maxChunks must be a positive integer, got ${String(maxChunks)}`,
+    );
+  }
+
   if (!(totalVirtualDtSeconds > 0)) {
     return { chunksProcessed: 0, totalVirtualSeconds: 0, truncated: false };
   }

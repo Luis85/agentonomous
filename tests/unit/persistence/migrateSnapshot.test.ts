@@ -29,4 +29,17 @@ describe('migrateSnapshot', () => {
       ),
     ).toThrow(/schemaVersion \(99\)/);
   });
+
+  it('throws on NaN / Infinity / fractional / negative schemaVersion', () => {
+    const base = {
+      snapshotAt: 0,
+      identity: { id: 'x', name: 'x', version: '0.0.0', role: 'npc', species: 'cat' },
+    };
+    for (const bad of [NaN, Infinity, -Infinity, 1.5, -1]) {
+      expect(() => migrateSnapshot({ ...base, schemaVersion: bad })).toThrow(SnapshotRestoreError);
+      expect(() => migrateSnapshot({ ...base, schemaVersion: bad })).toThrow(
+        /Invalid schemaVersion/,
+      );
+    }
+  });
 });

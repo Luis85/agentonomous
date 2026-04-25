@@ -28,6 +28,10 @@ export const DEFAULT_AUTOSAVE_POLICY: Readonly<Required<Omit<AutoSavePolicy, 'en
   onEvents: ['AgentDied', 'LifeStageChanged'],
 };
 
+function isPositiveFiniteNumber(n: number | undefined): n is number {
+  return n !== undefined && Number.isFinite(n) && n > 0;
+}
+
 /**
  * Stateful auto-save tracker. Agent owns one of these and asks `.shouldSave()`
  * each tick after running the pipeline.
@@ -59,11 +63,14 @@ export class AutoSaveTracker {
   shouldSave(): boolean {
     if (this.policy.enabled === false) return false;
     if (this.eventTriggeredThisTick) return true;
-    if (this.policy.everyTicks && this.ticksSinceSave >= this.policy.everyTicks) {
+    if (
+      isPositiveFiniteNumber(this.policy.everyTicks) &&
+      this.ticksSinceSave >= this.policy.everyTicks
+    ) {
       return true;
     }
     if (
-      this.policy.everyVirtualSeconds &&
+      isPositiveFiniteNumber(this.policy.everyVirtualSeconds) &&
       this.virtualSecondsSinceSave >= this.policy.everyVirtualSeconds
     ) {
       return true;
