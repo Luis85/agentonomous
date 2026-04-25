@@ -58,12 +58,23 @@ async function precomputeDecisions(provider: LlmProviderPort, n: number): Promis
         { role: 'user', content: 'What should the pet do next?' },
       ]);
       out.push(completion.text);
-    } catch {
-      // Queue exhausted past tick 3 — null intention on this tick.
-      out.push('');
+    } catch (err) {
+      // Only swallow the documented queue-exhausted condition — every
+      // other error (budget, malformed request, runtime regression)
+      // must surface so the example still works as a smoke test of the
+      // LLM port, not just a determinism replay.
+      if (isQueueExhausted(err)) {
+        out.push('');
+        continue;
+      }
+      throw err;
     }
   }
   return out;
+}
+
+function isQueueExhausted(err: unknown): boolean {
+  return err instanceof Error && err.message.includes('script queue exhausted');
 }
 
 function decisionToIntention(text: string): Intention | null {
