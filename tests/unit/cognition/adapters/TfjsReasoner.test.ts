@@ -367,7 +367,7 @@ describe('TfjsReasoner — persistence', () => {
 });
 
 describe('TfjsReasoner — bundled demo baseline', () => {
-  it('learning.network.json loads and produces sigmoid(-1) ≈ 0.2689 for hunger=1', async () => {
+  it('learning.network.json loads and produces a 7-vector softmax distribution', async () => {
     const { readFile } = await import('node:fs/promises');
     const path = await import('node:path');
     const baselinePath = path.resolve(
@@ -378,19 +378,36 @@ describe('TfjsReasoner — bundled demo baseline', () => {
       typeof TfjsReasoner.fromJSON
     >[0];
 
-    const featureVec = [1, 0, 0, 0, 0];
-    let captured: number | null = null;
+    // Topology contract — keep this in lockstep with the seed script
+    // (`scripts/seed-learning-network.ts`) and `SOFTMAX_SKILL_IDS`.
+    expect(snapshot.weightsShapes).toEqual([[5, 16], [16], [16, 7], [7]]);
+
+    // Feed a "very hungry" feature vector — the seed script's archetype
+    // distribution leans toward `feed` (index 0 in SOFTMAX_SKILL_IDS) for
+    // this kind of state. We don't pin the exact column probability — the
+    // snapshot is regenerated on tfjs minor bumps and the post-train
+    // weights drift — but we DO assert (a) seven outputs, (b) all in
+    // [0, 1], and (c) sum to ~1, which is the softmax invariant.
+    const featureVec = [0.05, 0.6, 0.6, 0.6, 0.6];
+    let captured: number[] | null = null;
     const reasoner = await TfjsReasoner.fromJSON<number[], number[]>(snapshot, {
       featuresOf: () => featureVec,
       interpret: (out) => {
-        captured = out[0] ?? null;
+        captured = out;
         return null;
       },
     });
     reasoner.selectIntention(ctx());
 
     expect(captured).not.toBeNull();
-    expect(captured!).toBeCloseTo(0.2689, 4);
+    expect(captured!).toHaveLength(7);
+    let sum = 0;
+    for (const p of captured!) {
+      expect(p).toBeGreaterThanOrEqual(0);
+      expect(p).toBeLessThanOrEqual(1);
+      sum += p;
+    }
+    expect(sum).toBeCloseTo(1, 5);
     reasoner.dispose();
   });
 });

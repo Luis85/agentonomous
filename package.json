@@ -70,7 +70,8 @@
     "size:why": "npm run build && size-limit --why",
     "demo:install": "npm install && npm run build && cd examples/nurture-pet && npm install",
     "demo:dev": "cd examples/nurture-pet && npm run dev",
-    "demo:build": "npm run build && cd examples/nurture-pet && npm run build"
+    "demo:build": "npm run build && cd examples/nurture-pet && npm run build",
+    "seed:learning-network": "node --experimental-strip-types scripts/seed-learning-network.ts"
   },
   "publishConfig": {
     "access": "public",

@@ -17,6 +17,15 @@ import type { Intention } from '../Intention.js';
  * `SkillFailed` event. Consumers that want to train on positive
  * evidence only should switch on `details.failed` in their
  * `toTrainingPair` projection and skip / negate accordingly.
+ *
+ * Both branches additionally carry `details.preNeeds` — a snapshot of
+ * the agent's need levels captured BEFORE the skill mutated state.
+ * Use this (not the agent's live `needs`) when projecting features for
+ * a training pair: post-skill levels reflect the action's effect, not
+ * the state the policy decided from, and training on the post-state
+ * inverts the policy direction (e.g. `feed` raises hunger, so a "high
+ * hunger → feed" pair would push the network the wrong way). The
+ * field is omitted when the agent has no `Needs` subsystem.
  */
 export interface LearningOutcome {
   intention: Intention;
@@ -26,7 +35,9 @@ export interface LearningOutcome {
   /**
    * Free-form metadata (skill outcomes, observed state deltas, ...).
    * The cognition pipeline populates `effectiveness` on success and
-   * `{ failed, code, message }` on failure — see Stage 8 contract above.
+   * `{ failed, code, message }` on failure, plus `preNeeds` (a
+   * `Record<needId, level>` snapshot taken before the skill ran)
+   * whenever a `Needs` subsystem is wired — see Stage 8 contract above.
    */
   details?: Record<string, unknown>;
 }

@@ -1,7 +1,7 @@
 import type { Agent, Learner, Reasoner } from 'agentonomous';
 import { NoopLearner } from 'agentonomous';
 import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
-import { buildLearningLearner } from './cognition/learning.js';
+import { buildLearningLearner, SOFTMAX_SKILL_IDS } from './cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
 
 /**
@@ -24,6 +24,63 @@ const NEED_IDS = ['hunger', 'cleanliness', 'happiness', 'energy', 'health'] as c
 const TRAIN_PAIR_COUNT = 30;
 const TRAIN_EPOCHS = 100;
 const TRAINED_FLASH_MS = 1500;
+
+/**
+ * Build a synthetic feature vector from the archetype distribution for
+ * `skillIdx` (an index into `SOFTMAX_SKILL_IDS`). The Train button uses
+ * stratified sampling rather than uniform-random draws so every class
+ * sees roughly equal representation in a 30-pair batch — without this,
+ * `pet` (`min(needs) > 0.7`) would appear with probability `~0.3^5 ≈
+ * 0.24%` and `scold` (`happiness > 0.8 ∧ energy < 0.4`) only ~8%, so
+ * the Train button would heavily reinforce the maintenance classes
+ * while washing out the under-represented ones.
+ *
+ * Archetype ranges are designed to land inside the class's region of
+ * input space without crossing into a sibling archetype:
+ *
+ * - feed/clean/play/rest/medicate: target need ∈ [0, 0.3], others ∈
+ *   [0.4, 0.95] so `min > 0.7` never fires (`pet` doesn't steal the
+ *   sample) and the lowest-need rule resolves correctly.
+ * - pet: every need ∈ [0.75, 1.0] so `min > 0.7` fires.
+ * - scold: happiness ∈ [0.85, 1.0], energy ∈ [0.0, 0.35], others ∈
+ *   [0.4, 0.7] so the `happiness > 0.8 ∧ energy < 0.4` clause fires
+ *   before the `min > 0.7` (impossible here) and lowest-need rules.
+ */
+function generateArchetypeFeatures(rng: () => number, skillIdx: number): number[] {
+  const range = (lo: number, hi: number): number => lo + rng() * (hi - lo);
+  // `pet` — all needs comfortably high.
+  if (skillIdx === SOFTMAX_SKILL_IDS.indexOf('pet')) {
+    return [range(0.75, 1), range(0.75, 1), range(0.75, 1), range(0.75, 1), range(0.75, 1)];
+  }
+  // `scold` — happy + tired.
+  if (skillIdx === SOFTMAX_SKILL_IDS.indexOf('scold')) {
+    return [range(0.4, 0.7), range(0.4, 0.7), range(0.85, 1), range(0, 0.35), range(0.4, 0.7)];
+  }
+  // Maintenance archetypes: target need low, others mid-high.
+  const needIdxBySkill: Partial<Record<(typeof SOFTMAX_SKILL_IDS)[number], number>> = {
+    feed: 0,
+    clean: 1,
+    play: 2,
+    rest: 3,
+    medicate: 4,
+  };
+  const skillId = SOFTMAX_SKILL_IDS[skillIdx] ?? 'feed';
+  const targetNeedIdx = needIdxBySkill[skillId] ?? 0;
+  const features: number[] = [];
+  for (let i = 0; i < NEED_IDS.length; i++) {
+    features.push(i === targetNeedIdx ? range(0, 0.3) : range(0.4, 0.95));
+  }
+  return features;
+}
+
+/**
+ * Build a one-hot label for class `skillIdx` over `SOFTMAX_SKILL_IDS`.
+ */
+function oneHotLabel(skillIdx: number): number[] {
+  const label = new Array<number>(SOFTMAX_SKILL_IDS.length).fill(0);
+  label[skillIdx] = 1;
+  return label;
+}
 
 /**
  * Duck-typed view of `TfjsReasoner`'s train + snapshot surface. The
@@ -365,16 +422,14 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       // gate can't be bypassed during this microtask window.
       await new Promise<void>((r) => setTimeout(r, 0));
       if (disposed) return;
-      const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
-        const features: number[] = [];
-        let min = 1;
-        for (let i = 0; i < NEED_IDS.length; i++) {
-          const level = agent.rng.next();
-          features.push(level);
-          if (level < min) min = level;
-        }
-        const urgency = 1 - min;
-        return { features, label: [urgency] };
+      // Stratified sampling: round-robin over the 7 softmax classes so
+      // every class gets roughly TRAIN_PAIR_COUNT / 7 samples. Replaces
+      // a previous uniform-random sweep that left `pet` (~0.24%) and
+      // `scold` (~8%) drastically under-represented in a 30-pair batch.
+      const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, (_unused, i) => {
+        const skillIdx = i % SOFTMAX_SKILL_IDS.length;
+        const features = generateArchetypeFeatures(() => agent.rng.next(), skillIdx);
+        return { features, label: oneHotLabel(skillIdx) };
       });
       // Live mid-fit progress: update the button text + push points
       // into the sparkline as each epoch completes. Both branches are

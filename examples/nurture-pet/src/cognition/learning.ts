@@ -11,16 +11,55 @@ import networkJson from './learning.network.json';
 const LEARNER_BATCH_SIZE = 50;
 
 /**
- * Urgency floor for the learning-mode `interpret()` gate. The network's
- * scalar output is a [0, 1] urgency estimate — values below this floor
- * cause the pet to idle this tick rather than commit an intention.
+ * Active-care skill ids the softmax output is indexed over. Order is
+ * load-bearing: it matches the bundled `learning.network.json` baseline's
+ * column order AND the one-hot label order used by both the `Train`
+ * button's synthetic dataset (`cognitionSwitcher.ts`) and the seed
+ * script (`scripts/seed-learning-network.ts`). Changing the ordering
+ * silently breaks every previously-trained snapshot — bump baseline +
+ * tests in lockstep.
  *
- * Picked empirically so the default hand-authored weights produce a
- * visible idle rate and re-training shifts the observable behavior.
- * Tune up (toward 0.5) if the post-train idle rate is indistinguishable
- * from the baseline; tune down (toward 0.2) if the pet rarely acts.
+ * Expression skills (`meow` / `sad` / `sleepy`) intentionally stay in
+ * the heuristic-reactive layer (NeedsPolicy) rather than the softmax —
+ * they're emoted reflexively from need state, not deliberately chosen,
+ * so a learning-mode argmax over them would conflict with the always-on
+ * heuristic emission. Plan open-question 2, resolved in row 17.
  */
-const URGENCY_THRESHOLD = 0.35;
+export const SOFTMAX_SKILL_IDS = [
+  'feed',
+  'clean',
+  'play',
+  'rest',
+  'pet',
+  'medicate',
+  'scold',
+] as const;
+
+/** Number of softmax outputs — matches `SOFTMAX_SKILL_IDS.length`. */
+const SOFTMAX_DIM = SOFTMAX_SKILL_IDS.length;
+
+/**
+ * Input feature width — matches `featuresFromNeeds`'s return length (the
+ * 5 normalized need levels). Hydration rejects snapshots whose model's
+ * input layer expects a different last-dim so a width mismatch fails
+ * fast at construct() rather than at runtime when `model.predict` first
+ * receives a 5-element vector.
+ */
+const FEATURE_DIM = 5;
+
+/**
+ * Idle floor for the learning-mode `interpret()` gate. The network's
+ * softmax output is a probability distribution over the 7 active-care
+ * skills — when the max probability sits below this floor the pet idles
+ * this tick rather than commit an intention. A uniform distribution over
+ * 7 skills sits at ~0.143; an untrained network with biased weights
+ * tends to sit only slightly above that. The floor is picked so the
+ * post-train idle rate stays observably different from the untrained
+ * baseline. Tune up (toward 0.4) if the post-train idle rate is
+ * indistinguishable from the baseline; tune down (toward 0.15) if the
+ * pet rarely acts.
+ */
+const IDLE_THRESHOLD = 0.2;
 
 /**
  * Module-scoped agent id used as the localStorage key scope when
@@ -65,17 +104,45 @@ function featuresFromNeeds(
   ];
 }
 
-function interpretUrgency(
-  output: number[],
-  _ctx: ReasonerContext,
-  helpers: {
-    topCandidate(): { intention: import('agentonomous').Intention } | null;
-  },
-): import('agentonomous').Intention | null {
-  const urgency = output[0] ?? 0;
-  if (urgency < URGENCY_THRESHOLD) return null;
-  const top = helpers.topCandidate();
-  return top ? top.intention : null;
+/**
+ * Pick the highest-probability skill from the softmax output. Returns
+ * an `Intention | null` per the `Reasoner.selectIntention` contract:
+ *
+ * - `null` when the max probability is below `IDLE_THRESHOLD` (the pet
+ *   idles this tick — observably different idle rates between trained
+ *   and untrained networks make the training visible in the demo).
+ * - `{ kind: 'satisfy', type: <skillId> }` otherwise, where `<skillId>`
+ *   is `SOFTMAX_SKILL_IDS[argmax(output)]`.
+ *
+ * The heuristic candidate fallback that the previous scalar-urgency
+ * gate used has retired — once the network has a positive-probability
+ * column for any active-care skill, the softmax IS the policy.
+ *
+ * Exported for unit tests (a hand-crafted `output` vector should pick
+ * `argmax` correctly and respect the idle floor) — module-scoped
+ * helpers usually wouldn't be exported but the contract is small enough
+ * that documenting it via a test is cheaper than re-deriving it.
+ */
+export function interpretSoftmax(output: number[]): import('agentonomous').Intention | null {
+  // Defensive width check: a snapshot whose model emits a different
+  // output dimension is rejected at `construct()` (see hydrate below),
+  // so this branch is only reachable if the adapter contract drifts in
+  // the future. Idle rather than `?? 0`-pad: a silent pad biases the
+  // argmax toward column 0 (`feed`).
+  if (output.length !== SOFTMAX_DIM) return null;
+  let maxIdx = 0;
+  let maxVal = output[0] ?? 0;
+  for (let i = 1; i < SOFTMAX_DIM; i++) {
+    const v = output[i] ?? 0;
+    if (v > maxVal) {
+      maxVal = v;
+      maxIdx = i;
+    }
+  }
+  if (maxVal < IDLE_THRESHOLD) return null;
+  const skillId = SOFTMAX_SKILL_IDS[maxIdx];
+  if (skillId === undefined) return null;
+  return { kind: 'satisfy', type: skillId };
 }
 
 /**
@@ -84,11 +151,11 @@ function interpretUrgency(
  * bundled `learning.network.json` baseline. The Train button in the
  * switcher calls `reasoner.train(...)` and persists `reasoner.toJSON()`.
  *
- * `interpret()` feeds the network's scalar output through an urgency
- * gate: the pet idles this tick when the output drops below
- * `URGENCY_THRESHOLD`; otherwise it commits the top heuristic
- * candidate. Trained and untrained networks thus produce different
- * idle rates, making training observable in the trace view.
+ * `interpret()` argmaxes the network's 7-way softmax output over the
+ * active-care skills and idles the pet whenever the top probability
+ * drops below `IDLE_THRESHOLD`. Trained and untrained networks thus
+ * produce different intention streams and idle rates, making training
+ * observable in the trace view.
  *
  * `construct()` side-effect-imports `@tensorflow/tfjs-backend-cpu` so
  * the backend is registered lazily — only when the user actually
@@ -119,11 +186,41 @@ export const learningMode: CognitionModeSpec = {
     const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
       const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
         featuresOf: featuresFromNeeds,
-        interpret: interpretUrgency,
+        interpret: (output) => interpretSoftmax(output),
       });
+      // Reject snapshots whose output OR input dimension doesn't match
+      // the bundled topology. A pre-row-17 snapshot (single sigmoid
+      // output, length 1) loads fine through `fromJSON` but its scalar
+      // urgency bears no resemblance to a 7-way softmax — silently
+      // treating `output[0]` as the `feed` probability would produce a
+      // "trained" pet that always feeds whenever the old scalar
+      // exceeded the idle floor. Likewise an output-7 snapshot whose
+      // input layer expects a different last-dim would only blow up at
+      // runtime when `featuresFromNeeds` first hands it a 5-element
+      // vector — Learning mode would then throw on every intention
+      // selection instead of falling back to the baseline. Throw on
+      // either mismatch so the caller falls back to the bundled
+      // baseline.
+      const model = r.getModel();
+      const outShape = model.outputs[0]?.shape;
+      const outLastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
+      const inShape = model.inputs[0]?.shape;
+      const inLastDim = inShape && inShape.length > 0 ? inShape[inShape.length - 1] : null;
+      if (outLastDim !== SOFTMAX_DIM || inLastDim !== FEATURE_DIM) {
+        // Free the rebuilt-but-incompatible model's tensors before the
+        // catch path constructs the bundled baseline. Without this,
+        // re-entering Learning mode with an incompatible persisted
+        // snapshot would leak one tfjs model + its weight tensors per
+        // attempt.
+        r.dispose();
+        throw new Error(
+          `learning: persisted snapshot has shape [${String(inLastDim)}, ${String(outLastDim)}], expected [${FEATURE_DIM}, ${SOFTMAX_DIM}] — rebuilding from bundled baseline.`,
+        );
+      }
       // The rebuilt Sequential ships uncompiled; compile with a default
-      // SGD + MSE pair so the Train button can call `r.train(...)`.
-      r.getModel().compile({ optimizer: tf.train.sgd(0.1), loss: 'meanSquaredError' });
+      // SGD + categoricalCrossentropy pair so the Train button can call
+      // `r.train(...)` over the 7-way softmax output.
+      r.getModel().compile({ optimizer: tf.train.sgd(0.1), loss: 'categoricalCrossentropy' });
       return r;
     };
 
@@ -137,26 +234,57 @@ export const learningMode: CognitionModeSpec = {
 
 /**
  * Project a `LearningOutcome` from the cognition pipeline's Stage 8 hook
- * into a 5-dim `(features, label)` training pair for the bundled
+ * into a 5-dim `(features, oneHotLabel)` training pair for the bundled
  * `learning.network.json` topology.
  *
- * - Features = current need levels (hunger, cleanliness, happiness,
- *   energy, health). Read at score-time, so the snapshot reflects the
- *   post-skill levels — that's the input the network would have to
- *   classify "should I act?" against on the *next* tick.
- * - Label = `[1]` when the outcome marks the skill as completed
- *   successfully; `[0]` when it failed (`details.failed === true`,
- *   shipped from `CognitionPipeline.scoreFailure`).
+ * - Features = `details.preNeeds` snapshot — the pre-skill need levels
+ *   captured by `CognitionPipeline.invokeSkillAction` BEFORE the skill
+ *   runs. Reading post-skill levels (e.g. via `agent.getState().needs`
+ *   right now) would invert the policy direction: `feed` raises hunger
+ *   from low → high, so a label of "feed" against post-feed features
+ *   trains the network on "high hunger → feed" instead of the intended
+ *   "low hunger → feed". Falls back to current `agent.getState().needs`
+ *   only if the outcome arrived without a `preNeeds` snapshot, for
+ *   defensive compatibility with consumer-emitted outcomes (the
+ *   library's own pipeline always populates it).
+ * - Label = one-hot 7-vector for SUCCESSFUL outcomes only. Successes
+ *   for skill `id` set `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`.
  *
- * Returns `null` for outcomes with no usable signal — e.g. a future
- * shape that doesn't carry `details.failed` and has no positive
- * effectiveness either.
+ * Returns `null` for:
+ * - Outcomes whose intention is outside the 7-skill softmax index
+ *   (e.g. an `express` intention from the heuristic-reactive layer).
+ * - **Failed outcomes.** An all-zero target under
+ *   `categoricalCrossentropy` (`-Σ y_i log p_i`) yields zero loss and
+ *   zero gradient — the network would silently ignore failure samples,
+ *   so the buffer slot is wasted. Skipping them keeps the loss honest;
+ *   when row 18 lifts the failure signal into a richer feature set
+ *   (negative `reward` field) we can revisit.
+ * - Successes with non-positive or non-finite `effectiveness`.
  */
 function projectLearningOutcome(
   agent: Agent,
   outcome: LearningOutcome,
 ): { features: number[]; label: number[] } | null {
-  const levels = agent.getState().needs;
+  const intentionType = outcome.intention.type;
+  if (typeof intentionType !== 'string') return null;
+  const skillIdx = SOFTMAX_SKILL_IDS.indexOf(intentionType as (typeof SOFTMAX_SKILL_IDS)[number]);
+  if (skillIdx < 0) return null;
+
+  const details = outcome.details ?? {};
+  const failed = (details as { failed?: unknown }).failed === true;
+  // Skip failed outcomes — see JSDoc above for the categoricalCrossentropy
+  // zero-loss reasoning.
+  if (failed) return null;
+
+  const eff = (details as { effectiveness?: unknown }).effectiveness;
+  if (typeof eff !== 'number' || !Number.isFinite(eff) || eff <= 0) return null;
+
+  // Prefer the pre-skill snapshot the pipeline captured before the skill
+  // mutated state; fall back to the live snapshot only when the outcome
+  // arrived without one. See JSDoc above for why post-skill features
+  // would invert the training direction.
+  const preNeeds = (details as { preNeeds?: Record<string, number> }).preNeeds;
+  const levels = preNeeds ?? agent.getState().needs;
   const features = [
     levels.hunger ?? 0,
     levels.cleanliness ?? 0,
@@ -164,17 +292,9 @@ function projectLearningOutcome(
     levels.energy ?? 0,
     levels.health ?? 0,
   ];
-  const details = outcome.details ?? {};
-  const failed = (details as { failed?: unknown }).failed === true;
-  if (failed) {
-    return { features, label: [0] };
-  }
-  // Success path: SkillCompleted with a positive effectiveness.
-  const eff = (details as { effectiveness?: unknown }).effectiveness;
-  if (typeof eff === 'number' && Number.isFinite(eff) && eff > 0) {
-    return { features, label: [1] };
-  }
-  return null;
+  const label = new Array<number>(SOFTMAX_DIM).fill(0);
+  label[skillIdx] = 1;
+  return { features, label };
 }
 
 /**

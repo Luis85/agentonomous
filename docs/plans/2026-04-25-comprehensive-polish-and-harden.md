@@ -78,6 +78,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 14  | #84 | `feat/demo-train-epoch-progress`             | `TfjsReasoner.train` `onEpochEnd` callback (minor bump); demo HUD goes live mid-fit.   |
 | 15  | #85 | `feat/llm-port-example-and-readme`           | README LLM section, `examples/llm-mock/` deterministic playback example, vision spec status update. |
 | 16  | TBD | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner` with `Buffered: N/50` HUD. |
+| 17  | TBD | `feat/tfjs-multi-output-softmax`             | 7-way softmax over active-care skills; bundled baseline rebuilt; `TfjsReasoner` JSDoc example (minor bump). |
 | 23–25 | TBD | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
 
 ---
@@ -471,33 +472,58 @@ the model drifts from the bundled baseline as the user plays.
 **Cost:** M. Small library docstring update on `Learner.score()`'s
 expected call cadence; no library code change.
 
-### 17 — Multi-output softmax action selection
+### 17 — Multi-output softmax action selection — **shipped**
 
 **Branch:** `feat/tfjs-multi-output-softmax`
 
-Current Learning mode's `interpret` callback gates on a scalar
-urgency and falls back to `topCandidate` from `NeedsPolicy`. Replace
-with an N-way softmax over skills (feed / clean / play / rest / pet
-/ medicate / scold = 7 outputs in the demo). `interpret` picks
-`argmax` directly; the heuristic fallback retires.
+**As shipped:**
 
-**Library scope (S):** the adapter already supports multi-dim outputs
-(forward pass returns `dataSync()`-flattened arrays). The change is
-purely in the consumer-supplied `interpret` shape — no
-`TfjsReasoner` code changes. Add a JSDoc example to `TfjsReasoner`
-showing the N-way pattern.
+- Library: added a fenced TypeScript JSDoc example to `TfjsReasoner`
+  demonstrating the N-way softmax pattern (build → compile with
+  `categoricalCrossentropy` → `interpret` picks `argmax` with an
+  idle floor → map to one of K intention ids). No source change — the
+  adapter already returned `dataSync()`-flattened arrays — so the
+  bundle stays at the same byte budget. Minor bump (consumer-facing
+  doc surface).
+- Demo: re-authored `examples/nurture-pet/src/cognition/learning.network.json`
+  at the new `[5, 16, 7]` topology — 5 need-level inputs → 16 sigmoid
+  hidden → 7-way softmax over the active-care skills. The bundled
+  baseline is generated via the new `scripts/seed-learning-network.ts`
+  one-shot (deterministic; LCG-seeded; trained 50 epochs on a
+  hand-crafted archetype distribution that maps lowest-need to its
+  matching skill plus dedicated `pet` / `scold` archetypes). The script
+  is wired as `npm run seed:learning-network` but NOT into `verify` —
+  it runs on demand to refresh the bundled baseline.
+- Demo: `learning.ts` `interpret` retired the scalar-urgency gate plus
+  the `topCandidate` fallback. The new `interpretSoftmax(output)`
+  picks `argmax`, returns `null` (idle) when the max probability sits
+  below `IDLE_THRESHOLD = 0.2`, and returns
+  `{ kind: 'satisfy', type: <skillId> }` otherwise. Loss switched from
+  `meanSquaredError` to `categoricalCrossentropy`.
+- Demo: `projectLearningOutcome` produces one-hot 7-vector labels
+  keyed by `outcome.intention.type` against `SOFTMAX_SKILL_IDS`.
+  Outcomes whose intention falls outside the softmax index (e.g.
+  expression skills) are skipped — they don't pollute the active-care
+  baseline.
+- Demo: `cognitionSwitcher.ts` Train button's synthetic 30-pair set
+  now uses `featuresToOneHotLabel(features)` (lowest-need → matching
+  maintenance skill, plus `pet` / `scold` archetypes for high-need /
+  over-stimulated states) so a click reinforces the same heuristic
+  the bundled baseline approximates.
+- Tests: `tests/examples/learningMode.train.test.ts` now asserts the
+  trained snapshot's `weightsShapes` matches the `[5, 16] / [16] /
+  [16, 7] / [7]` contract; outcomes labeled as one-hot 7-vectors;
+  out-of-softmax intentions skipped. New `interpretSoftmax` describe
+  covers argmax + idle floor + tie-break + per-skill emission.
 
-**Demo scope (M):**
-
-- Re-author the bundled `learning.network.json` with a
-  `[13, 16, 7]` topology (or similar — match row 18's input dims).
-- Update `learning.ts` `featuresOf` and `interpret` to produce /
-  consume the 7-skill softmax.
-- Update `cognitionSwitcher.ts` Train pairs to label each outcome
-  with the executed skill's index (one-hot).
-- Update tests in `tests/examples/learningMode.train.test.ts`.
-
-**Bump:** minor (no breaking surface change; new JSDoc example only).
+**Open question 2 (softmax target shape) resolved:** stick to the 7
+active-care skills (`feed / clean / play / rest / pet / medicate /
+scold`). Expression skills (`meow / sad / sleepy`) stay in the
+heuristic-reactive layer (`NeedsPolicy`) because they're emoted
+reflexively from need state rather than deliberately chosen — a
+learning-mode argmax over them would conflict with the always-on
+heuristic emission. The softmax stays consequentialist; the heuristic
+layer stays reactive.
 
 ### 18 — Richer feature vector
 
