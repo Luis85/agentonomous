@@ -110,6 +110,14 @@ Full rules in [`STYLE_GUIDE.md`](./STYLE_GUIDE.md). High-frequency ones:
   brainstorm outputs).
 - Date prefix = first-commit date. Never drop the date; rename via
   `git mv` if the slug changes.
+- **Plan + doc updates ride with the PR that lands the work.** When a
+  PR completes a roadmap row, mark it shipped in the plan (or move it
+  under "What's already shipped") in the same diff. When a PR changes
+  user-visible surface (new option, new event, new helper), update the
+  relevant doc (`README.md`, `STYLE_GUIDE.md`, `PUBLISHING.md`, the
+  matching spec) in the same diff. No "docs catch-up" follow-up PRs —
+  stale plans force a second review cycle and degrade Codex review
+  quality.
 
 ## Changesets
 

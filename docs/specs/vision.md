@@ -77,6 +77,11 @@ provider of choice, use `MockLlmProvider` in tests, plug the library
 into their existing event bus via adapters. LLM tool integration
 (Phase B) treats non-determinism as a budget, not a bug.
 
+> Status: the `LlmProviderPort` contract + `MockLlmProvider` ship in
+> 1.0 — see `examples/llm-mock/` for the deterministic playback
+> end-to-end. Concrete `AnthropicLlmProvider` / `OpenAiLlmProvider`
+> adapters land in Phase B; existing consumers pick them up additively.
+
 ## Product pillars
 
 These are the invariants every feature must honor. Trade-offs flow
