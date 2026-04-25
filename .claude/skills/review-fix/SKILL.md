@@ -24,7 +24,7 @@ description: Ingests one or all open findings from the rolling daily-code-review
   Runs steps 1 → 6 once for that ID. Default and primary path.
 - **Sweep mode** — user invokes the skill with no argument. Pull the
   latest comment on `#87`, parse every `<!-- f:<id> -->` marker, skip
-  ones already rendered `- [x]`, and run steps 3 → 5 once per remaining
+  ones already rendered `- [x]`, and run steps 2 → 5 once per remaining
   finding. Each finding still gets its own worktree + branch + plan
   (one finding = one branch = one PR — sweep just batches the _setup_,
   not the findings themselves). At the end, print a single hand-off
