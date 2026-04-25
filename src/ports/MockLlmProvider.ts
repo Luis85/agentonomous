@@ -65,9 +65,19 @@ export class MockLlmProvider implements LlmProviderPort {
   private cursor = 0;
 
   constructor(options: MockLlmProviderOptions) {
+    const dispatch = options.dispatch ?? 'queue';
+    if (dispatch === 'match-or-error') {
+      const bad = options.scripts.findIndex((s) => s.match === undefined);
+      if (bad !== -1) {
+        throw new Error(
+          `MockLlmProvider: script[${bad}] has no 'match' predicate ` +
+            `(required in match-or-error mode — positional fallback is disabled).`,
+        );
+      }
+    }
     this.scripts = options.scripts;
     this.defaultModel = options.defaultModel ?? 'mock-llm';
-    this.dispatch = options.dispatch ?? 'queue';
+    this.dispatch = dispatch;
   }
 
   complete(
