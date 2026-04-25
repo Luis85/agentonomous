@@ -1,7 +1,7 @@
 import '@tensorflow/tfjs-backend-cpu';
 import * as tf from '@tensorflow/tfjs-core';
 import { layers, sequential, type Sequential } from '@tensorflow/tfjs-layers';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   TfjsReasoner,
   TfjsBackendNotRegisteredError,
@@ -414,5 +414,80 @@ describe('TfjsReasoner — bundled demo baseline', () => {
     }
     expect(sum).toBeCloseTo(1, 5);
     reasoner.dispose();
+  });
+});
+
+describe('TfjsReasoner — backend detection', () => {
+  // `detectBestBackend` walks the chain via `tf.setBackend` and
+  // commits the first that activates — this can flip the active tfjs
+  // backend. Restore cpu after every case so the shared `beforeAll`
+  // invariant ("tests run on cpu") holds for any case that runs after
+  // this block. `probeBackend` does not flip backends, but the
+  // restore is cheap and idempotent, so we run it unconditionally.
+  afterEach(async () => {
+    if (tf.getBackend() !== 'cpu') {
+      await tf.setBackend('cpu');
+      await tf.ready();
+    }
+  });
+
+  it('probeBackend is pure-inquiry: never calls tf.setBackend and never flips the active backend', async () => {
+    // The whole point of the post-Codex-P1 redesign: `probeBackend`
+    // resolves via `tf.findBackendFactory(name) != null` and never
+    // touches `tf.setBackend`, so calling it mid-fit cannot disturb
+    // the active backend instance, its kernels, or live tensors.
+    const before = tf.getBackend();
+    await TfjsReasoner.probeBackend('cpu');
+    await TfjsReasoner.probeBackend('wasm');
+    await TfjsReasoner.probeBackend('webgl');
+    expect(tf.getBackend()).toBe(before);
+  });
+
+  it('probeBackend("cpu") resolves true once the cpu package has been imported', async () => {
+    // The shared `beforeAll` already imported `@tensorflow/tfjs-backend-cpu`,
+    // so the factory is registered. `probeBackend` re-imports
+    // (idempotent dynamic-import lookup) and confirms registration.
+    const ok = await TfjsReasoner.probeBackend('cpu');
+    expect(ok).toBe(true);
+  });
+
+  it('probeBackend("webgl") resolves false in node because the webgl package gates registration on isBrowser()', async () => {
+    // `@tensorflow/tfjs-backend-webgl/base.js` wraps its
+    // `registerBackend` call in `if (device_util.isBrowser()) { ... }`,
+    // so importing the package in node loads the module without
+    // registering the factory. `probeBackend` therefore reports
+    // `false` — the contract is "factory present in
+    // `tf.engine().registryFactory`", and an unregistered factory
+    // can't be activated.
+    //
+    // Note: `wasm` does NOT have this guard (it registers
+    // unconditionally) so `probeBackend('wasm')` returns true in
+    // node even though the wasm runtime may fail at first use; that
+    // is the documented limitation of inquiry-only probing — see the
+    // `probeBackend` JSDoc.
+    const ok = await TfjsReasoner.probeBackend('webgl');
+    expect(ok).toBe(false);
+  });
+
+  it('detectBestBackend skips webgl in the node test env (its factory throws on first use)', async () => {
+    const result = await TfjsReasoner.detectBestBackend();
+    // The chain calls `tf.setBackend` for each candidate in order.
+    // In node, the webgl factory throws at first invocation (no GL
+    // context) so `setBackend('webgl')` returns false / rejects, and
+    // the chain falls through. cpu always succeeds; wasm sometimes
+    // registers in node depending on WebAssembly + fetch shim
+    // surface — accept either. The strict assertion is "not webgl",
+    // which is what the activation-based fallback chain guarantees
+    // when the GPU is unavailable.
+    expect(result).not.toBe('webgl');
+    expect(['cpu', 'wasm']).toContain(result);
+    expect(tf.getBackend()).toBe(result);
+  });
+
+  it('detectBestBackend is idempotent across repeated calls', async () => {
+    const a = await TfjsReasoner.detectBestBackend();
+    const b = await TfjsReasoner.detectBestBackend();
+    expect(a).toBe(b);
+    expect(['cpu', 'wasm', 'webgl']).toContain(a);
   });
 });

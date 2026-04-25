@@ -5,6 +5,9 @@ import {
   buildLearningLearner,
   getIdleThreshold,
   getLastPrediction,
+  getLearningBackend,
+  serializeTfActivation,
+  setLearningBackend,
   SOFTMAX_SKILL_IDS,
 } from './cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
@@ -698,6 +701,27 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     }),
   );
 
+  const backendPicker = mountBackendPicker(rootEl, {
+    // Returns true while Learning is the user's intent — covers
+    // both the committed-active case (`activeModeId === 'learning'`)
+    // AND the still-loading case where the user has clicked Learning
+    // but `mode.construct()` hasn't yet flipped `activeModeId`. Per
+    // Codex round 7: a backend change between the click and the
+    // construct's settle was previously skipped by this guard, leaving
+    // the freshly-constructed reasoner on the snapshotted-at-entry
+    // backend (`const backend = selectedBackend` in `learningMode.
+    // construct()`) while `setLearningBackend` + localStorage tracked
+    // the new pick — picker UI and runtime drift apart until a
+    // manual toggle. Triggering reconstruct on the loading case
+    // funnels through the existing `changeEpoch` machinery, which
+    // discards the stale in-flight construct cleanly.
+    isLearningActive: () => activeModeId === 'learning' || select.value === 'learning',
+    isDisposed: () => disposed,
+    triggerReconstruct: () => {
+      void onChange();
+    },
+  });
+
   return {
     dispose(): void {
       if (disposed) return;
@@ -705,12 +729,337 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       select.removeEventListener('change', onChangeWrapped);
       if (trainBtn) trainBtn.removeEventListener('click', onTrainClickWrapped);
       if (untrainBtn) untrainBtn.removeEventListener('click', onUntrainClickWrapped);
+      backendPicker.dispose();
       disposeIfOwned(activeReasoner);
       activeReasoner = null;
       stopLearnerReadout();
       stopPredictionStrip();
       disposeLearner(activeLearner);
       activeLearner = null;
+    },
+  };
+}
+
+const BACKEND_STORAGE_KEY = 'agentonomous/cognition-backend';
+const VALID_BACKENDS = ['cpu', 'wasm', 'webgl'] as const;
+type Backend = (typeof VALID_BACKENDS)[number];
+
+function isBackend(s: string): s is Backend {
+  return s === 'cpu' || s === 'wasm' || s === 'webgl';
+}
+
+type BackendPickerHooks = {
+  isLearningActive(): boolean;
+  isDisposed(): boolean;
+  /**
+   * Triggered when the user changes backend AND learning mode is the
+   * active cognition mode. Implemented in the switcher closure as a
+   * same-mode `onChange()` invocation so the existing concurrent-change
+   * + dispose-old-reasoner machinery handles the rebuild.
+   */
+  triggerReconstruct(): void;
+};
+
+type BackendPickerHandle = { dispose(): void };
+
+/**
+ * Mount the tfjs backend dropdown next to the cognition picker. On
+ * mount: restore the persisted selection (if any), sync it to
+ * `learning.ts`'s module-scoped `selectedBackend`, then probe each
+ * backend in the background to disable unavailable options. On change:
+ * persist + propagate to learning, and force a same-mode reconstruct
+ * when learning is the active cognition mode (other modes don't use
+ * tfjs, so a reconstruct would just churn).
+ *
+ * Probes are inquiry-only (`TfjsReasoner.probeBackend` restores the
+ * prior backend), so this background sweep doesn't disturb the
+ * cognition mode's own `tf.setBackend(...)` selection mid-tick.
+ *
+ * No-op when `#cognition-backend-select` isn't present in `rootEl` —
+ * keeps the demo HTML free to omit the picker (e.g. in a stripped-down
+ * embed) without a runtime error.
+ */
+function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): BackendPickerHandle {
+  const backendSelect = rootEl.querySelector<HTMLSelectElement>('#cognition-backend-select');
+  if (!backendSelect) return { dispose: (): void => undefined };
+
+  // Read the persisted choice but do NOT propagate it to
+  // `selectedBackend` until the async probe validates it. A stale
+  // localStorage value (e.g. `'webgl'` from a previous session on a
+  // device that no longer has a GL context) would otherwise be
+  // applied synchronously, and a fast user click on Learning before
+  // the async probe finishes would land in `learningMode.construct()`
+  // with an unsupported backend — `fromJSON` rejects with
+  // `TfjsBackendNotRegisteredError`, the existing `onChange` catch
+  // path disables Learning mode for the rest of the session, and
+  // the user can't pick CPU as a recovery.
+  let persisted: Backend | null = null;
+  try {
+    const raw = globalThis.localStorage?.getItem(BACKEND_STORAGE_KEY);
+    if (typeof raw === 'string' && isBackend(raw)) persisted = raw;
+  } catch {
+    // localStorage unavailable — proceed with the cpu default.
+  }
+
+  // Seed selectedBackend with `cpu` synchronously. CPU is always
+  // registered (the package gates nothing on environment), so any
+  // Learning activation that races the probe succeeds. After the
+  // probe validates `persisted`, we promote it (and force a same-
+  // mode reconstruct when Learning is the active cognition mode so
+  // the running reasoner picks up the upgraded backend).
+  setLearningBackend('cpu');
+  backendSelect.value = persisted ?? 'cpu';
+  // Probe-lock: disable the picker until the async startup probe
+  // finishes. Without this, a fast user pick during the probe window
+  // can fire `onBackendChange` against an unverified backend and
+  // (per Codex P1#4) the reconstruct path can disable Learning mode
+  // permanently for the session.
+  backendSelect.disabled = true;
+
+  void (async (): Promise<void> => {
+    try {
+      const tf = await import('@tensorflow/tfjs-core');
+      // Real activation sweep — sequential because `tf.setBackend` is a
+      // global-state mutex. `TfjsReasoner.probeBackend` (registry-only)
+      // can't tell us whether `@tensorflow/tfjs-backend-wasm@4.22` will
+      // actually initialize on this device — its factory registers
+      // unconditionally but throws at first use under runtime
+      // constraints. Per Codex P1 round 6, deciding `finalBackend` from
+      // a registry-only result lets a stale `'wasm'` persist through to
+      // `learningMode.construct()`, which then fails and disables
+      // Learning for the session. Doing the activation here, while no
+      // reasoner exists, makes the disabled-option UX accurate AND
+      // gates the persisted-promotion on real availability.
+      //
+      // Each iteration: side-effect-import the matching backend
+      // package (literal-string `import()` so Vite can code-split),
+      // try `tf.setBackend(name)`, record the boolean. Throws are
+      // caught and treated as unavailable.
+      const probeResults: { readonly name: Backend; readonly ok: boolean }[] = [];
+      for (const name of VALID_BACKENDS) {
+        // Serialize each iteration's `tf.setBackend` through the
+        // shared mutex so a `learningMode.construct()` triggered by
+        // a fast user click on Learning can't interleave with the
+        // probe sweep — without this, the probe loop can flip
+        // `tf.backend` between `fromJSON`'s internal `tf.setBackend`
+        // and `new TfjsReasoner`'s constructor check, which throws
+        // `TfjsBackendNotRegisteredError` and disables Learning for
+        // the session (Codex P1 round 9).
+        const ok = await serializeTfActivation(async (): Promise<boolean> => {
+          try {
+            switch (name) {
+              case 'cpu':
+                await import('@tensorflow/tfjs-backend-cpu');
+                break;
+              case 'wasm':
+                await import('@tensorflow/tfjs-backend-wasm');
+                break;
+              case 'webgl':
+                await import('@tensorflow/tfjs-backend-webgl');
+                break;
+            }
+            const result = await tf.setBackend(name);
+            if (result) await tf.ready();
+            return result;
+          } catch {
+            return false;
+          }
+        });
+        if (hooks.isDisposed()) return;
+        probeResults.push({ name, ok });
+      }
+
+      for (const { name, ok } of probeResults) {
+        const opt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${name}"]`);
+        if (!opt) continue;
+        if (ok) {
+          opt.disabled = false;
+          opt.removeAttribute('title');
+        } else {
+          opt.disabled = true;
+          opt.title = `${name.toUpperCase()} unavailable in this browser`;
+        }
+      }
+
+      // Validate the LIVE selection — not just the persisted value.
+      // Two distinct races live here:
+      //
+      // 1. Persisted-but-broken (e.g. `'webgl'` from a previous
+      //    session on a device that no longer has GL). Pre-probe we
+      //    seeded `selectedBackend = 'cpu'` synchronously, so any
+      //    Learning activation that races the probe is safe.
+      // 2. User picks a backend during the probe window. The
+      //    `onBackendChange` listener has already called
+      //    `setLearningBackend(...)` + persisted it, but the probe
+      //    may now report that pick as unavailable. The earlier
+      //    "persisted-only" check here would miss this — `persisted`
+      //    is null and the post-probe path leaves
+      //    `selectedBackend` pointing at the broken pick.
+      //
+      // The live `<select>` value reflects BOTH cases (it carries
+      // the user's intent if changed, or the pre-probe seed
+      // otherwise). Validating it post-probe + reverting to `cpu`
+      // on failure handles both races uniformly.
+      const liveRaw = backendSelect.value;
+      const liveValue: Backend = isBackend(liveRaw) ? liveRaw : 'cpu';
+      const liveOk =
+        liveValue === 'cpu' || (probeResults.find((r) => r.name === liveValue)?.ok ?? false);
+      const finalBackend: Backend = liveOk ? liveValue : 'cpu';
+      if (backendSelect.value !== finalBackend) backendSelect.value = finalBackend;
+      // Commit `finalBackend` as the active tf backend. The probe loop
+      // above leaves tf on whichever name was last successful (last in
+      // iteration order — typically `webgl` in browsers), which may
+      // differ from what the user actually wants. A subsequent
+      // `learningMode.construct()` would self-commit via
+      // `fromJSON({ backend })`, but doing it here keeps tf state
+      // consistent with the picker's reported selection between mount
+      // and the next mode change.
+      if (tf.getBackend() !== finalBackend) {
+        await serializeTfActivation(async (): Promise<void> => {
+          try {
+            await tf.setBackend(finalBackend);
+            await tf.ready();
+          } catch {
+            // cpu commit shouldn't fail; if it does we leave tf wherever
+            // the loop ended and let learningMode.construct() retry.
+          }
+        });
+      }
+      if (getLearningBackend() !== finalBackend) {
+        setLearningBackend(finalBackend);
+        // If Learning was already selected during the probe window,
+        // force a same-mode reconstruct so the in-flight reasoner
+        // picks up the corrected (or upgraded) backend.
+        if (hooks.isLearningActive()) hooks.triggerReconstruct();
+      }
+      try {
+        globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, finalBackend);
+      } catch {
+        // localStorage unavailable — selection still applied for this session.
+      }
+    } catch {
+      // Adapter import failed (peer dep missing). Leave all options
+      // enabled; if the user actually selects Learning mode, the mode's
+      // own probe surfaces the missing dep. selectedBackend stays at
+      // 'cpu' so Learning still has a viable activation path.
+    } finally {
+      // Release the probe-lock regardless of probe outcome — without
+      // this a thrown adapter import would leave the picker frozen
+      // for the session.
+      if (!hooks.isDisposed()) backendSelect.disabled = false;
+    }
+  })();
+
+  // Monotonic counter incremented on every `change` event. Each
+  // in-flight `onBackendChange` invocation captures the current
+  // value into `myEpoch` before any `await`; after each await it
+  // re-checks the latest counter and bails if a newer change has
+  // started. Without this guard, rapid sequential picks can complete
+  // out of order — an earlier-but-slower `tf.setBackend` activation
+  // lands AFTER a newer user choice and overwrites both
+  // `setLearningBackend(...)` and localStorage with the stale value.
+  // Mirrors the `changeEpoch` pattern in the cognition-mode
+  // `onChange` handler above.
+  let backendChangeEpoch = 0;
+  // The shared `serializeTfActivation` mutex (in `cognition/learning.ts`)
+  // already coordinates `onBackendChange`'s `tf.setBackend` with the
+  // startup probe sweep AND `learningMode.construct()`. Any stale
+  // handler that woke up AFTER a newer change will see
+  // `myEpoch !== backendChangeEpoch` BEFORE its `setBackend` and
+  // bail without mutating tf state, eliminating the out-of-order
+  // race Codex flagged in round 8 — and the round-9 race between
+  // this handler and `mode.construct()`.
+  const onBackendChange = async (): Promise<void> => {
+    if (hooks.isDisposed()) return;
+    const value = backendSelect.value;
+    if (!isBackend(value)) return;
+    const myEpoch = ++backendChangeEpoch;
+    const activated = await serializeTfActivation(async (): Promise<boolean> => {
+      // Re-check epoch + dispose AFTER the serialization wait. A
+      // newer change may have arrived while we queued; if so, bail
+      // before any tf mutation rather than executing a stale
+      // `setBackend` that the next handler would have to undo.
+      if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return false;
+      // Verify activation BEFORE asking the cognition switcher to
+      // reconstruct. `probeBackend` (the registry-only probe used by
+      // mountBackendPicker's startup sweep) cannot detect runtime
+      // false-positives — `@tensorflow/tfjs-backend-wasm@4.22`
+      // registers its factory unconditionally, but the factory
+      // itself can throw at first use (no fetch shim, WebAssembly
+      // disabled). Without an activation check here, that bad pick
+      // would propagate to `mode.construct()`, `fromJSON` would
+      // reject with `TfjsBackendNotRegisteredError`, the existing
+      // `onChange` catch path would disable Learning mode for the
+      // rest of the session, and the user would have no way to
+      // recover short of a reload.
+      const tf = await import('@tensorflow/tfjs-core');
+      // Snapshot the prior backend INSIDE the mutex so it can't shift
+      // between this read and the restore below. A failed
+      // `tf.setBackend(value)` can leave tfjs without a usable active
+      // backend (Codex P1 round 11) — restore the snapshot in the
+      // failure branch so a Learning-mode reasoner that was happily
+      // running on the prior backend doesn't start failing on the
+      // next tick. Mirrors the all-failed restore in
+      // `TfjsReasoner.detectBestBackend`.
+      const prior = tf.getBackend();
+      try {
+        const ok = await tf.setBackend(value);
+        if (ok) {
+          await tf.ready();
+          return true;
+        }
+      } catch {
+        // Fall through to restore.
+      }
+      if (prior !== '' && prior !== value) {
+        try {
+          await tf.setBackend(prior);
+          await tf.ready();
+        } catch {
+          // Best-effort — surfacing as a separate error here would
+          // mask the more useful "this backend is unavailable" UX
+          // signal the caller already handles below.
+        }
+      }
+      return false;
+    });
+    // Post-activation stale guard: even with serialization, a
+    // newer change can arrive between our setBackend completing
+    // and our commit running. The newer handler will own the
+    // commit; we bail.
+    if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return;
+    if (!activated) {
+      // Mark the failing option disabled so a future pick can't hit
+      // the same path, revert the picker to whichever backend is
+      // still believed-good (the in-flight `selectedBackend`), and
+      // skip persistence — the bad value never reaches localStorage.
+      const failingOpt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${value}"]`);
+      if (failingOpt) {
+        failingOpt.disabled = true;
+        failingOpt.title = `${value.toUpperCase()} unavailable in this browser`;
+      }
+      const fallback = getLearningBackend();
+      backendSelect.value = isBackend(fallback) ? fallback : 'cpu';
+      return;
+    }
+    setLearningBackend(value);
+    try {
+      globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, value);
+    } catch {
+      // localStorage unavailable — selection still applies for this session.
+    }
+    if (hooks.isLearningActive()) {
+      hooks.triggerReconstruct();
+    }
+  };
+  const onBackendChangeWrapped = (): void => {
+    void onBackendChange();
+  };
+  backendSelect.addEventListener('change', onBackendChangeWrapped);
+
+  return {
+    dispose(): void {
+      backendSelect.removeEventListener('change', onBackendChangeWrapped);
     },
   };
 }

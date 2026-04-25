@@ -93,6 +93,8 @@
     "@eslint/js": "^10.0.1",
     "@size-limit/file": "^12.1.0",
     "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
     "@tensorflow/tfjs-layers": "^4.22.0",
     "@types/node": "^25.6.0",
@@ -116,6 +118,9 @@
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": "*",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
     "@tensorflow/tfjs-layers": "^4.22.0",
     "excalibur": "*",
@@ -126,6 +131,15 @@
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@tensorflow/tfjs-backend-cpu": {
+      "optional": true
+    },
+    "@tensorflow/tfjs-backend-wasm": {
+      "optional": true
+    },
+    "@tensorflow/tfjs-backend-webgl": {
       "optional": true
     },
     "@tensorflow/tfjs-core": {
@@ -179,7 +193,7 @@
       "name": "dist/cognition/adapters/tfjs/index.js (gzip)",
       "path": "dist/cognition/adapters/tfjs/index.js",
       "gzip": true,
-      "limit": "7 KB"
+      "limit": "9 KB"
     }
   ],
   "lint-staged": {

@@ -172,7 +172,8 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
       }
-      #cognition-mode-select {
+      #cognition-mode-select,
+      #cognition-backend-select {
         padding: 4px 8px;
         font-size: 13px;
         border-radius: 6px;
@@ -180,7 +181,8 @@
         background: inherit;
         color: inherit;
       }
-      #cognition-mode-select:disabled {
+      #cognition-mode-select:disabled,
+      #cognition-backend-select:disabled {
         opacity: 0.5;
       }
       .cognition-status {
@@ -532,6 +534,15 @@
         <span class="cognition-label">Cognition</span>
         <select id="cognition-mode-select" aria-label="Cognition mode">
           <option value="heuristic">Heuristic (urgency)</option>
+        </select>
+        <select
+          id="cognition-backend-select"
+          aria-label="TensorFlow.js backend"
+          title="Backend used by the Learning (tfjs) reasoner. CPU is determinism-preserving; WebGL/WASM trade replay parity for speed."
+        >
+          <option value="cpu">CPU</option>
+          <option value="wasm">WASM</option>
+          <option value="webgl">WebGL</option>
         </select>
         <span class="cognition-status" id="cognition-status" data-mode="heuristic">active</span>
         <button id="train-network" type="button" hidden>Train</button>

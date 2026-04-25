@@ -71,6 +71,16 @@ function copyAmbientDts(): Plugin {
 
 const externalPackages = [
   '@anthropic-ai/sdk',
+  // tfjs backends are dynamic-imported by `TfjsReasoner.detectBestBackend` /
+  // `probeBackend` and `learningMode.construct()` (literal-string `import()`
+  // per backend so Vite can code-split). Each is an optional peer dep —
+  // consumers install only the backend(s) they actually use. Without these
+  // entries Rollup pulls the full backend kernel sets into the published
+  // `dist/` (300–700 KB per backend), inflating the package and undermining
+  // the optional-peer contract.
+  '@tensorflow/tfjs-backend-cpu',
+  '@tensorflow/tfjs-backend-wasm',
+  '@tensorflow/tfjs-backend-webgl',
   '@tensorflow/tfjs-core',
   '@tensorflow/tfjs-layers',
   'excalibur',

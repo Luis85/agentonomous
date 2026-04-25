@@ -82,6 +82,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 23–25 | #93 | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
 | 18  | #96 | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; small library addition (`details.preModifierCount` snapshot). |
 | 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
+| 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
 
 ---
 
@@ -615,31 +616,51 @@ getter needed.
 
 **Cost:** S. **No changeset** — demo + UI only.
 
-### 20 — Backend probe + picker
+### 20 — Backend probe + picker — **shipped**
 
-**Branch:** `feat/tfjs-detect-backend-and-picker`
+**Branch:** `feat/tfjs-detect-backend-and-picker` (PR pending)
 
-**Library scope:**
+**Library:**
 
-- New static `TfjsReasoner.detectBestBackend(): Promise<'webgl' |
-  'wasm' | 'cpu'>` — probes in that order, returns the first that
-  registers without throwing. Side-effect-imports the corresponding
-  `@tensorflow/tfjs-backend-*` package (lazy dynamic `import()`).
-- JSDoc invariant: GPU backends (`webgl`) are NOT determinism-
-  preserving. Document that bit-identical replay is CPU-only.
+- `TfjsReasoner.detectBestBackend(): Promise<'webgl' | 'wasm' | 'cpu'>`
+  — walks the chain in that order and commits the first that
+  registers; lazy dynamic `import()` of the matching
+  `@tensorflow/tfjs-backend-*` package keeps backend packages
+  code-split.
+- `TfjsReasoner.probeBackend(name): Promise<boolean>` —
+  inquiry-only single-name probe; restores the prior backend
+  regardless of outcome so a UI can probe all three in sequence
+  without disturbing the active backend.
+- Determinism JSDoc invariant: replay parity holds only on `cpu`;
+  `webgl`/`wasm` callers opt into a faster-but-non-replay backend
+  explicitly.
+- Backend packages (`@tensorflow/tfjs-backend-cpu` / `-wasm` /
+  `-webgl`) become optional peer deps; size-limit budget for the
+  tfjs adapter chunk bumps `7 KB → 9 KB` to absorb the new statics
+  + dynamic-import wrappers.
 
-**Demo scope:**
+**Demo:**
 
-- Dropdown next to the cognition mode picker: `CPU` (default) /
-  `WebGL` / `WASM`. Selecting one calls `tf.setBackend(...)` then
-  re-constructs the active reasoner via the existing
-  `mode.construct()` path.
-- Persist selection in localStorage like the speed picker.
-- Disable picker options whose backend probe fails.
+- `<select id="cognition-backend-select">` next to the cognition
+  picker (`CPU` / `WASM` / `WebGL`). Selecting one persists to
+  `agentonomous/cognition-backend` localStorage and — when the
+  active cognition mode is Learning — forces a same-mode
+  reconstruct via the existing `mode.construct()` flow so the new
+  backend is registered + committed.
+- On mount, each option is probed in the background and disabled
+  with an "X unavailable in this browser" tooltip when its
+  registration fails. A persisted-but-unavailable selection
+  auto-corrects to `cpu` and re-persists.
+- Picker is mounted by `cognitionSwitcher.ts` (no new top-level
+  module). Learning mode reads the selection via a new
+  module-scoped `selectedBackend` + `setLearningBackend` /
+  `getLearningBackend` exports in `cognition/learning.ts` and
+  passes `backend: selectedBackend` through to
+  `TfjsReasoner.fromJSON`.
 
-**Bump:** minor (new public static on `TfjsReasoner`).
+**Bump:** minor (new public statics on `TfjsReasoner`).
 
-**Sequence:** before row 4 (backend matrix in CI).
+**Sequence:** unblocks row 4 (backend matrix in CI).
 
 ---
 
