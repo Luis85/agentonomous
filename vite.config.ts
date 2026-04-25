@@ -78,7 +78,6 @@ const externalPackages = [
   'mistreevous',
   'openai',
   'sim-ecs',
-  'gray-matter',
 ];
 
 export default defineConfig({

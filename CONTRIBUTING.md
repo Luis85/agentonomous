@@ -108,20 +108,25 @@ into `develop` afterwards so the fix propagates.
 
 ## Commit messages
 
-Subject line: `<type>: <summary>` or `<Rxx>: <summary>` for remediation items.
+Subject line: `<type>: <summary>` or `<type>(<scope>): <summary>`
+(Conventional Commits — scope optional).
 
 - `type` is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`.
 - Keep subjects under 72 chars.
 - Body explains **why**, not what. Wrap at 72.
 - One logical change per commit. Squash noise before opening a PR.
 
-Example:
+Examples:
 
 ```
 fix: snapshot mood roundtrip no longer re-emits MoodChanged
 
 The previous restore path set `currentMood` only when a snapshot
 carried one, leaving stale state on partial restores. …
+```
+
+```
+feat(persistence): add LocalStorage adapter
 ```
 
 ## Pull requests

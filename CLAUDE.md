@@ -117,6 +117,13 @@ PRs that change library behavior need a changeset (`npm run changeset`).
 Docs / refactor / chore PRs can skip it. The `.changeset/*.md` file goes in
 the same PR.
 
+> The pile of unconsumed changesets on `develop` is intentional — the 1.0
+> publish is held by owner decision until library + demo polish lands.
+> Don't run `npx changeset version` to consume them; let them accumulate
+> until the owner is ready to ship. The next push to `main` is what
+> triggers `changesets/action` to open a version PR; until that happens,
+> the queued bumps stay queued.
+
 ## Common pitfalls
 
 - **Adding a new `Skill`:** register it via an `AgentModule` or the
