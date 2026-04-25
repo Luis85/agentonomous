@@ -266,7 +266,19 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         // localStorage unavailable — training still succeeds for this session.
       }
       const losses = result.history?.loss;
-      if (sparkline && losses && losses.length > 0) {
+      // Race guard: a `train()` started in Learning mode can resolve
+      // *after* the user has switched to a different cognition mode.
+      // `setTrainVisibility` already cleared the sparkline on that
+      // switch — repopulating it here would leak stale training state
+      // into a non-Learning HUD. Gate on the run still owning the
+      // active reasoner AND the active mode still being Learning.
+      if (
+        sparkline &&
+        losses &&
+        losses.length > 0 &&
+        activeModeId === 'learning' &&
+        reasonerHandle === activeReasoner
+      ) {
         renderLossSparkline(sparkline, losses);
       }
       flashStatus(status, formatTrainedToast(result), TRAINED_FLASH_MS);
