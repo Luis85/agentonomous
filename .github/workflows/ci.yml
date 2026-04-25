@@ -158,7 +158,7 @@ jobs:
         uses: andresz1/size-limit-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          script: size-limit --json
+          script: npx size-limit --json
           package_manager: npm
 
   demo-build:
