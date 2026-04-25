@@ -121,15 +121,19 @@ Steps the skill performs:
    origin/develop`. Run `npm install` inside.
 5. **Plan.** Write `docs/plans/2026-04-25-review-bot-<slug>.md` with:
    - Frontmatter (`date`, `slug`, `finding-id`, `tracker: '#87'`).
+     The `tracker` value MUST be quoted — `#` opens a YAML comment
+     and would otherwise drop the issue reference silently.
    - The finding body verbatim, quoted.
    - Acceptance criteria mirroring the bot's proposed fix (apply +
      tests + `npm run verify` green).
    - Rollout: PR to `develop`, body line `Refs #87 finding:<id>`,
      no `Closes` / `Fixes` keyword.
-6. **Hand off.** Invoke `superpowers:writing-plans` to expand the plan
-   into chunked tasks. The skill stops here — actual implementation
-   runs in a separate `superpowers:executing-plans` session, by
-   project convention.
+6. **Hand off.** The skill prints a single-line instruction:
+   "Plan written to `<path>`. Run `/superpowers:writing-plans <path>`
+   to expand into chunked tasks." The skill itself does **not**
+   invoke `writing-plans`; the user runs it explicitly so they can
+   review the plan first. Implementation then runs in a separate
+   `superpowers:executing-plans` session, by project convention.
 
 The skill does **not** open the PR. PR creation happens at the end of
 the implementation session, not at plan time, since plans can be
@@ -166,9 +170,10 @@ Job runs only when `github.event.pull_request.merged == true`.
 
 Steps:
 
-1. Read PR body. Match `/^Refs #(\d+) finding:([0-9a-f]{7})\.(\d+)$/m`.
-   Loop over all matches (a single PR may, in rare cases, ship two
-   findings).
+1. Read PR body. Match `/^Refs #(\d+) finding:([0-9a-f]{7})\.(\d+)\s*$/m`.
+   Trailing whitespace is tolerated; trailing punctuation is not — PR
+   authors must keep the marker line clean. Loop over all matches (a
+   single PR may, in rare cases, ship two findings).
 2. For each match:
    - `gh api /repos/{owner}/{repo}/issues/comments` paginated until a
      comment containing `<!-- f:<sha7>.<idx> -->` is found.
@@ -265,6 +270,12 @@ against a sample diff.
   check" drops a finding mid-run, the indices of subsequent findings
   shift. Mitigation: bot computes IDs only after counter-arg pruning,
   immediately before writing the comment — locked at write time.
+- **IDs do not de-duplicate across runs.** The same unfixed finding
+  re-emitted in tomorrow's run gets a new ID (different `head-sha`).
+  This is intentional: each run's IDs reference that run's snapshot.
+  The unshipped checkbox on the prior comment still flips when the
+  eventual PR ships; future maintainers should not try to reconcile
+  IDs across runs.
 - **Comment rewrite race.** Bot writes a fresh comment same day the
   Action tries to flip a prior one. Different comments → no race in
   practice; both go through the GitHub API serially.
@@ -293,7 +304,10 @@ against a sample diff.
 - [ ] `review-fix` skill file present, documented, lints clean.
 - [ ] `.github/workflows/review-fix-shipped.yml` present and
       `actionlint`-clean.
-- [ ] Existing `#87` comment migrated to new format.
+- [ ] Existing `#87` comment migrated to new format. Visually
+      verified post-PATCH that the markers (`<!-- f:682b557.1 -->`
+      etc.) do not render and the checklist items render as
+      checkboxes.
 - [ ] Implementation plan exists at
       `docs/plans/2026-04-25-review-fix-skill.md`.
 - [ ] No `Closes #87` / `Fixes #87` anywhere in this PR's body.
