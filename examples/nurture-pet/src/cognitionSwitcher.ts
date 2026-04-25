@@ -1,7 +1,7 @@
 import type { Agent, Learner, Reasoner } from 'agentonomous';
 import { NoopLearner } from 'agentonomous';
 import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
-import { buildLearningLearner } from './cognition/learning.js';
+import { buildLearningLearner, SOFTMAX_SKILL_IDS } from './cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
 
 /**
@@ -24,6 +24,61 @@ const NEED_IDS = ['hunger', 'cleanliness', 'happiness', 'energy', 'health'] as c
 const TRAIN_PAIR_COUNT = 30;
 const TRAIN_EPOCHS = 100;
 const TRAINED_FLASH_MS = 1500;
+
+/**
+ * Map a 5-dim need-level feature vector to a 7-dim one-hot label over
+ * `SOFTMAX_SKILL_IDS`. The mapping mirrors the heuristic the demo's
+ * baseline network was seeded against (see
+ * `scripts/seed-learning-network.ts`):
+ *
+ * - The lowest need maps to a maintenance skill —
+ *   `hunger → feed`, `cleanliness → clean`, `happiness → play`,
+ *   `energy → rest`, `health → medicate`.
+ * - When every need is comfortably high (`min(needs) > 0.7`) we treat
+ *   the state as a bonding moment → `pet`.
+ * - When happiness is very high but energy is low (over-stimulated +
+ *   jittery) we treat the state as needing a boundary → `scold`.
+ *
+ * The synthetic Train button thus produces the same archetype
+ * distribution as the bundled baseline, so a click reinforces the
+ * heuristic the network already approximates rather than fighting it.
+ * Live agent outcomes (via `projectLearningOutcome`) push the network
+ * away from this baseline as the user actually interacts with the pet.
+ */
+function featuresToOneHotLabel(features: readonly number[]): number[] {
+  const label = new Array<number>(SOFTMAX_SKILL_IDS.length).fill(0);
+  const hunger = features[0] ?? 0;
+  const cleanliness = features[1] ?? 0;
+  const happiness = features[2] ?? 0;
+  const energy = features[3] ?? 0;
+  const health = features[4] ?? 0;
+  // `pet` archetype: every need comfortably high.
+  const minLevel = Math.min(hunger, cleanliness, happiness, energy, health);
+  if (minLevel > 0.7) {
+    label[SOFTMAX_SKILL_IDS.indexOf('pet')] = 1;
+    return label;
+  }
+  // `scold` archetype: over-stimulated but jittery.
+  if (happiness > 0.8 && energy < 0.4) {
+    label[SOFTMAX_SKILL_IDS.indexOf('scold')] = 1;
+    return label;
+  }
+  // Lowest-need-wins maintenance mapping.
+  const needToSkill = ['feed', 'clean', 'play', 'rest', 'medicate'] as const;
+  let minIdx = 0;
+  let minVal = features[0] ?? 0;
+  for (let i = 1; i < NEED_IDS.length; i++) {
+    const v = features[i] ?? 0;
+    if (v < minVal) {
+      minVal = v;
+      minIdx = i;
+    }
+  }
+  // hunger/cleanliness/happiness/energy/health → feed/clean/play/rest/medicate.
+  const skill = needToSkill[minIdx] ?? 'feed';
+  label[SOFTMAX_SKILL_IDS.indexOf(skill)] = 1;
+  return label;
+}
 
 /**
  * Duck-typed view of `TfjsReasoner`'s train + snapshot surface. The
@@ -367,14 +422,10 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       if (disposed) return;
       const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
         const features: number[] = [];
-        let min = 1;
         for (let i = 0; i < NEED_IDS.length; i++) {
-          const level = agent.rng.next();
-          features.push(level);
-          if (level < min) min = level;
+          features.push(agent.rng.next());
         }
-        const urgency = 1 - min;
-        return { features, label: [urgency] };
+        return { features, label: featuresToOneHotLabel(features) };
       });
       // Live mid-fit progress: update the button text + push points
       // into the sparkline as each epoch completes. Both branches are

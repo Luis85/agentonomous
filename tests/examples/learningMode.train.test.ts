@@ -10,7 +10,11 @@ import * as tf from '@tensorflow/tfjs-core';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
-import { setLearningAgentId } from '../../examples/nurture-pet/src/cognition/learning.js';
+import {
+  interpretSoftmax,
+  setLearningAgentId,
+  SOFTMAX_SKILL_IDS,
+} from '../../examples/nurture-pet/src/cognition/learning.js';
 import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
 
 interface FakeAgent {
@@ -237,12 +241,22 @@ describe('Train click handler', () => {
     const parsed = JSON.parse(raw!) as {
       version?: number;
       weights?: string;
-      weightsShapes?: unknown[];
+      weightsShapes?: number[][];
     };
     expect(parsed.version).toBe(1);
     expect(typeof parsed.weights).toBe('string');
     expect(parsed.weights!.length).toBeGreaterThan(0);
     expect(Array.isArray(parsed.weightsShapes)).toBe(true);
+    // Topology contract: [5, 16] kernel + [16] bias on the hidden dense
+    // layer, then [16, 7] kernel + [7] bias on the softmax head. Locks
+    // the post-train snapshot to the row-17 shape so a topology drift
+    // can't sneak past review.
+    expect(parsed.weightsShapes).toEqual([
+      [5, 16],
+      [16],
+      [16, SOFTMAX_SKILL_IDS.length],
+      [SOFTMAX_SKILL_IDS.length],
+    ]);
   });
 
   it('disables the button and changes its text during training, then restores', async () => {
@@ -406,7 +420,7 @@ describe('projectLearningOutcome (via buildLearningLearner)', () => {
     localStorage.clear();
   });
 
-  it('labels SkillCompleted outcomes as [1] (positive sample)', async () => {
+  it('labels SkillCompleted outcomes as a one-hot 7-vector (positive sample)', async () => {
     const { fakeAgent, selectMode } = await mountDemo();
     await selectMode('learning');
     const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
@@ -423,7 +437,7 @@ describe('projectLearningOutcome (via buildLearningLearner)', () => {
     expect(learner.bufferedCount()).toBe(1);
   });
 
-  it('labels SkillFailed outcomes as [0] (negative sample)', async () => {
+  it('labels SkillFailed outcomes as an all-zero 7-vector (negative sample)', async () => {
     const { fakeAgent, selectMode } = await mountDemo();
     await selectMode('learning');
     const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
@@ -447,6 +461,54 @@ describe('projectLearningOutcome (via buildLearningLearner)', () => {
     };
     learner.score({ intention: { kind: 'satisfy', type: 'feed' }, actions: [] });
     expect(learner.bufferedCount()).toBe(0);
+  });
+
+  it('skips outcomes whose intention is outside the 7-skill softmax index', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score: (o: unknown) => void;
+      bufferedCount: () => number;
+    };
+    // `meow` is an expression skill; it stays in the heuristic-reactive
+    // layer and must NOT influence the softmax baseline.
+    learner.score({
+      intention: { kind: 'express', type: 'meow' },
+      actions: [],
+      details: { effectiveness: 0.8 },
+    });
+    expect(learner.bufferedCount()).toBe(0);
+  });
+});
+
+describe('interpretSoftmax', () => {
+  it('picks argmax of the 7-vector softmax output', () => {
+    // High confidence on `play` (index 2 in SOFTMAX_SKILL_IDS).
+    const output = [0.05, 0.05, 0.7, 0.05, 0.05, 0.05, 0.05];
+    const intent = interpretSoftmax(output);
+    expect(intent).not.toBeNull();
+    expect(intent).toEqual({ kind: 'satisfy', type: 'play' });
+  });
+
+  it('returns null when the max probability is below the idle floor', () => {
+    // ~uniform distribution: max ≈ 0.143, well below the 0.2 floor.
+    const output = new Array<number>(SOFTMAX_SKILL_IDS.length).fill(1 / SOFTMAX_SKILL_IDS.length);
+    expect(interpretSoftmax(output)).toBeNull();
+  });
+
+  it('breaks ties on the lowest index (deterministic argmax)', () => {
+    // Two columns at exactly 0.5 — argmax should pick the first.
+    const output = [0.5, 0.5, 0, 0, 0, 0, 0];
+    expect(interpretSoftmax(output)).toEqual({ kind: 'satisfy', type: 'feed' });
+  });
+
+  it('emits each of the 7 active-care skills when its column dominates', () => {
+    for (let i = 0; i < SOFTMAX_SKILL_IDS.length; i++) {
+      const output = new Array<number>(SOFTMAX_SKILL_IDS.length).fill(0.05);
+      output[i] = 0.7;
+      const intent = interpretSoftmax(output);
+      expect(intent).toEqual({ kind: 'satisfy', type: SOFTMAX_SKILL_IDS[i] });
+    }
   });
 });
 

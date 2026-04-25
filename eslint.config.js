@@ -246,9 +246,10 @@ export default tseslint.config(
     },
   },
 
-  // Tests and examples get to touch globals directly, use console, etc.
+  // Tests, examples, and one-shot scripts get to touch globals
+  // directly, use console, etc.
   {
-    files: ['tests/**/*.ts', 'examples/**/*.ts', '**/*.config.ts'],
+    files: ['tests/**/*.ts', 'examples/**/*.ts', 'scripts/**/*.ts', '**/*.config.ts'],
     rules: {
       'no-restricted-globals': 'off',
       'no-restricted-syntax': 'off',

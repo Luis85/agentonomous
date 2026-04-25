@@ -168,6 +168,35 @@ export type TrainResult = {
  * Lifecycle: `train(pairs, opts)` updates in-place (weights mutate);
  * `toJSON()` / `fromJSON(snapshot)` round-trip a full model through a
  * plain-JSON `TfjsSnapshot`; `dispose()` releases tensor memory.
+ *
+ * @example N-way softmax over a fixed skill set
+ *
+ * The forward pass returns the model's output flattened via
+ * `dataSync()`, so a softmax head emits a `number[]` whose entries sum
+ * to 1. `interpret` picks `argmax` and maps the index to one of K
+ * intention ids:
+ *
+ * ```ts
+ * const SKILLS = ['feed', 'clean', 'play', 'rest', 'pet'] as const;
+ * const model = sequential();
+ * model.add(layers.dense({ units: 16, activation: 'sigmoid', inputShape: [5] }));
+ * model.add(layers.dense({ units: SKILLS.length, activation: 'softmax' }));
+ * model.compile({ optimizer: tf.train.sgd(0.1), loss: 'categoricalCrossentropy' });
+ *
+ * const reasoner = new TfjsReasoner<number[], number[]>({
+ *   model,
+ *   featuresOf: (_ctx, helpers) => Object.values(helpers.needsLevels()),
+ *   interpret: (output) => {
+ *     let argmax = 0;
+ *     for (let i = 1; i < output.length; i++) {
+ *       if ((output[i] ?? 0) > (output[argmax] ?? 0)) argmax = i;
+ *     }
+ *     const top = output[argmax] ?? 0;
+ *     if (top < 0.2) return null; // idle below confidence floor
+ *     return { kind: 'satisfy', type: SKILLS[argmax]! };
+ *   },
+ * });
+ * ```
  */
 export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
   private readonly model: Sequential;
