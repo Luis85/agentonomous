@@ -42,7 +42,7 @@ export function encodeWeights(weights: readonly Float32Array[]): string {
   }
   const bytes = new Uint8Array(combined.buffer);
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
 

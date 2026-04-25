@@ -21,6 +21,13 @@ concurrency:
 permissions:
   contents: read
 
+# Force third-party JavaScript actions still pinned to Node 20
+# (dorny/paths-filter@v3, andresz1/size-limit-action@v1) onto Node 24
+# until upstream releases tag a Node 24 build. Removes the GitHub
+# Actions deprecation annotations on every CI run.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   changes:
     name: Detect changed paths
@@ -149,14 +156,12 @@ jobs:
           cache: npm
       - name: Install dependencies (npm ci)
         run: npm ci
+      # Typedoc runs as a wiring/coverage check — a clean generation
+      # proves every exported symbol is reachable and documented.
+      # The generated `docs/api/` is regenerated on demand locally; we
+      # do not consume the artifact in CI, so skip the upload step.
       - name: Generate API docs (typedoc)
         run: npm run docs
-      - name: Upload API docs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-docs
-          path: docs/api
-          retention-days: 14
 
   test:
     name: Test (Vitest + coverage)
@@ -226,8 +231,10 @@ jobs:
         uses: andresz1/size-limit-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          script: npx size-limit --json
-          package_manager: npm
+          # Action runs `npm run <build_script>` then `npx size-limit --json`
+          # internally. Older `script` / `package_manager` inputs were
+          # removed upstream and now trigger schema warnings.
+          build_script: build
 
   demo-build:
     name: Demo build (examples/nurture-pet)
