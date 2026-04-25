@@ -5,7 +5,7 @@
  * the global `Date` — that's the seam that keeps ticks deterministic under
  * `ManualClock` in tests.
  */
-export interface WallClock {
+export type WallClock = {
   /** Current wall time in milliseconds (UNIX epoch compatible). */
   now(): number;
-}
+};

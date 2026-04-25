@@ -19,18 +19,18 @@ export type LlmRole = 'system' | 'user' | 'assistant';
  * in-memory mock: response memoisation). Opaque to the core — consumers
  * supply an arbitrary stable string; the adapter translates.
  */
-export interface LlmCacheHint {
+export type LlmCacheHint = {
   /** Stable logical key the provider may use to group cache lookups. */
   readonly key: string;
-}
+};
 
 /** A single message in a completion request. */
-export interface LlmMessage {
+export type LlmMessage = {
   readonly role: LlmRole;
   readonly content: string;
   /** If present, signals a cache breakpoint after this message. */
   readonly cacheHint?: LlmCacheHint;
-}
+};
 
 /**
  * Upper bounds a consumer wants enforced per request. Adapters throw
@@ -38,17 +38,17 @@ export interface LlmMessage {
  * upstream provider when any populated limit would be exceeded. All
  * fields optional: absence means "no cap".
  */
-export interface LlmBudget {
+export type LlmBudget = {
   /** Hard ceiling on tokens the provider may generate. */
   readonly maxOutputTokens?: number;
   /** Hard ceiling on input tokens (rough estimate is acceptable). */
   readonly maxInputTokens?: number;
   /** Hard ceiling on spend for this single request, in USD cents. */
   readonly maxCostCents?: number;
-}
+};
 
 /** Per-call knobs. All fields optional; adapter defaults apply. */
-export interface LlmCompleteOptions {
+export type LlmCompleteOptions = {
   /** Specific model id (e.g. `claude-opus-4-7`). Adapter picks a default. */
   readonly model?: string;
   /** Per-request budget caps. */
@@ -60,20 +60,20 @@ export interface LlmCompleteOptions {
   readonly temperature?: number;
   /** Abort signal. Adapters should surface aborts as `stopReason: 'abort'`. */
   readonly signal?: AbortSignal;
-}
+};
 
 /** Token + cost accounting for a single completion. */
-export interface LlmUsage {
+export type LlmUsage = {
   readonly inputTokens: number;
   readonly outputTokens: number;
   /** Total spend in USD cents, when the adapter can compute it. */
   readonly costCents?: number;
   /** True if the provider served (part of) the response from its cache. */
   readonly cached?: boolean;
-}
+};
 
 /** One completion response. */
-export interface LlmCompletion {
+export type LlmCompletion = {
   /** Assistant text. Empty string is legal (e.g. tool-only turn in Phase B). */
   readonly text: string;
   /** Token + cost accounting. */
@@ -86,7 +86,7 @@ export interface LlmCompletion {
    * provider-specific strings (`'content_filter'`, …).
    */
   readonly stopReason?: 'stop' | 'length' | 'abort' | (string & {});
-}
+};
 
 /**
  * Minimum LLM provider contract. v1.0 = completion only. Streaming,
@@ -94,6 +94,6 @@ export interface LlmCompletion {
  * (likely `stream(...)` returning an async iterator) — existing
  * adapters keep working unchanged.
  */
-export interface LlmProviderPort {
+export type LlmProviderPort = {
   complete(messages: readonly LlmMessage[], options?: LlmCompleteOptions): Promise<LlmCompletion>;
-}
+};
