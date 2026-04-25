@@ -1,0 +1,34 @@
+{
+  "name": "agentonomous",
+  "version": "0.0.0",
+  "description": "Autonomous agent library for TypeScript simulations, engine-agnostic. Name reserved for upcoming v1.0.0 release.",
+  "license": "MIT",
+  "author": "luis85",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luis85/agentonomous.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luis85/agentonomous/issues"
+  },
+  "homepage": "https://github.com/luis85/agentonomous#readme",
+  "files": [
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "reserved"
+  },
+  "keywords": [
+    "agent",
+    "autonomous",
+    "simulation",
+    "nurture",
+    "virtual-pet",
+    "ecs",
+    "excalibur",
+    "sim-ecs",
+    "typescript"
+  ]
+}
