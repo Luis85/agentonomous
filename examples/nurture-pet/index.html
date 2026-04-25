@@ -189,6 +189,23 @@
         margin-left: auto;
         font-variant-numeric: tabular-nums;
       }
+      .loss-sparkline {
+        display: block;
+        margin-top: 4px;
+        opacity: 0.85;
+      }
+      .loss-sparkline .axis {
+        stroke: currentColor;
+        stroke-opacity: 0.2;
+        stroke-width: 1;
+      }
+      .loss-sparkline .curve {
+        fill: none;
+        stroke: #4f8cff;
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+      }
       .speed-label {
         font-size: 12px;
         opacity: 0.7;
@@ -488,6 +505,16 @@
         <span class="cognition-status" id="cognition-status" data-mode="heuristic">active</span>
         <button id="train-network" type="button" hidden>Train</button>
         <button id="untrain-network" type="button" hidden>Untrain</button>
+        <svg
+          id="loss-sparkline"
+          class="loss-sparkline"
+          width="120"
+          height="32"
+          viewBox="0 0 120 32"
+          aria-label="Training loss curve"
+          role="img"
+          hidden
+        ></svg>
       </div>
       <div class="speed">
         <span class="speed-label">Speed</span>

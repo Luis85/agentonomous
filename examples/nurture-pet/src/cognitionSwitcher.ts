@@ -1,5 +1,6 @@
 import type { Agent, Reasoner } from 'agentonomous';
 import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
+import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
 
 const NEED_IDS = ['hunger', 'cleanliness', 'happiness', 'energy', 'health'] as const;
 const TRAIN_PAIR_COUNT = 30;
@@ -118,6 +119,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
 
   const trainBtn = document.getElementById('train-network') as HTMLButtonElement | null;
   const untrainBtn = document.getElementById('untrain-network') as HTMLButtonElement | null;
+  const sparkline = document.getElementById('loss-sparkline') as unknown as SVGSVGElement | null;
   const setTrainVisibility = (modeId: CognitionModeSpec['id']): void => {
     const show = modeId === 'learning';
     if (trainBtn) {
@@ -128,6 +130,11 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       if (show) untrainBtn.removeAttribute('hidden');
       else untrainBtn.setAttribute('hidden', '');
     }
+    // Sparkline is gated on `learning` mode AND the presence of a prior
+    // train run; renderLossSparkline / clearLossSparkline manage the
+    // hidden attribute. Switching away from learning forces a clear so a
+    // stale curve doesn't bleed into other modes.
+    if (sparkline && !show) clearLossSparkline(sparkline);
   };
 
   let disposed = false;
@@ -258,6 +265,22 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       } catch {
         // localStorage unavailable — training still succeeds for this session.
       }
+      const losses = result.history?.loss;
+      // Race guard: a `train()` started in Learning mode can resolve
+      // *after* the user has switched to a different cognition mode.
+      // `setTrainVisibility` already cleared the sparkline on that
+      // switch — repopulating it here would leak stale training state
+      // into a non-Learning HUD. Gate on the run still owning the
+      // active reasoner AND the active mode still being Learning.
+      if (
+        sparkline &&
+        losses &&
+        losses.length > 0 &&
+        activeModeId === 'learning' &&
+        reasonerHandle === activeReasoner
+      ) {
+        renderLossSparkline(sparkline, losses);
+      }
       flashStatus(status, formatTrainedToast(result), TRAINED_FLASH_MS);
     };
 
@@ -327,6 +350,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       // localStorage unavailable — the next construct() falls back to
       // the bundled baseline anyway.
     }
+    if (sparkline) clearLossSparkline(sparkline);
 
     const mode = COGNITION_MODES.find((m) => m.id === 'learning');
     if (!mode) {
