@@ -10,13 +10,13 @@ import type { AgentAction } from './AgentAction.js';
  * Introduced in M6. Primarily aimed at deterministic integration tests and
  * pre-recorded demos.
  */
-export interface ScriptedController {
+export type ScriptedController = {
   /**
    * Advance the script one step. Returns the next batch of actions, or
    * `null` if the script has been exhausted.
    */
   next(agentId: string, wallNowMs: number): readonly AgentAction[] | null;
-}
+};
 
 /**
  * Array-backed `ScriptedController` used by tests. Accepts a fixed script

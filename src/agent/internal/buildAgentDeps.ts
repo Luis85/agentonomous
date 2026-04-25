@@ -37,7 +37,7 @@ import type { CreateAgentConfig } from '../createAgent.js';
  * One-pass resolution keeps the `createAgent` orchestrator flat and lets
  * each subsystem's defaulting policy live in its own `resolve*` helper.
  */
-export interface ResolvedDeps {
+export type ResolvedDeps = {
   identity: AgentIdentity;
   speciesDescriptor: SpeciesDescriptor | undefined;
   eventBus: EventBusPort;
@@ -55,7 +55,7 @@ export interface ResolvedDeps {
   autoSaveKey: string | undefined;
   skills: SkillRegistry;
   embodiment: Embodiment | undefined;
-}
+};
 
 export function buildAgentDeps(config: CreateAgentConfig): ResolvedDeps {
   const speciesDescriptor = resolveSpecies(config.species, config.speciesRegistry);

@@ -13,9 +13,9 @@
  * Consumers can add arbitrary numeric traits; unknown keys get 0 bias
  * unless a custom `personaBias` function is injected.
  */
-export interface Persona {
+export type Persona = {
   /** Numeric personality dials in [-1, 1] by convention, though not enforced. */
   traits: Record<string, number>;
   /** Free-form archetype labels (e.g., `['timid', 'bookish']`). Cosmetic / UI. */
   tags?: readonly string[];
-}
+};

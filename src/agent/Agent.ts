@@ -76,7 +76,7 @@ import {
  * Optional subsystems land in later milestones; their fields are added
  * here incrementally.
  */
-export interface AgentDependencies {
+export type AgentDependencies = {
   identity: AgentIdentity;
   eventBus: EventBusPort;
   clock: WallClock;
@@ -134,7 +134,7 @@ export interface AgentDependencies {
   needsPolicy?: NeedsPolicy;
   /** Animation state machine. Defaults to a new instance with sensible maps. M8. */
   animation?: AnimationStateMachine | AnimationStateMachineOptions;
-}
+};
 
 /**
  * The Agent orchestrator. In M2 it provides the lifecycle skeleton, event

@@ -48,7 +48,7 @@ import {
  * required; every other slot has a sensible Phase A default so a consumer
  * can get a running agent in a one-liner.
  */
-export interface CreateAgentConfig {
+export type CreateAgentConfig = {
   /** Stable unique identifier. */
   id: string;
   /**
@@ -144,7 +144,7 @@ export interface CreateAgentConfig {
         autoSave?: AutoSavePolicy;
         autoSaveKey?: string;
       };
-}
+};
 
 /**
  * Default ingress. Returns a running `Agent` with Phase A defaults wired in.

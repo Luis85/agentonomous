@@ -20,7 +20,7 @@ export type SelectedActionSummary = { type: string; skillId?: string } | null;
  * from the resulting record when empty / null — keeps the trace shape
  * stable across ticks where a subsystem produced nothing.
  */
-export interface TickDeltasInput {
+export type TickDeltasInput = {
   needsDeltas: readonly NeedsDelta[];
   expired: readonly ModifierRemoval[];
   activeModifierIds: readonly string[];
@@ -28,17 +28,17 @@ export interface TickDeltasInput {
   moodChange: { from: string | undefined; to: string; valence: number | undefined } | null;
   animationTransition: { from: string; to: string; reason?: string } | null;
   candidates: readonly IntentionCandidate[];
-}
+};
 
 /** Inputs needed to assemble a halted-tick `DecisionTrace`. */
-export interface HaltedTraceInput {
+export type HaltedTraceInput = {
   agentId: string;
   tickStartedAt: number;
   virtualDtSeconds: number;
   controlMode: ControlMode;
   perceived: readonly DomainEvent[];
   emitted: readonly DomainEvent[];
-}
+};
 
 /**
  * Builds the optional `deltas` record from the per-stage tick outputs.
