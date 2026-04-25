@@ -88,6 +88,16 @@ const FEATURE_DIM = 5 + MOOD_KEYS.length + 1 + 3;
 const IDLE_THRESHOLD = 0.2;
 
 /**
+ * Read-only accessor for `IDLE_THRESHOLD`. Exposed so the prediction
+ * strip can render the threshold line without re-deriving the demo's
+ * tuning constant. Direct re-export of the constant is avoided to
+ * keep the value as the single source of truth.
+ */
+export function getIdleThreshold(): number {
+  return IDLE_THRESHOLD;
+}
+
+/**
  * Module-scoped agent id used as the localStorage key scope when
  * hydrating the trained network. Set by `setLearningAgent` from
  * `main.ts` after the agent is created. Kept module-scoped (rather
@@ -109,6 +119,33 @@ let currentTick = 0;
 type RecentEventKind = 'completed' | 'failed' | 'critical';
 let recentEvents: Array<{ tick: number; kind: RecentEventKind }> = [];
 let unsubscribers: Array<() => void> = [];
+
+/**
+ * Last softmax probability vector observed by the consumer-supplied
+ * `interpret` callback. Captured as a side effect so the demo's
+ * prediction strip can render the same distribution that drove this
+ * tick's argmax / idle decision without re-running a forward pass.
+ * `null` until the first reasoner-driven `selectIntention` of a
+ * Learning-mode session.
+ */
+let lastPrediction: number[] | null = null;
+
+/**
+ * Index of the column `interpretSoftmax` selected on the most recent
+ * call, or `null` when the pet idled. Tracked alongside
+ * `lastPrediction` so the strip can highlight the chosen action even
+ * though `interpret` only returns the resulting `Intention`.
+ */
+let lastSelectedIdx: number | null = null;
+
+/**
+ * Read the most recent softmax distribution + selected column. Used
+ * by the demo's prediction strip; the tuple is `[output, selectedIdx]`
+ * so a single call returns both halves.
+ */
+export function getLastPrediction(): { output: number[] | null; selectedIdx: number | null } {
+  return { output: lastPrediction, selectedIdx: lastSelectedIdx };
+}
 
 /**
  * Record one completion / failure outcome into the recent-event window.
@@ -163,6 +200,8 @@ export function setLearningAgent(
   currentMood = null;
   currentTick = 0;
   recentEvents = [];
+  lastPrediction = null;
+  lastSelectedIdx = null;
   agentIdForHydration = agent?.identity.id ?? null;
   if (agent === null) return;
   unsubscribers.push(
@@ -275,6 +314,24 @@ function featuresFromNeeds(
  * helpers usually wouldn't be exported but the contract is small enough
  * that documenting it via a test is cheaper than re-deriving it.
  */
+/**
+ * Argmax index over a softmax vector. Returns `0` for empty / single-
+ * element inputs (the strip never runs in those cases — guarded above
+ * — but the function is total to keep callers branch-free).
+ */
+function argmaxIndex(output: readonly number[]): number {
+  let maxIdx = 0;
+  let maxVal = output[0] ?? 0;
+  for (let i = 1; i < output.length; i++) {
+    const v = output[i] ?? 0;
+    if (v > maxVal) {
+      maxVal = v;
+      maxIdx = i;
+    }
+  }
+  return maxIdx;
+}
+
 export function interpretSoftmax(output: number[]): import('agentonomous').Intention | null {
   // Defensive width check: a snapshot whose model emits a different
   // output dimension is rejected at `construct()` (see hydrate below),
@@ -338,7 +395,26 @@ export const learningMode: CognitionModeSpec = {
     const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
       const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
         featuresOf: featuresFromNeeds,
-        interpret: (output) => interpretSoftmax(output),
+        interpret: (output) => {
+          // Side-effect: snapshot the per-tick distribution + chosen
+          // column so the demo's prediction strip can render the same
+          // numbers `interpretSoftmax` argmaxed without re-running a
+          // forward pass. `interpretSoftmax` returns `null` for both
+          // shape mismatches and below-threshold idles; pair the
+          // capture with an explicit argmax pass so the strip can
+          // distinguish "idle because below threshold" (output is
+          // valid, selected is null) from "idle because invalid"
+          // (output stays null).
+          if (output.length === SOFTMAX_DIM) {
+            lastPrediction = [...output];
+            const intent = interpretSoftmax(output);
+            lastSelectedIdx = intent === null ? null : argmaxIndex(output);
+            return intent;
+          }
+          lastPrediction = null;
+          lastSelectedIdx = null;
+          return interpretSoftmax(output);
+        },
       });
       // Reject snapshots whose output OR input dimension doesn't match
       // the bundled topology. A pre-row-17 snapshot (single sigmoid

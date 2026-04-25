@@ -80,7 +80,8 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 16  | TBD | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner` with `Buffered: N/50` HUD. |
 | 17  | #94 | `feat/tfjs-multi-output-softmax`             | 7-way softmax over active-care skills; bundled baseline rebuilt; `TfjsReasoner` JSDoc example (minor bump). |
 | 23–25 | #93 | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
-| 18  | TBD | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; demo-only. |
+| 18  | #96 | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; small library addition (`details.preModifierCount` snapshot). |
+| 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
 
 ---
 
@@ -575,25 +576,44 @@ paths.
 **Cost:** S. **Minor changeset** — `preModifierCount` is additive on
 the `LearningOutcome.details` shape.
 
-### 19 — Live prediction strip
+### 19 — Live prediction strip — **shipped**
 
 **Branch:** `feat/demo-prediction-strip`
 
-Render the network's last scalar (or, post-row 17, the softmax
-distribution) as a horizontal bar under the HUD, with a vertical
-line at `URGENCY_THRESHOLD`. Player sees *why* the pet idled vs.
-acted this tick — turns the black-box policy into an explainable one.
+**As shipped:**
 
-**Files:**
+- `examples/nurture-pet/src/predictionStrip.ts` (new) — pure-DOM SVG
+  renderer with `renderPredictionStrip(host, output, opts)` +
+  `clearPredictionStrip(host)`. Draws 7 vertical bars (one per
+  `SOFTMAX_SKILL_IDS` column) inside a 200×60 viewBox, with a
+  dashed horizontal line at `IDLE_THRESHOLD`. The argmaxed column
+  gets a `.selected` class so the chosen action stands out. Probabilities
+  outside `[0, 1]` (or `NaN`) clamp to the displayable range.
+- `cognition/learning.ts` — `interpret` callback now snapshots the
+  per-tick softmax output + selected-column index into module state.
+  New `getLastPrediction()` accessor returns `{ output, selectedIdx }`;
+  `getIdleThreshold()` exposes the demo's tuning constant so the strip
+  doesn't have to re-derive it. Capture state clears on
+  `setLearningAgent(null)`.
+- `cognitionSwitcher.ts` — when entering Learning mode, subscribes to
+  `AgentTicked` and re-renders the strip every tick by reading
+  `getLastPrediction()`. Unsubscribes + clears the strip on mode
+  leave / dispose so a stale distribution doesn't bleed into other
+  modes.
+- `index.html` — `<svg id="prediction-strip">` anchor next to the
+  loss sparkline + matching CSS classes (`.threshold` /
+  `.prediction-bar` / `.prediction-bar.selected` / `.prediction-label`).
+- `tests/examples/predictionStrip.test.ts` (new, jsdom) — 9 tests
+  covering one-bar-per-column rendering, hidden-on-null /
+  hidden-on-mismatch fallbacks, idempotent re-render, selected-class
+  flagging, threshold-y math, height-proportional-to-prob, and
+  out-of-range clamping.
 
-- `examples/nurture-pet/src/predictionStrip.ts` (new)
-- `cognitionSwitcher.ts` — fan the per-tick prediction out via a
-  small observable; the strip subscribes
-- `index.html` — anchor
+**Library impact:** none — the closure-captured `lastPrediction`
+approach kept the seam ergonomic; no `TfjsReasoner.lastPrediction`
+getter needed.
 
-**Library impact:** none, but consider exposing a
-`reasoner.lastPrediction` getter on `TfjsReasoner` if the closure
-plumbing gets ugly. Defer until the demo work proves it's needed.
+**Cost:** S. **No changeset** — demo + UI only.
 
 ### 20 — Backend probe + picker
 

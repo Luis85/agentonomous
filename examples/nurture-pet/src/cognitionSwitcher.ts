@@ -1,8 +1,14 @@
 import type { Agent, Learner, Reasoner } from 'agentonomous';
 import { NoopLearner } from 'agentonomous';
 import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
-import { buildLearningLearner, SOFTMAX_SKILL_IDS } from './cognition/learning.js';
+import {
+  buildLearningLearner,
+  getIdleThreshold,
+  getLastPrediction,
+  SOFTMAX_SKILL_IDS,
+} from './cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
+import { clearPredictionStrip, renderPredictionStrip } from './predictionStrip.js';
 
 /**
  * Match the LEARNER_BATCH_SIZE in `cognition/learning.ts`. Duplicated
@@ -247,6 +253,9 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   const untrainBtn = document.getElementById('untrain-network') as HTMLButtonElement | null;
   const sparkline = document.getElementById('loss-sparkline') as unknown as SVGSVGElement | null;
   const learnerReadout = document.getElementById('learner-buffer') as HTMLElement | null;
+  const predictionStrip = document.getElementById(
+    'prediction-strip',
+  ) as unknown as SVGSVGElement | null;
   const setTrainVisibility = (modeId: CognitionModeSpec['id']): void => {
     const show = modeId === 'learning';
     if (trainBtn) {
@@ -269,6 +278,10 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     // hidden attribute. Switching away from learning forces a clear so a
     // stale curve doesn't bleed into other modes.
     if (sparkline && !show) clearLossSparkline(sparkline);
+    // Prediction strip is gated on `learning` mode — clear on leave so
+    // a stale distribution doesn't render against a different mode's
+    // intent picker.
+    if (predictionStrip && !show) clearPredictionStrip(predictionStrip);
   };
 
   let disposed = false;
@@ -282,6 +295,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   // poll its buffer + the Untrain handler dispose it cleanly.
   let activeLearner: DisposableLearner | null = null;
   let learnerReadoutTimer: number | null = null;
+  let predictionStripUnsubscribe: (() => void) | null = null;
   // If the Train button is in flight when the user swaps modes, the
   // outgoing reasoner still has a live `model.fit` running against its
   // tensors. Disposing it immediately frees those tensors mid-fit and
@@ -340,6 +354,36 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     if (learnerReadoutTimer === null) return;
     globalThis.clearInterval(learnerReadoutTimer);
     learnerReadoutTimer = null;
+  };
+
+  /**
+   * Subscribe to `AgentTicked` and re-render the prediction strip on
+   * every tick while Learning mode is active. Unsubscribe on mode
+   * leave (idempotent) so the strip doesn't keep painting on
+   * heuristic / bdi / bt ticks.
+   */
+  const startPredictionStrip = (): void => {
+    if (predictionStripUnsubscribe !== null || predictionStrip === null) return;
+    const sub = (
+      agent as unknown as { subscribe?: (fn: (e: { type: string }) => void) => () => void }
+    ).subscribe;
+    if (typeof sub !== 'function') return;
+    predictionStripUnsubscribe = sub.call(agent, (event: { type: string }) => {
+      if (event.type !== 'AgentTicked') return;
+      const { output, selectedIdx } = getLastPrediction();
+      renderPredictionStrip(predictionStrip, output, {
+        threshold: getIdleThreshold(),
+        selectedIdx,
+      });
+    });
+  };
+
+  const stopPredictionStrip = (): void => {
+    if (predictionStripUnsubscribe !== null) {
+      predictionStripUnsubscribe();
+      predictionStripUnsubscribe = null;
+    }
+    if (predictionStrip) clearPredictionStrip(predictionStrip);
   };
 
   /**
@@ -405,8 +449,13 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       status.dataset.mode = mode.id;
       status.textContent = 'active';
       setTrainVisibility(mode.id);
-      if (mode.id === 'learning') startLearnerReadout();
-      else stopLearnerReadout();
+      if (mode.id === 'learning') {
+        startLearnerReadout();
+        startPredictionStrip();
+      } else {
+        stopLearnerReadout();
+        stopPredictionStrip();
+      }
     } catch (err) {
       if (disposed || myEpoch !== changeEpoch) return;
       // eslint-disable-next-line no-console -- user-visible diagnostic.
@@ -659,6 +708,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       disposeIfOwned(activeReasoner);
       activeReasoner = null;
       stopLearnerReadout();
+      stopPredictionStrip();
       disposeLearner(activeLearner);
       activeLearner = null;
     },
