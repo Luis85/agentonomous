@@ -875,10 +875,22 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
     }
   })();
 
+  // Monotonic counter incremented on every `change` event. Each
+  // in-flight `onBackendChange` invocation captures the current
+  // value into `myEpoch` before any `await`; after each await it
+  // re-checks the latest counter and bails if a newer change has
+  // started. Without this guard, rapid sequential picks can complete
+  // out of order — an earlier-but-slower `tf.setBackend` activation
+  // lands AFTER a newer user choice and overwrites both
+  // `setLearningBackend(...)` and localStorage with the stale value.
+  // Mirrors the `changeEpoch` pattern in the cognition-mode
+  // `onChange` handler above.
+  let backendChangeEpoch = 0;
   const onBackendChange = async (): Promise<void> => {
     if (hooks.isDisposed()) return;
     const value = backendSelect.value;
     if (!isBackend(value)) return;
+    const myEpoch = ++backendChangeEpoch;
     // Verify activation BEFORE asking the cognition switcher to
     // reconstruct. `probeBackend` (the registry-only probe used by
     // mountBackendPicker's startup sweep) cannot detect runtime
@@ -898,7 +910,12 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
     } catch {
       activated = false;
     }
-    if (hooks.isDisposed()) return;
+    // Stale completion guard: a newer change has fired since we
+    // started. Drop everything — let the newest in-flight invocation
+    // own the commit. No revert UI: the live `<select>` already
+    // reflects the newer pick, and `setLearningBackend` / localStorage
+    // are exactly the writes we're skipping.
+    if (hooks.isDisposed() || myEpoch !== backendChangeEpoch) return;
     if (!activated) {
       // Mark the failing option disabled so a future pick can't hit
       // the same path, revert the picker to whichever backend is
