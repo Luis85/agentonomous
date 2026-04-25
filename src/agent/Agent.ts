@@ -9,40 +9,33 @@ import {
   type ModifierRemovedEvent,
 } from '../events/standardEvents.js';
 import {
-  AnimationStateMachine,
+  type AnimationStateMachine,
   type AnimationStateMachineOptions,
 } from '../animation/AnimationStateMachine.js';
 import type { Embodiment } from '../body/Embodiment.js';
 import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
-import { DirectBehaviorRunner } from '../cognition/behavior/DirectBehaviorRunner.js';
 import type { Learner } from '../cognition/learning/Learner.js';
-import { NoopLearner } from '../cognition/learning/NoopLearner.js';
 import type { Reasoner } from '../cognition/reasoning/Reasoner.js';
-import { UrgencyReasoner } from '../cognition/reasoning/UrgencyReasoner.js';
 import type { NeedsPolicy } from '../needs/NeedsPolicy.js';
 import type { AgeModel } from '../lifecycle/AgeModel.js';
 import { DECEASED_STAGE, type LifeStage } from '../lifecycle/LifeStage.js';
 import type { StageCapabilityMap } from '../lifecycle/StageCapabilities.js';
 import type { MemoryRepository } from '../memory/MemoryRepository.js';
 import type { Modifier } from '../modifiers/Modifier.js';
-import { Modifiers } from '../modifiers/Modifiers.js';
+import { type Modifiers } from '../modifiers/Modifiers.js';
 import type { Mood } from '../mood/Mood.js';
 import type { MoodModel } from '../mood/MoodModel.js';
 import type { Needs } from '../needs/Needs.js';
 import type { AgentSnapshot, SnapshotPart } from '../persistence/AgentSnapshot.js';
-import {
-  AutoSaveTracker,
-  DEFAULT_AUTOSAVE_POLICY,
-  type AutoSavePolicy,
-} from '../persistence/AutoSavePolicy.js';
+import type { AutoSaveTracker, AutoSavePolicy } from '../persistence/AutoSavePolicy.js';
 import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
 import type { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
-import { SkillRegistry } from '../skills/SkillRegistry.js';
+import { type SkillRegistry } from '../skills/SkillRegistry.js';
 import type { RemoteController } from './RemoteController.js';
 import type { ScriptedController } from './ScriptedController.js';
 import type { Rng } from '../ports/Rng.js';
 import type { WallClock } from '../ports/WallClock.js';
-import { NullLogger, type Logger } from '../ports/Logger.js';
+import type { Logger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
 import type { AgentState } from '../persistence/AgentState.js';
 import { INTERACTION_REQUESTED } from '../interaction/InteractionRequestedEvent.js';
@@ -51,7 +44,7 @@ import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule, ReactiveHandler } from './AgentModule.js';
 import type { ControlMode } from './ControlMode.js';
 import type { DecisionTrace } from './DecisionTrace.js';
-import { InvalidTimeScaleError, MissingDependencyError } from './errors.js';
+import { InvalidTimeScaleError } from './errors.js';
 import { LifecycleTicker } from './internal/LifecycleTicker.js';
 import { ModifiersTicker } from './internal/ModifiersTicker.js';
 import { NeedsTicker } from './internal/NeedsTicker.js';
@@ -66,8 +59,13 @@ import {
 } from './internal/tickHelpers.js';
 import { runDeath } from './internal/DeathCoordinator.js';
 import { assembleSnapshot } from './internal/SnapshotAssembler.js';
-
-const DEFAULT_TIME_SCALE = 1;
+import {
+  assertRequiredDeps,
+  resolveCognition,
+  resolveCorePorts,
+  resolvePersistence,
+  resolveSubsystems,
+} from './internal/agentDepsResolver.js';
 
 /**
  * Dependencies required to construct an `Agent` directly.
@@ -213,48 +211,45 @@ export class Agent {
   private readonly cognitionPipeline: CognitionPipeline;
 
   constructor(deps: AgentDependencies) {
-    if (!deps.identity) throw new MissingDependencyError('identity');
-    if (!deps.eventBus) throw new MissingDependencyError('eventBus');
-    if (!deps.clock) throw new MissingDependencyError('clock');
-    if (!deps.rng) throw new MissingDependencyError('rng');
-
+    assertRequiredDeps(deps);
     this.identity = deps.identity;
     this.eventBus = deps.eventBus;
     this.clock = deps.clock;
     this.rng = deps.rng;
-    this.logger = deps.logger ?? new NullLogger();
-    this.validator = deps.validator;
-    this.timeScale = deps.timeScale ?? DEFAULT_TIME_SCALE;
-    this.controlMode = deps.controlMode ?? 'autonomous';
-    this.needs = deps.needs;
-    this.modifiers = deps.modifiers ?? new Modifiers();
-    this.ageModel = deps.ageModel;
-    this.stageCapabilities = deps.stageCapabilities;
-    this.moodModel = deps.moodModel;
-    this.embodiment = deps.embodiment;
-    this.randomEvents = deps.randomEvents;
-    this.memory = deps.memory;
-    this.remote = deps.remote;
-    this.scripted = deps.scripted;
-    this.snapshotStore = deps.snapshotStore;
-    this.autoSaveKey = deps.autoSaveKey ?? this.identity.id;
-    this.autoSaveTracker =
-      this.snapshotStore !== undefined
-        ? new AutoSaveTracker(deps.autoSave ?? DEFAULT_AUTOSAVE_POLICY)
-        : undefined;
-    this.reasoner = deps.reasoner ?? new UrgencyReasoner();
-    this.behavior = deps.behavior ?? new DirectBehaviorRunner();
-    this.learner = deps.learner ?? new NoopLearner();
-    this.skills = deps.skills ?? new SkillRegistry();
-    this.needsPolicy = deps.needsPolicy;
-    this.animation =
-      deps.animation instanceof AnimationStateMachine
-        ? deps.animation
-        : new AnimationStateMachine(deps.animation);
+
+    const ports = resolveCorePorts(deps);
+    this.logger = ports.logger;
+    this.validator = ports.validator;
+    this.timeScale = ports.timeScale;
+    this.controlMode = ports.controlMode;
+
+    const subs = resolveSubsystems(deps);
+    this.needs = subs.needs;
+    this.modifiers = subs.modifiers;
+    this.ageModel = subs.ageModel;
+    this.stageCapabilities = subs.stageCapabilities;
+    this.moodModel = subs.moodModel;
+    this.embodiment = subs.embodiment;
+    this.randomEvents = subs.randomEvents;
+    this.memory = subs.memory;
+    this.remote = subs.remote;
+    this.scripted = subs.scripted;
+
+    const cog = resolveCognition(deps);
+    this.reasoner = cog.reasoner;
+    this.behavior = cog.behavior;
+    this.learner = cog.learner;
+    this.skills = cog.skills;
+    this.needsPolicy = cog.needsPolicy;
+    this.animation = cog.animation;
+
+    const persistence = resolvePersistence(deps, this.identity.id);
+    this.snapshotStore = persistence.snapshotStore;
+    this.autoSaveKey = persistence.autoSaveKey;
+    this.autoSaveTracker = persistence.autoSaveTracker;
+
     this.virtualNowSeconds = this.ageModel?.ageSeconds ?? 0;
-    if (this.ageModel?.stage === DECEASED_STAGE) {
-      this.halted = true;
-    }
+    if (this.ageModel?.stage === DECEASED_STAGE) this.halted = true;
 
     // Wire up the tick-pipeline helpers. They keep a reference back to the
     // agent and read/mutate state through the (now-public) field surface.
@@ -265,7 +260,6 @@ export class Agent {
     this.animationReconciler = new AnimationReconciler(this);
     this.cognitionPipeline = new CognitionPipeline(this);
 
-    // Install config-time modules.
     for (const mod of deps.modules ?? []) {
       this.installModule(mod);
     }
