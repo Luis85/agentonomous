@@ -21,6 +21,58 @@ per weekday and persists findings to two sinks.
    `develop` via an automated PR `chore/daily-review-YYYY-MM-DD`,
    never a direct push.
 
+## Ingesting findings via `review-fix`
+
+The `.claude/skills/review-fix/SKILL.md` skill turns one finding into
+a worktree-isolated topic branch + plan, ready for
+`superpowers:writing-plans` → `superpowers:executing-plans`.
+
+### Finding ID
+
+Each finding the bot writes carries a stable ID
+`<head-sha[:7]>.<idx>`, embedded as an HTML comment on its checklist
+line. `head-sha[:7]` is the seven-char prefix of the head SHA
+reviewed in that run; `idx` is the 1-based position of the finding
+within the run.
+
+IDs do not deduplicate across reruns: tomorrow's run on a new SHA
+emits a fresh set of IDs even for findings that were already
+unshipped. The unshipped checkbox on the prior comment still flips
+when the eventual PR ships.
+
+### Workflow
+
+```text
+gh issue view 87 --comments       # find a finding ID
+/review-fix pick <id>             # creates worktree + plan
+/superpowers:writing-plans <plan> # expand plan into chunked tasks
+/superpowers:executing-plans …    # implement, verify, open PR
+```
+
+The PR body MUST contain, on its own line:
+
+```
+Refs #87 finding:<sha7>.<idx>
+```
+
+Trailing whitespace is tolerated; trailing punctuation breaks the
+match. The PR body MUST NOT contain `Closes #87` / `Fixes #87` —
+the tracker is long-lived and stays open.
+
+### Auto-flip on merge
+
+`.github/workflows/review-fix-shipped.yml` triggers on
+`pull_request: closed && merged`, regexes the PR body for the magic
+line, locates the matching tracker comment, and edits the body so
+the checklist item becomes:
+
+```markdown
+- [x] **[BLOCKER]** `path/to/file.ts:42` — short title (shipped in #N) <!-- f:<sha7>.<idx> -->
+```
+
+The Action does not block merges; it observes them. If the magic
+line is missing, it logs and exits 0.
+
 ## CI behavior on the daily PR
 
 `.github/workflows/ci.yml` short-circuits doc-only PRs:
@@ -71,6 +123,10 @@ invariants, or output-format pain. To change it:
 - [ ] Dry-run twice manually before scheduling. Set `DRY_RUN=1` in the
       routine's env to print intended commands without pushing or
       calling `gh`.
+- [ ] Confirm the `review-fix-shipped` workflow file is present on
+      `develop` (`.github/workflows/review-fix-shipped.yml`). It needs
+      no extra setup; the default `GITHUB_TOKEN` has the required
+      `issues:write` scope.
 
 ## Cadence
 
