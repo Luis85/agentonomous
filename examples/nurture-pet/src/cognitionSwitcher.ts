@@ -5,6 +5,8 @@ import {
   buildLearningLearner,
   getIdleThreshold,
   getLastPrediction,
+  getLearningBackend,
+  setLearningBackend,
   SOFTMAX_SKILL_IDS,
 } from './cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
@@ -698,6 +700,14 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     }),
   );
 
+  const backendPicker = mountBackendPicker(rootEl, {
+    isLearningActive: () => activeModeId === 'learning',
+    isDisposed: () => disposed,
+    triggerReconstruct: () => {
+      void onChange();
+    },
+  });
+
   return {
     dispose(): void {
       if (disposed) return;
@@ -705,12 +715,128 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       select.removeEventListener('change', onChangeWrapped);
       if (trainBtn) trainBtn.removeEventListener('click', onTrainClickWrapped);
       if (untrainBtn) untrainBtn.removeEventListener('click', onUntrainClickWrapped);
+      backendPicker.dispose();
       disposeIfOwned(activeReasoner);
       activeReasoner = null;
       stopLearnerReadout();
       stopPredictionStrip();
       disposeLearner(activeLearner);
       activeLearner = null;
+    },
+  };
+}
+
+const BACKEND_STORAGE_KEY = 'agentonomous/cognition-backend';
+const VALID_BACKENDS = ['cpu', 'wasm', 'webgl'] as const;
+type Backend = (typeof VALID_BACKENDS)[number];
+
+function isBackend(s: string): s is Backend {
+  return s === 'cpu' || s === 'wasm' || s === 'webgl';
+}
+
+type BackendPickerHooks = {
+  isLearningActive(): boolean;
+  isDisposed(): boolean;
+  /**
+   * Triggered when the user changes backend AND learning mode is the
+   * active cognition mode. Implemented in the switcher closure as a
+   * same-mode `onChange()` invocation so the existing concurrent-change
+   * + dispose-old-reasoner machinery handles the rebuild.
+   */
+  triggerReconstruct(): void;
+};
+
+type BackendPickerHandle = { dispose(): void };
+
+/**
+ * Mount the tfjs backend dropdown next to the cognition picker. On
+ * mount: restore the persisted selection (if any), sync it to
+ * `learning.ts`'s module-scoped `selectedBackend`, then probe each
+ * backend in the background to disable unavailable options. On change:
+ * persist + propagate to learning, and force a same-mode reconstruct
+ * when learning is the active cognition mode (other modes don't use
+ * tfjs, so a reconstruct would just churn).
+ *
+ * Probes are inquiry-only (`TfjsReasoner.probeBackend` restores the
+ * prior backend), so this background sweep doesn't disturb the
+ * cognition mode's own `tf.setBackend(...)` selection mid-tick.
+ *
+ * No-op when `#cognition-backend-select` isn't present in `rootEl` —
+ * keeps the demo HTML free to omit the picker (e.g. in a stripped-down
+ * embed) without a runtime error.
+ */
+function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): BackendPickerHandle {
+  const backendSelect = rootEl.querySelector<HTMLSelectElement>('#cognition-backend-select');
+  if (!backendSelect) return { dispose: (): void => undefined };
+
+  let initialBackend: Backend = getLearningBackend();
+  try {
+    const raw = globalThis.localStorage?.getItem(BACKEND_STORAGE_KEY);
+    if (typeof raw === 'string' && isBackend(raw)) {
+      initialBackend = raw;
+      setLearningBackend(initialBackend);
+    }
+  } catch {
+    // localStorage unavailable — keep the default.
+  }
+  backendSelect.value = initialBackend;
+
+  void (async (): Promise<void> => {
+    try {
+      const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
+      await Promise.all(
+        VALID_BACKENDS.map(async (name) => {
+          const ok = await TfjsReasoner.probeBackend(name);
+          if (hooks.isDisposed()) return;
+          const opt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${name}"]`);
+          if (!opt) return;
+          if (ok) {
+            opt.disabled = false;
+            opt.removeAttribute('title');
+          } else {
+            opt.disabled = true;
+            opt.title = `${name.toUpperCase()} unavailable in this browser`;
+            // Persisted selection unreachable — fall back to cpu
+            // (always available) and re-persist the corrected value
+            // so a future load doesn't re-pick the broken one.
+            if (backendSelect.value === name) {
+              backendSelect.value = 'cpu';
+              setLearningBackend('cpu');
+              try {
+                globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, 'cpu');
+              } catch {
+                // localStorage unavailable — selection still applied for this session.
+              }
+            }
+          }
+        }),
+      );
+    } catch {
+      // Adapter import failed (peer dep missing). Leave all options
+      // enabled; if the user actually selects Learning mode, the mode's
+      // own probe surfaces the missing dep.
+    }
+  })();
+
+  const onBackendChange = (): void => {
+    if (hooks.isDisposed()) return;
+    const value = backendSelect.value;
+    if (!isBackend(value)) return;
+    setLearningBackend(value);
+    try {
+      globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, value);
+    } catch {
+      // localStorage unavailable — selection still applies for this session.
+    }
+    if (hooks.isLearningActive()) {
+      hooks.triggerReconstruct();
+    }
+  };
+  backendSelect.addEventListener('change', onBackendChange);
+
+  return {
+    dispose(): void {
+      backendSelect.removeEventListener('change', onBackendChange);
     },
   };
 }

@@ -107,6 +107,38 @@ export function getIdleThreshold(): number {
 let agentIdForHydration: string | null = null;
 
 /**
+ * Module-scoped tfjs backend used by `learningMode.construct()`. The
+ * cognition switcher's backend picker writes this via
+ * `setLearningBackend` before triggering a reconstruct so the next
+ * `construct()` registers the chosen backend (and its tfjs package
+ * lazy-import) and asks `TfjsReasoner.fromJSON` to commit it.
+ *
+ * Defaults to `'cpu'` so the first construct after a cold load matches
+ * the determinism-preserving baseline. The picker overrides this on
+ * mount from the persisted value (or `TfjsReasoner.detectBestBackend`)
+ * before any user-driven reconstruct fires.
+ */
+let selectedBackend: 'cpu' | 'wasm' | 'webgl' = 'cpu';
+
+/**
+ * Set the tfjs backend the next `learningMode.construct()` will request.
+ * Called by the cognition switcher's backend picker; learning mode reads
+ * this when rebuilding its `TfjsReasoner` from the persisted snapshot or
+ * the bundled baseline.
+ */
+export function setLearningBackend(name: 'cpu' | 'wasm' | 'webgl'): void {
+  selectedBackend = name;
+}
+
+/**
+ * Read the current selection — exposed so the picker can sync its
+ * `<select>` value on mount without re-reading localStorage.
+ */
+export function getLearningBackend(): 'cpu' | 'wasm' | 'webgl' {
+  return selectedBackend;
+}
+
+/**
  * Module-scoped recent state used by `featuresFromNeeds` to build the
  * mood / modifier-count / event-count dims. Populated via the agent
  * subscription wired up in `setLearningAgent`. Kept module-scoped so
@@ -384,7 +416,22 @@ export const learningMode: CognitionModeSpec = {
     }
   },
   async construct(): Promise<Reasoner> {
-    await import('@tensorflow/tfjs-backend-cpu');
+    // Side-effect-import the package matching the user-selected backend.
+    // Each branch uses a literal string so Vite's static analysis can
+    // emit a per-backend async chunk; passing `selectedBackend` to a
+    // computed `import()` would inline all three packages into the
+    // learning chunk (or fail at build time).
+    switch (selectedBackend) {
+      case 'cpu':
+        await import('@tensorflow/tfjs-backend-cpu');
+        break;
+      case 'wasm':
+        await import('@tensorflow/tfjs-backend-wasm');
+        break;
+      case 'webgl':
+        await import('@tensorflow/tfjs-backend-webgl');
+        break;
+    }
     const tf = await import('@tensorflow/tfjs-core');
     const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
     type Snapshot = Parameters<typeof TfjsReasoner.fromJSON>[0];
@@ -394,6 +441,7 @@ export const learningMode: CognitionModeSpec = {
 
     const hydrate = async (snap: Snapshot): Promise<Reasoner> => {
       const r = await TfjsReasoner.fromJSON<number[], number[]>(snap, {
+        backend: selectedBackend,
         featuresOf: featuresFromNeeds,
         interpret: (output) => {
           // Side-effect: snapshot the per-tick distribution + chosen

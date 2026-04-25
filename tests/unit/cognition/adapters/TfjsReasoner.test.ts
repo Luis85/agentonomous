@@ -1,7 +1,7 @@
 import '@tensorflow/tfjs-backend-cpu';
 import * as tf from '@tensorflow/tfjs-core';
 import { layers, sequential, type Sequential } from '@tensorflow/tfjs-layers';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   TfjsReasoner,
   TfjsBackendNotRegisteredError,
@@ -414,5 +414,59 @@ describe('TfjsReasoner — bundled demo baseline', () => {
     }
     expect(sum).toBeCloseTo(1, 5);
     reasoner.dispose();
+  });
+});
+
+describe('TfjsReasoner — backend detection', () => {
+  // Each detection test may flip the active tfjs backend (the chain
+  // probes via `tf.setBackend`). Restore cpu after every case so the
+  // shared `beforeAll` invariant ("tests run on cpu") holds for any
+  // case that runs after this block.
+  afterEach(async () => {
+    if (tf.getBackend() !== 'cpu') {
+      await tf.setBackend('cpu');
+      await tf.ready();
+    }
+  });
+
+  it('probeBackend("cpu") resolves true and is non-committing (prior backend restored)', async () => {
+    // `probeBackend` is inquiry-only — even on success, the prior
+    // backend is restored. The caller commits separately if it wants
+    // the probed backend active. This lets a UI probe all three in
+    // sequence without leaving tfjs on whichever ran last.
+    const before = tf.getBackend();
+    const ok = await TfjsReasoner.probeBackend('cpu');
+    expect(ok).toBe(true);
+    expect(tf.getBackend()).toBe(before);
+  });
+
+  it('probeBackend("webgl") resolves false in the node test environment (no WebGL context)', async () => {
+    const before = tf.getBackend();
+    const ok = await TfjsReasoner.probeBackend('webgl');
+    expect(ok).toBe(false);
+    // Failed probe restores the prior backend rather than leaving tfjs
+    // in an unspecified intermediate state.
+    expect(tf.getBackend()).toBe(before);
+  });
+
+  it('detectBestBackend skips webgl in the node test env and returns the first non-webgl backend that registers', async () => {
+    const result = await TfjsReasoner.detectBestBackend();
+    // In the node test env, webgl has no GL context — its probe must
+    // fail (otherwise the chain returns 'webgl' first). cpu is bundled
+    // and always succeeds; wasm sometimes registers in node depending
+    // on the runtime's WebAssembly.instantiateStreaming + fetch shim
+    // surface, so accept either. The strict assertion is "not webgl",
+    // which is what the fallback chain is supposed to guarantee when
+    // the GPU is unavailable.
+    expect(result).not.toBe('webgl');
+    expect(['cpu', 'wasm']).toContain(result);
+    expect(tf.getBackend()).toBe(result);
+  });
+
+  it('detectBestBackend returns a valid backend name on every call (idempotent)', async () => {
+    const a = await TfjsReasoner.detectBestBackend();
+    const b = await TfjsReasoner.detectBestBackend();
+    expect(a).toBe(b);
+    expect(['cpu', 'wasm', 'webgl']).toContain(a);
   });
 });
