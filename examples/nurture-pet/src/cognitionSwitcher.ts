@@ -26,57 +26,59 @@ const TRAIN_EPOCHS = 100;
 const TRAINED_FLASH_MS = 1500;
 
 /**
- * Map a 5-dim need-level feature vector to a 7-dim one-hot label over
- * `SOFTMAX_SKILL_IDS`. The mapping mirrors the heuristic the demo's
- * baseline network was seeded against (see
- * `scripts/seed-learning-network.ts`):
+ * Build a synthetic feature vector from the archetype distribution for
+ * `skillIdx` (an index into `SOFTMAX_SKILL_IDS`). The Train button uses
+ * stratified sampling rather than uniform-random draws so every class
+ * sees roughly equal representation in a 30-pair batch — without this,
+ * `pet` (`min(needs) > 0.7`) would appear with probability `~0.3^5 ≈
+ * 0.24%` and `scold` (`happiness > 0.8 ∧ energy < 0.4`) only ~8%, so
+ * the Train button would heavily reinforce the maintenance classes
+ * while washing out the under-represented ones.
  *
- * - The lowest need maps to a maintenance skill —
- *   `hunger → feed`, `cleanliness → clean`, `happiness → play`,
- *   `energy → rest`, `health → medicate`.
- * - When every need is comfortably high (`min(needs) > 0.7`) we treat
- *   the state as a bonding moment → `pet`.
- * - When happiness is very high but energy is low (over-stimulated +
- *   jittery) we treat the state as needing a boundary → `scold`.
+ * Archetype ranges are designed to land inside the class's region of
+ * input space without crossing into a sibling archetype:
  *
- * The synthetic Train button thus produces the same archetype
- * distribution as the bundled baseline, so a click reinforces the
- * heuristic the network already approximates rather than fighting it.
- * Live agent outcomes (via `projectLearningOutcome`) push the network
- * away from this baseline as the user actually interacts with the pet.
+ * - feed/clean/play/rest/medicate: target need ∈ [0, 0.3], others ∈
+ *   [0.4, 0.95] so `min > 0.7` never fires (`pet` doesn't steal the
+ *   sample) and the lowest-need rule resolves correctly.
+ * - pet: every need ∈ [0.75, 1.0] so `min > 0.7` fires.
+ * - scold: happiness ∈ [0.85, 1.0], energy ∈ [0.0, 0.35], others ∈
+ *   [0.4, 0.7] so the `happiness > 0.8 ∧ energy < 0.4` clause fires
+ *   before the `min > 0.7` (impossible here) and lowest-need rules.
  */
-function featuresToOneHotLabel(features: readonly number[]): number[] {
+function generateArchetypeFeatures(rng: () => number, skillIdx: number): number[] {
+  const range = (lo: number, hi: number): number => lo + rng() * (hi - lo);
+  // `pet` — all needs comfortably high.
+  if (skillIdx === SOFTMAX_SKILL_IDS.indexOf('pet')) {
+    return [range(0.75, 1), range(0.75, 1), range(0.75, 1), range(0.75, 1), range(0.75, 1)];
+  }
+  // `scold` — happy + tired.
+  if (skillIdx === SOFTMAX_SKILL_IDS.indexOf('scold')) {
+    return [range(0.4, 0.7), range(0.4, 0.7), range(0.85, 1), range(0, 0.35), range(0.4, 0.7)];
+  }
+  // Maintenance archetypes: target need low, others mid-high.
+  const needIdxBySkill: Partial<Record<(typeof SOFTMAX_SKILL_IDS)[number], number>> = {
+    feed: 0,
+    clean: 1,
+    play: 2,
+    rest: 3,
+    medicate: 4,
+  };
+  const skillId = SOFTMAX_SKILL_IDS[skillIdx] ?? 'feed';
+  const targetNeedIdx = needIdxBySkill[skillId] ?? 0;
+  const features: number[] = [];
+  for (let i = 0; i < NEED_IDS.length; i++) {
+    features.push(i === targetNeedIdx ? range(0, 0.3) : range(0.4, 0.95));
+  }
+  return features;
+}
+
+/**
+ * Build a one-hot label for class `skillIdx` over `SOFTMAX_SKILL_IDS`.
+ */
+function oneHotLabel(skillIdx: number): number[] {
   const label = new Array<number>(SOFTMAX_SKILL_IDS.length).fill(0);
-  const hunger = features[0] ?? 0;
-  const cleanliness = features[1] ?? 0;
-  const happiness = features[2] ?? 0;
-  const energy = features[3] ?? 0;
-  const health = features[4] ?? 0;
-  // `pet` archetype: every need comfortably high.
-  const minLevel = Math.min(hunger, cleanliness, happiness, energy, health);
-  if (minLevel > 0.7) {
-    label[SOFTMAX_SKILL_IDS.indexOf('pet')] = 1;
-    return label;
-  }
-  // `scold` archetype: over-stimulated but jittery.
-  if (happiness > 0.8 && energy < 0.4) {
-    label[SOFTMAX_SKILL_IDS.indexOf('scold')] = 1;
-    return label;
-  }
-  // Lowest-need-wins maintenance mapping.
-  const needToSkill = ['feed', 'clean', 'play', 'rest', 'medicate'] as const;
-  let minIdx = 0;
-  let minVal = features[0] ?? 0;
-  for (let i = 1; i < NEED_IDS.length; i++) {
-    const v = features[i] ?? 0;
-    if (v < minVal) {
-      minVal = v;
-      minIdx = i;
-    }
-  }
-  // hunger/cleanliness/happiness/energy/health → feed/clean/play/rest/medicate.
-  const skill = needToSkill[minIdx] ?? 'feed';
-  label[SOFTMAX_SKILL_IDS.indexOf(skill)] = 1;
+  label[skillIdx] = 1;
   return label;
 }
 
@@ -420,12 +422,14 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       // gate can't be bypassed during this microtask window.
       await new Promise<void>((r) => setTimeout(r, 0));
       if (disposed) return;
-      const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, () => {
-        const features: number[] = [];
-        for (let i = 0; i < NEED_IDS.length; i++) {
-          features.push(agent.rng.next());
-        }
-        return { features, label: featuresToOneHotLabel(features) };
+      // Stratified sampling: round-robin over the 7 softmax classes so
+      // every class gets roughly TRAIN_PAIR_COUNT / 7 samples. Replaces
+      // a previous uniform-random sweep that left `pet` (~0.24%) and
+      // `scold` (~8%) drastically under-represented in a 30-pair batch.
+      const pairs = Array.from({ length: TRAIN_PAIR_COUNT }, (_unused, i) => {
+        const skillIdx = i % SOFTMAX_SKILL_IDS.length;
+        const features = generateArchetypeFeatures(() => agent.rng.next(), skillIdx);
+        return { features, label: oneHotLabel(skillIdx) };
       });
       // Live mid-fit progress: update the button text + push points
       // into the sparkline as each epoch completes. Both branches are
