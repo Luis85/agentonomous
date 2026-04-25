@@ -48,9 +48,8 @@ jobs:
               - 'vite.config.*'
               - 'vitest.config.*'
               - 'eslint.config.*'
+              - 'typedoc.json'
               - '.github/workflows/**'
-              - 'size-limit.config.*'
-              - '.size-limit.*'
 
   format-check:
     name: Format (Prettier)
