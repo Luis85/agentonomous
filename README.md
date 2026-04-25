@@ -4,10 +4,15 @@ Autonomous agent library for TypeScript simulations. Engine-agnostic, fully
 testable, designed to nurture an agent from birth to death in the browser with
 zero configuration.
 
-**Status:** pre-release (`0.1.0`). The Phase A MVP — a virtual-pet nurture demo
-— ships in `examples/nurture-pet`.
+**Status:** pre-release (`0.0.0` per `package.json`). The Phase A MVP — a
+virtual-pet nurture demo — ships in `examples/nurture-pet`.
 
 **Demo:** https://luis85.github.io/agentonomous/
+
+> **Pre-v1 — not yet on npm.** The package is not published. To evaluate
+> locally, clone this repo and resolve `agentonomous` via a `file:` or
+> `link:` dependency in your consuming project. The `npm install agentonomous`
+> snippet below describes the post-publish flow.
 
 ## What you get
 

@@ -108,7 +108,7 @@ into `develop` afterwards so the fix propagates.
 
 ## Commit messages
 
-Subject line: `<type>: <summary>` or `<Rxx>: <summary>` for remediation items.
+Subject line: `<type>(<scope>): <summary>` (Conventional Commits).
 
 - `type` is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`.
 - Keep subjects under 72 chars.
