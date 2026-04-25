@@ -557,16 +557,19 @@ jobs:
 
             const prNumber = context.payload.pull_request.number;
 
+            // Track write-side failures separately so the run fails at the
+            // end if any flip could not be persisted. Read-side failures
+            // (listComments 404, etc.) stay soft — a finding pointing at
+            // a non-existent issue is a content bug in the PR body, not
+            // a problem with the automation.
+            let writeFailures = 0;
+
             for (const m of matches) {
               const [, issueStr, sha7, idxStr] = m;
               const issueNumber = Number(issueStr);
               const findingId = `${sha7}.${idxStr}`;
               const marker = `<!-- f:${findingId} -->`;
 
-              // Per-match try/catch: a missing/inaccessible target issue
-              // (or any other transient API error) must not abort sibling
-              // matches in the same PR body. Soft-warn and continue so
-              // the rest of the flips still happen.
               try {
                 core.info(`Looking for ${marker} in #${issueNumber} comments...`);
 
@@ -614,17 +617,28 @@ jobs:
                   .replace(` ${marker}`, ` (shipped in #${prNumber}) ${marker}`);
                 const newBody = hit.body.slice(0, lineStart) + newLine + hit.body.slice(lineEnd);
 
-                await github.rest.issues.updateComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: hit.id,
-                  body: newBody,
-                });
-
-                core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
-              } catch (err) {
-                core.warning(`Failed to process finding ${findingId} in #${issueNumber}: ${err.message}. Continuing with remaining matches.`);
+                // Inner try/catch: write failures (missing perms, rate
+                // limit, 5xx) MUST surface as a failed run; otherwise
+                // shipped-state silently drifts.
+                try {
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: hit.id,
+                    body: newBody,
+                  });
+                  core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
+                } catch (writeErr) {
+                  writeFailures++;
+                  core.error(`Failed to write flip for ${findingId} in #${issueNumber}: ${writeErr.message}`);
+                }
+              } catch (readErr) {
+                core.warning(`Failed to read comments for #${issueNumber} (finding ${findingId}): ${readErr.message}. Continuing with remaining matches.`);
               }
+            }
+
+            if (writeFailures > 0) {
+              core.setFailed(`${writeFailures} flip write(s) failed; tracker comment is out of sync. Review run logs and re-run after fixing the underlying issue.`);
             }
 ```
 
