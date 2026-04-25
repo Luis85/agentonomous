@@ -84,6 +84,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
 | 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
 | 3   | TBD | `chore/ci-actions-sha-pinning`               | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
+| 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
 
 ---
 

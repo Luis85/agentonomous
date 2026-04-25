@@ -94,83 +94,135 @@ export class MockLlmProvider implements LlmProviderPort {
     options: LlmCompleteOptions,
   ): LlmCompletion {
     if (options.signal?.aborted === true) {
-      return {
-        text: '',
-        usage: { inputTokens: 0, outputTokens: 0 },
-        model: options.model ?? this.defaultModel,
-        stopReason: 'abort',
-      };
+      return abortStub(options.model ?? this.defaultModel);
     }
 
     const picked = this.pickScript(messages, options);
-    const script = picked.script;
-    const model = script.model ?? options.model ?? this.defaultModel;
-    // Request-side input count used for the budget check — scripts must
-    // not be able to under-report `inputTokens` and sneak an oversize
-    // prompt past `maxInputTokens`. The reported usage on the completion
-    // still honours the script override so tests can pin exact numbers.
-    const requestInputTokens = estimateTokens(messages);
-    const reportedInputTokens = script.usage?.inputTokens ?? requestInputTokens;
-    const outputTokens = script.usage?.outputTokens ?? estimateTokensFor(script.text);
-    const costCents = script.usage?.costCents;
-
-    enforceBudget(options.budget, requestInputTokens, outputTokens, costCents);
-
-    // Only commit the queue cursor once budget checks have passed —
-    // otherwise a budget-rejected request would consume a scripted
-    // entry and make retries non-deterministic.
-    picked.commit();
-
-    return {
-      text: script.text,
-      usage: buildUsage(reportedInputTokens, outputTokens, costCents, script.usage?.cached),
-      model,
-      stopReason: script.stopReason ?? 'stop',
-    };
+    return runScript(picked, messages, options, this.defaultModel);
   }
 
-  private pickScript(
-    messages: readonly LlmMessage[],
-    options: LlmCompleteOptions,
-  ): { script: MockLlmScript; commit: () => void } {
-    if (this.dispatch === 'match-or-error') {
-      // Strict dispatch must fail fast on both zero and multi-match — the
-      // whole point is that each request resolves to exactly one scripted
-      // response. Silently taking the first match would mask misconfigured
-      // scripts and produce the wrong completion in replay tests.
-      const hits = this.scripts.filter((s) => s.match?.(messages, options) === true);
-      if (hits.length === 0) {
-        throw new Error('MockLlmProvider: no script matched the request.');
-      }
-      if (hits.length > 1) {
-        throw new Error(
-          `MockLlmProvider: ${hits.length} scripts matched the request (match-or-error requires exactly one).`,
-        );
-      }
-      // match-or-error has no queue state to advance; commit is a no-op.
-      const [only] = hits;
-      if (!only) throw new Error('MockLlmProvider: no script matched the request.');
-      return { script: only, commit: () => undefined };
-    }
-    // Queue mode: honour a `match` predicate if it's set; otherwise take
-    // the next positional script. Exhausted queue throws. The returned
-    // `commit` advances the queue cursor; callers defer it until after
-    // budget checks so a rejected request doesn't consume an entry.
-    for (let i = this.cursor; i < this.scripts.length; i++) {
-      const candidate = this.scripts[i];
-      if (!candidate) continue;
-      if (candidate.match === undefined || candidate.match(messages, options)) {
-        const advanceTo = i + 1;
-        return {
-          script: candidate,
-          commit: () => {
-            this.cursor = advanceTo;
-          },
-        };
-      }
-    }
-    throw new Error('MockLlmProvider: script queue exhausted.');
+  private pickScript(messages: readonly LlmMessage[], options: LlmCompleteOptions): PickedScript {
+    return this.dispatch === 'match-or-error'
+      ? pickFromMatchOrError(this.scripts, messages, options)
+      : pickFromQueue(this.scripts, this.cursor, messages, options, (next) => {
+          this.cursor = next;
+        });
   }
+}
+
+/**
+ * Selected script plus a `commit` thunk the caller invokes once the
+ * request has passed budget checks. Deferring the commit keeps queue
+ * mode deterministic across retries (a budget-rejected request must
+ * not consume a queued script).
+ */
+type PickedScript = {
+  readonly script: MockLlmScript;
+  readonly commit: () => void;
+};
+
+/**
+ * Build the `'abort'` stub completion returned when an already-aborted
+ * `AbortSignal` is passed in. Kept as its own helper so `completeSync`
+ * stays a flat dispatcher.
+ */
+function abortStub(model: string): LlmCompletion {
+  return {
+    text: '',
+    usage: { inputTokens: 0, outputTokens: 0 },
+    model,
+    stopReason: 'abort',
+  };
+}
+
+/**
+ * Apply budget checks then construct the completion. Mutating the
+ * cursor (in queue mode) is deferred to `picked.commit()` so a
+ * budget-rejected request leaves queue state untouched.
+ */
+function runScript(
+  picked: PickedScript,
+  messages: readonly LlmMessage[],
+  options: LlmCompleteOptions,
+  defaultModel: string,
+): LlmCompletion {
+  const { script } = picked;
+  const model = script.model ?? options.model ?? defaultModel;
+  // Request-side input count used for the budget check — scripts must
+  // not be able to under-report `inputTokens` and sneak an oversize
+  // prompt past `maxInputTokens`. The reported usage on the completion
+  // still honours the script override so tests can pin exact numbers.
+  const requestInputTokens = estimateTokens(messages);
+  const reportedInputTokens = script.usage?.inputTokens ?? requestInputTokens;
+  const outputTokens = script.usage?.outputTokens ?? estimateTokensFor(script.text);
+  const costCents = script.usage?.costCents;
+
+  enforceBudget(options.budget, requestInputTokens, outputTokens, costCents);
+
+  // Only commit the queue cursor once budget checks have passed —
+  // otherwise a budget-rejected request would consume a scripted
+  // entry and make retries non-deterministic.
+  picked.commit();
+
+  return {
+    text: script.text,
+    usage: buildUsage(reportedInputTokens, outputTokens, costCents, script.usage?.cached),
+    model,
+    stopReason: script.stopReason ?? 'stop',
+  };
+}
+
+/**
+ * Strict dispatch: every request must resolve to exactly one matching
+ * script. Zero-match and multi-match both throw — silently taking the
+ * first match would mask misconfigured scripts and produce the wrong
+ * completion under replay. No queue state to advance, so `commit` is
+ * a no-op.
+ */
+function pickFromMatchOrError(
+  scripts: readonly MockLlmScript[],
+  messages: readonly LlmMessage[],
+  options: LlmCompleteOptions,
+): PickedScript {
+  const hits = scripts.filter((s) => s.match?.(messages, options) === true);
+  if (hits.length === 0) {
+    throw new Error('MockLlmProvider: no script matched the request.');
+  }
+  if (hits.length > 1) {
+    throw new Error(
+      `MockLlmProvider: ${hits.length} scripts matched the request (match-or-error requires exactly one).`,
+    );
+  }
+  const [only] = hits;
+  if (!only) throw new Error('MockLlmProvider: no script matched the request.');
+  return { script: only, commit: () => undefined };
+}
+
+/**
+ * Queue dispatch: honour a `match` predicate when set; otherwise take
+ * the next positional script. Exhausted queue throws. The returned
+ * `commit` thunk advances the cursor via `setCursor`, deferred until
+ * after budget checks so rejected requests don't consume an entry.
+ */
+function pickFromQueue(
+  scripts: readonly MockLlmScript[],
+  cursor: number,
+  messages: readonly LlmMessage[],
+  options: LlmCompleteOptions,
+  setCursor: (next: number) => void,
+): PickedScript {
+  for (let i = cursor; i < scripts.length; i++) {
+    const candidate = scripts[i];
+    if (!candidate) continue;
+    if (candidate.match === undefined || candidate.match(messages, options)) {
+      const advanceTo = i + 1;
+      return {
+        script: candidate,
+        commit: () => setCursor(advanceTo),
+      };
+    }
+  }
+  throw new Error('MockLlmProvider: script queue exhausted.');
 }
 
 function enforceBudget(
