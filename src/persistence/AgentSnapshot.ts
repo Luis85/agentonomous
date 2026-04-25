@@ -28,7 +28,7 @@ export type SnapshotPart =
  * Opaque subsystem payloads (beliefs, custom) are `unknown` — schema is
  * owned by the plugin that populates them.
  */
-export interface AgentSnapshot {
+export type AgentSnapshot = {
   schemaVersion: number;
   /** Wall-clock ms at save time. */
   snapshotAt: number;
@@ -75,6 +75,6 @@ export interface AgentSnapshot {
 
   /** Consumer-owned extension slot. */
   custom?: Record<string, unknown>;
-}
+};
 
 export const CURRENT_SNAPSHOT_VERSION = 2 as const;

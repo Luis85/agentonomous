@@ -18,15 +18,15 @@ import type { StageCapabilityMap } from './StageCapabilities.js';
  * });
  * ```
  */
-export interface LifecycleTemplate {
+export type LifecycleTemplate = {
   schedule: LifeStageSchedule;
   capabilities?: StageCapabilityMap;
-}
+};
 
-export interface LifecycleDescriptor {
+export type LifecycleDescriptor = {
   schedule: LifeStageSchedule;
   capabilities?: StageCapabilityMap;
-}
+};
 
 export function defineLifecycle(template: LifecycleTemplate): LifecycleDescriptor {
   const schedule: readonly LifeStageScheduleEntry[] = [...template.schedule].sort(

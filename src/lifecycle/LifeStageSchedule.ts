@@ -11,10 +11,10 @@ import type { LifeStage } from './LifeStage.js';
  * `deceased` is **not** a schedulable stage — death is triggered by vitality
  * depletion or an explicit `agent.kill()` call.
  */
-export interface LifeStageScheduleEntry {
+export type LifeStageScheduleEntry = {
   stage: LifeStage;
   atSeconds: number;
-}
+};
 
 /** Ordered schedule of age → stage transitions. */
 export type LifeStageSchedule = readonly LifeStageScheduleEntry[];

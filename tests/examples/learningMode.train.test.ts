@@ -17,7 +17,7 @@ import {
 } from '../../examples/nurture-pet/src/cognition/learning.js';
 import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
 
-interface FakeAgent {
+type FakeAgent = {
   setReasoner: Mock<(r: unknown) => void>;
   setLearner: Mock<(l: unknown) => void>;
   getState: () => {
@@ -33,7 +33,7 @@ interface FakeAgent {
     chance: (p: number) => boolean;
     pick: <T>(items: readonly T[]) => T;
   };
-}
+};
 
 beforeAll(async () => {
   await tf.setBackend('cpu');

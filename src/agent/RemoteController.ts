@@ -12,14 +12,14 @@ import type { AgentAction } from './AgentAction.js';
  *
  * Introduced in M6.
  */
-export interface RemoteController {
+export type RemoteController = {
   /**
    * Pull the next batch of actions for the given agent. The implementation
    * is expected to return any actions that have accumulated since the last
    * pull (FIFO) and clear them from its internal buffer.
    */
   pull(agentId: string, wallNowMs: number): Promise<readonly AgentAction[]>;
-}
+};
 
 /**
  * In-memory `RemoteController` used by tests and the built-in simulator.

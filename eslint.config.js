@@ -131,6 +131,10 @@ export default tseslint.config(
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
       '@typescript-eslint/consistent-type-exports': 'error',
+      // Closes a downstream-consumer footgun: `interface` enables TS declaration
+      // merging, so a `.d.ts` augmentation can silently widen a library type.
+      // `type` aliases cannot be merged. See review-bot finding 682b557.1.
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       '@typescript-eslint/prefer-readonly': 'warn',
       // Style nudges.
       'prefer-template': 'error',

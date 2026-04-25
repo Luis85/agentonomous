@@ -35,12 +35,12 @@ export function assertRequiredDeps(deps: AgentDependencies): void {
   if (!deps.rng) throw new MissingDependencyError('rng');
 }
 
-export interface ResolvedPorts {
+export type ResolvedPorts = {
   logger: Logger;
   validator: Validator | undefined;
   timeScale: number;
   controlMode: ControlMode;
-}
+};
 
 export function resolveCorePorts(deps: AgentDependencies): ResolvedPorts {
   return {
@@ -51,7 +51,7 @@ export function resolveCorePorts(deps: AgentDependencies): ResolvedPorts {
   };
 }
 
-export interface ResolvedSubsystems {
+export type ResolvedSubsystems = {
   needs: Needs | undefined;
   modifiers: Modifiers;
   ageModel: AgeModel | undefined;
@@ -62,7 +62,7 @@ export interface ResolvedSubsystems {
   memory: MemoryRepository | undefined;
   remote: RemoteController | undefined;
   scripted: ScriptedController | undefined;
-}
+};
 
 export function resolveSubsystems(deps: AgentDependencies): ResolvedSubsystems {
   return {
@@ -79,14 +79,14 @@ export function resolveSubsystems(deps: AgentDependencies): ResolvedSubsystems {
   };
 }
 
-export interface ResolvedCognition {
+export type ResolvedCognition = {
   reasoner: Reasoner;
   behavior: BehaviorRunner;
   learner: Learner;
   skills: SkillRegistry;
   needsPolicy: NeedsPolicy | undefined;
   animation: AnimationStateMachine;
-}
+};
 
 export function resolveCognition(deps: AgentDependencies): ResolvedCognition {
   return {
@@ -102,11 +102,11 @@ export function resolveCognition(deps: AgentDependencies): ResolvedCognition {
   };
 }
 
-export interface ResolvedPersistence {
+export type ResolvedPersistence = {
   snapshotStore: SnapshotStorePort | undefined;
   autoSaveKey: string;
   autoSaveTracker: AutoSaveTracker | undefined;
-}
+};
 
 export function resolvePersistence(deps: AgentDependencies, agentId: string): ResolvedPersistence {
   const snapshotStore = deps.snapshotStore;

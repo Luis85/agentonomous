@@ -7,7 +7,7 @@ import type { Species } from './Species.js';
  * and serialized into every `AgentSnapshot` so downstream consumers can route
  * events and rebuild state without side channels.
  */
-export interface AgentIdentity {
+export type AgentIdentity = {
   /** Stable unique identifier; survives across snapshots. */
   id: string;
   /** Human-readable name. May be renamed post-hoc without breaking persistence. */
@@ -20,4 +20,4 @@ export interface AgentIdentity {
   species: Species;
   /** Optional personality dials read by the reasoner. */
   persona?: Persona;
-}
+};

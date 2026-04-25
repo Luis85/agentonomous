@@ -8,14 +8,14 @@ import type { Mood } from './Mood.js';
  * of the agent's state — deterministic under fixed inputs, which keeps
  * snapshot/restore trace equivalence intact.
  */
-export interface MoodEvaluationContext {
+export type MoodEvaluationContext = {
   needs: Needs | undefined;
   modifiers: Modifiers;
   persona: Persona | undefined;
   wallNowMs: number;
   previous: Mood | undefined;
-}
+};
 
-export interface MoodModel {
+export type MoodModel = {
   evaluate(ctx: MoodEvaluationContext): Mood;
-}
+};

@@ -8,7 +8,7 @@
  * Set `enabled: false` to disable auto-save entirely — consumers can still
  * call `agent.snapshot()` manually.
  */
-export interface AutoSavePolicy {
+export type AutoSavePolicy = {
   enabled?: boolean;
   /** Save every N ticks. Set to 0 or omit to disable tick-based saves. */
   everyTicks?: number;
@@ -16,7 +16,7 @@ export interface AutoSavePolicy {
   everyVirtualSeconds?: number;
   /** Save when any of these event types are published. */
   onEvents?: readonly string[];
-}
+};
 
 /** Default auto-save policy when consumers opt into persistence without specifying one. */
 export const DEFAULT_AUTOSAVE_POLICY: Readonly<Required<Omit<AutoSavePolicy, 'enabled'>>> & {

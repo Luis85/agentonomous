@@ -6,23 +6,23 @@
  * `ValidationResult` mirrors the shape of `Result<T, E>` but is defined here
  * so this port has no dependencies on anything else in the library.
  */
-export interface Validator {
+export type Validator = {
   /**
    * Validate `input` against `schema`. `schema` is intentionally typed as
    * `unknown` — each adapter knows how to interpret its own schema dialect.
    */
   validate<T = unknown>(schema: unknown, input: unknown): ValidationResult<T>;
-}
+};
 
 export type ValidationResult<T> =
   | { ok: true; value: T }
   | { ok: false; issues: readonly ValidationIssue[] };
 
-export interface ValidationIssue {
+export type ValidationIssue = {
   path: readonly (string | number)[];
   message: string;
   code?: string;
-}
+};
 
 /**
  * No-op validator: accepts every input unchanged. Intended as a no-op /

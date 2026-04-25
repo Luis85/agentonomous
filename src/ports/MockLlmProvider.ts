@@ -12,7 +12,7 @@ import type {
  * decides whether this entry fires for a given request; if omitted, the
  * script is matched only by position in the queue.
  */
-export interface MockLlmScript {
+export type MockLlmScript = {
   /** Optional predicate — if returns true, this script serves the request. */
   readonly match?: (messages: readonly LlmMessage[], options: LlmCompleteOptions) => boolean;
   /** Response text. */
@@ -23,10 +23,10 @@ export interface MockLlmScript {
   readonly model?: string;
   /** Stop reason reported. Defaults to `'stop'`. */
   readonly stopReason?: LlmCompletion['stopReason'];
-}
+};
 
 /** Construction options for `MockLlmProvider`. */
-export interface MockLlmProviderOptions {
+export type MockLlmProviderOptions = {
   /** Ordered list of scripted responses. */
   readonly scripts: readonly MockLlmScript[];
   /**
@@ -42,7 +42,7 @@ export interface MockLlmProviderOptions {
    *    `match` returns true; no positional fallback.
    */
   readonly dispatch?: 'queue' | 'match-or-error';
-}
+};
 
 /**
  * Deterministic `LlmProviderPort` for tests and golden-trace replays.

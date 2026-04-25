@@ -11,7 +11,7 @@ import type { AgentFacade } from './AgentFacade.js';
  * lands (see `docs/plans/2026-04-19-v1-comprehensive-plan.md#11--composable-kernel`).
  * Additions to this interface are minor bumps, not major.
  */
-export interface ReactiveHandler {
+export type ReactiveHandler = {
   /**
    * Event type string to match against `DomainEvent.type`, or the literal
    * `'*'` wildcard for all events. No globbing yet.
@@ -19,7 +19,7 @@ export interface ReactiveHandler {
   on: string;
   /** Handler invoked when the filter matches. */
   handle(event: DomainEvent, agent: AgentFacade): void | Promise<void>;
-}
+};
 
 /**
  * A plugin bundle registered with the agent. Lets consumers package related
@@ -32,7 +32,7 @@ export interface ReactiveHandler {
  * through `createAgent({ modules: [...] })` over reaching for the
  * underlying class directly.
  */
-export interface AgentModule {
+export type AgentModule = {
   id: string;
   /** Skills contributed by this module. */
   skills?: readonly Skill[];
@@ -42,4 +42,4 @@ export interface AgentModule {
   reactiveHandlers?: readonly ReactiveHandler[];
   /** Optional lifecycle hook run once during installation. */
   onInstall?(agent: AgentFacade): void;
-}
+};

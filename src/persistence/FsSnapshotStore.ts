@@ -5,21 +5,21 @@ import type { SnapshotStorePort } from './SnapshotStorePort.js';
  * Minimal fs surface the store needs. Consumers pass `node:fs/promises` or
  * a stub in tests.
  */
-export interface FsAdapter {
+export type FsAdapter = {
   readFile(path: string, encoding: 'utf8'): Promise<string>;
   writeFile(path: string, data: string, encoding: 'utf8'): Promise<void>;
   mkdir(path: string, opts: { recursive: true }): Promise<void | string | undefined>;
   readdir(path: string): Promise<string[]>;
   unlink(path: string): Promise<void>;
   access(path: string): Promise<void>;
-}
+};
 
-export interface FsSnapshotStoreOptions {
+export type FsSnapshotStoreOptions = {
   directory: string;
   fs: FsAdapter;
   /** Path separator. Defaults to `'/'`. */
   sep?: string;
-}
+};
 
 /**
  * Filesystem-backed snapshot store for Node consumers. Each key becomes a

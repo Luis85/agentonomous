@@ -11,7 +11,7 @@ import type { RandomEventContext, RandomEventDef } from './defineRandomEvent.js'
  * cumulative timestamp so the ticker can track per-def cooldowns without
  * owning its own clock.
  */
-export interface RandomEventTickOptions {
+export type RandomEventTickOptions = {
   virtualDtSeconds: number;
   /** Cumulative virtual time for cooldown tracking. */
   virtualNowSeconds: number;
@@ -19,7 +19,7 @@ export interface RandomEventTickOptions {
   needs: Needs | undefined;
   modifiers: Modifiers;
   stage: LifeStage | undefined;
-}
+};
 
 /**
  * Seeded per-tick random event dispatcher. Holds a registration-ordered list

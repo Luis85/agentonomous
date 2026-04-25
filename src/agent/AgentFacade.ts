@@ -22,7 +22,7 @@ import type { AgentIdentity } from './AgentIdentity.js';
  * `SkillContext` so that reactive handlers (which should not
  * arbitrarily mutate need levels) have a deliberately smaller surface.
  */
-export interface AgentFacade {
+export type AgentFacade = {
   readonly identity: AgentIdentity;
   readonly clock: WallClock;
   readonly rng: Rng;
@@ -47,4 +47,4 @@ export interface AgentFacade {
    * facade boundary.
    */
   getTimeScale(): number;
-}
+};

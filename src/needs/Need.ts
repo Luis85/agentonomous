@@ -10,7 +10,7 @@
  * that the `Reasoner` feeds into candidate scoring. The default curve is
  * `1 - level` — linear urgency as the need depletes.
  */
-export interface Need {
+export type Need = {
   id: string;
   /** Current level in [0, 1]. Clamped by `Needs` on mutation. */
   level: number;
@@ -24,10 +24,10 @@ export interface Need {
    * `NeedSafe`. Undefined = never emits critical.
    */
   criticalThreshold?: number;
-}
+};
 
 /** Result of a single Needs.tick() / satisfy() call for one need. */
-export interface NeedsDelta {
+export type NeedsDelta = {
   needId: string;
   before: number;
   after: number;
@@ -35,7 +35,7 @@ export interface NeedsDelta {
   crossedCritical: boolean;
   /** True if the level crossed `criticalThreshold` upward in this step. */
   crossedSafe: boolean;
-}
+};
 
 export const DEFAULT_URGENCY_CURVE = (level: number): number => 1 - clamp01(level);
 

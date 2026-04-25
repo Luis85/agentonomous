@@ -17,7 +17,7 @@ export type IntentionKind = 'express' | 'satisfy' | 'idle' | 'react' | 'do-task'
  * `NeedsPolicy` / reactive handlers / consumer-supplied reasoners;
  * consumed by the `BehaviorRunner` to produce `AgentAction`s.
  */
-export interface Intention {
+export type Intention = {
   kind: IntentionKind;
   /** Specific kind-qualified string, e.g. `'satisfy-need:hunger'`. */
   type: string;
@@ -25,4 +25,4 @@ export interface Intention {
   target?: string;
   /** Optional parameters for the behavior runner. */
   params?: Record<string, unknown>;
-}
+};
