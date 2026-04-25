@@ -220,10 +220,16 @@ export const learningMode: CognitionModeSpec = {
  * into a 5-dim `(features, oneHotLabel)` training pair for the bundled
  * `learning.network.json` topology.
  *
- * - Features = current need levels (hunger, cleanliness, happiness,
- *   energy, health). Read at score-time, so the snapshot reflects the
- *   post-skill levels — that's the input the network would have to
- *   classify against on the *next* tick.
+ * - Features = `details.preNeeds` snapshot — the pre-skill need levels
+ *   captured by `CognitionPipeline.invokeSkillAction` BEFORE the skill
+ *   runs. Reading post-skill levels (e.g. via `agent.getState().needs`
+ *   right now) would invert the policy direction: `feed` raises hunger
+ *   from low → high, so a label of "feed" against post-feed features
+ *   trains the network on "high hunger → feed" instead of the intended
+ *   "low hunger → feed". Falls back to current `agent.getState().needs`
+ *   only if the outcome arrived without a `preNeeds` snapshot, for
+ *   defensive compatibility with consumer-emitted outcomes (the
+ *   library's own pipeline always populates it).
  * - Label = one-hot 7-vector for SUCCESSFUL outcomes only. Successes
  *   for skill `id` set `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`.
  *
@@ -256,7 +262,12 @@ function projectLearningOutcome(
   const eff = (details as { effectiveness?: unknown }).effectiveness;
   if (typeof eff !== 'number' || !Number.isFinite(eff) || eff <= 0) return null;
 
-  const levels = agent.getState().needs;
+  // Prefer the pre-skill snapshot the pipeline captured before the skill
+  // mutated state; fall back to the live snapshot only when the outcome
+  // arrived without one. See JSDoc above for why post-skill features
+  // would invert the training direction.
+  const preNeeds = (details as { preNeeds?: Record<string, number> }).preNeeds;
+  const levels = preNeeds ?? agent.getState().needs;
   const features = [
     levels.hunger ?? 0,
     levels.cleanliness ?? 0,

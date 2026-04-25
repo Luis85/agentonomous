@@ -117,6 +117,13 @@ export class CognitionPipeline {
     wallNowMs: number,
   ): Promise<void> {
     const agent = this.agent;
+    // Snapshot the pre-skill need levels BEFORE any branch — every Stage-8
+    // score call (success + every failure path) needs them so consumer
+    // learners can build training pairs of the form
+    // (state_decided_from → action_chosen). Reading after `skills.invoke`
+    // returns would capture post-effect levels (e.g. `feed` raises hunger
+    // from low → high), inverting the policy direction.
+    const preNeeds = this.snapshotNeeds();
     // Stage capability gate.
     if (agent.ageModel && agent.stageCapabilities) {
       if (!stageAllowsSkill(agent.stageCapabilities, agent.ageModel.stage, skillId)) {
@@ -129,7 +136,7 @@ export class CognitionPipeline {
           message: `Skill '${skillId}' is blocked at stage '${agent.ageModel.stage}'.`,
         };
         agent.publishEvent(event);
-        this.scoreFailure(skillId, params, 'stage-blocked', event.message);
+        this.scoreFailure(skillId, params, 'stage-blocked', event.message, preNeeds);
         return;
       }
     }
@@ -143,7 +150,7 @@ export class CognitionPipeline {
         message: `No skill registered with id '${skillId}'.`,
       };
       agent.publishEvent(event);
-      this.scoreFailure(skillId, params, 'not-registered', event.message);
+      this.scoreFailure(skillId, params, 'not-registered', event.message, preNeeds);
       return;
     }
     // Expose the running skill to the animation reconciler. Scoped to this
@@ -171,7 +178,7 @@ export class CognitionPipeline {
         details: { cause: message },
       };
       agent.publishEvent(event);
-      this.scoreFailure(skillId, params, 'execution-threw', message);
+      this.scoreFailure(skillId, params, 'execution-threw', message, preNeeds);
       return;
     }
     agent.currentActiveSkillId = previousActive;
@@ -193,7 +200,10 @@ export class CognitionPipeline {
       agent.learner.score({
         intention: { kind: 'satisfy', type: skillId },
         actions: [{ type: 'invoke-skill', skillId, ...(params !== undefined ? { params } : {}) }],
-        details: { effectiveness },
+        details: {
+          effectiveness,
+          ...(preNeeds !== undefined ? { preNeeds } : {}),
+        },
       });
     } else {
       const event: SkillFailedEvent = {
@@ -206,26 +216,48 @@ export class CognitionPipeline {
         ...(result.error.details !== undefined ? { details: result.error.details } : {}),
       };
       agent.publishEvent(event);
-      this.scoreFailure(skillId, params, result.error.code, result.error.message);
+      this.scoreFailure(skillId, params, result.error.code, result.error.message, preNeeds);
     }
+  }
+
+  /**
+   * Snapshot the agent's current need levels into a plain object for
+   * inclusion on `LearningOutcome.details.preNeeds`. Returns `undefined`
+   * when the agent has no `Needs` subsystem (the snapshot field is
+   * omitted from `details` rather than emitting an empty object so
+   * consumers can `if (preNeeds === undefined)` cleanly).
+   */
+  private snapshotNeeds(): Record<string, number> | undefined {
+    const needs = this.agent.needs;
+    if (!needs) return undefined;
+    const snap: Record<string, number> = {};
+    for (const n of needs.list()) snap[n.id] = n.level;
+    return snap;
   }
 
   /**
    * Common Stage-8 hook for every SkillFailed branch. Mirrors the
    * success-side `score` call shape so consumers can switch on
    * `details.failed` to label the outcome (negative reward, one-hot
-   * `[0]`, or skip entirely depending on policy).
+   * `[0]`, or skip entirely depending on policy). `preNeeds` is the
+   * pre-skill snapshot captured at the top of `invokeSkillAction`.
    */
   private scoreFailure(
     skillId: string,
     params: Record<string, unknown> | undefined,
     code: string,
     message: string,
+    preNeeds: Record<string, number> | undefined,
   ): void {
     this.agent.learner.score({
       intention: { kind: 'satisfy', type: skillId },
       actions: [{ type: 'invoke-skill', skillId, ...(params !== undefined ? { params } : {}) }],
-      details: { failed: true, code, message },
+      details: {
+        failed: true,
+        code,
+        message,
+        ...(preNeeds !== undefined ? { preNeeds } : {}),
+      },
     });
   }
 

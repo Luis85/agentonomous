@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Agent, type AgentDependencies } from '../../../src/agent/Agent.js';
 import type { AgentIdentity } from '../../../src/agent/AgentIdentity.js';
-import { err } from '../../../src/agent/result.js';
+import { err, ok } from '../../../src/agent/result.js';
 import type { Learner, LearningOutcome } from '../../../src/cognition/learning/Learner.js';
 import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
 import { DirectBehaviorRunner } from '../../../src/cognition/behavior/DirectBehaviorRunner.js';
 import { INTERACTION_REQUESTED } from '../../../src/interaction/InteractionRequestedEvent.js';
+import { Needs } from '../../../src/needs/Needs.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
 import type { Skill } from '../../../src/skills/Skill.js';
@@ -146,5 +147,51 @@ describe('Stage 8 (score) on SkillFailed branches', () => {
       intention: { kind: 'satisfy', type: 'ghost' },
       details: { failed: true, code: 'not-registered' },
     });
+  });
+
+  it('captures pre-skill needs in outcome.details.preNeeds for the success branch', async () => {
+    // The skill mutates a need via the context (`satisfyNeed`). The score
+    // call MUST carry the level BEFORE the mutation, otherwise consumers
+    // would train on (post-effect state → action), inverting the policy.
+    const feeder: Skill = {
+      id: 'feeder',
+      label: 'Feeder',
+      baseEffectiveness: 1,
+      execute(_params, ctx) {
+        ctx.satisfyNeed('hunger', 0.5);
+        return Promise.resolve(ok({ effectiveness: 1 }));
+      },
+    };
+    const learner = recordingLearner();
+    const needs = new Needs([{ id: 'hunger', level: 0.2, decayPerSec: 0, criticalThreshold: 0.1 }]);
+    const agent = agentWithSkill(feeder, learner, { needs });
+    agent.interact('feeder');
+    await agent.tick(0.016);
+
+    expect(learner.calls).toHaveLength(1);
+    const details = learner.calls[0]?.details as { preNeeds?: Record<string, number> };
+    expect(details.preNeeds).toBeDefined();
+    // Pre-skill hunger ≈ 0.2 (initial level); post-skill would be 0.7.
+    // Tolerate tiny float drift; the key claim is "pre, not post".
+    expect(details.preNeeds!.hunger).toBeCloseTo(0.2, 5);
+  });
+
+  it('omits preNeeds when the agent has no Needs subsystem', async () => {
+    const failing: Skill = {
+      id: 'flop',
+      label: 'Flop',
+      baseEffectiveness: 1,
+      execute() {
+        return Promise.resolve(err({ code: 'forced-fail', message: 'nope' }));
+      },
+    };
+    const learner = recordingLearner();
+    const agent = agentWithSkill(failing, learner);
+    agent.interact('flop');
+    await agent.tick(0.016);
+
+    expect(learner.calls).toHaveLength(1);
+    const details = learner.calls[0]?.details as { preNeeds?: unknown };
+    expect(details.preNeeds).toBeUndefined();
   });
 });
