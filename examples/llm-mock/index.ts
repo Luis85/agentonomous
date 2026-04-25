@@ -4,12 +4,18 @@
  *
  * 1. Build a `MockLlmProvider` whose script queue scripts three
  *    completions in order.
- * 2. Wrap it in a tiny `LlmReasoner` that calls `provider.complete(...)`
- *    once per tick, parses the assistant text into an `Intention`.
- * 3. Run a `createAgent`-built agent under `SeededRng` + `ManualClock`
- *    for 5 ticks, capturing each `DecisionTrace`.
- * 4. Repeat the run from scratch and assert that the two trace arrays
- *    are byte-identical — proving determinism through an LLM-backed
+ * 2. Pre-compute one completion per tick by awaiting
+ *    `provider.complete(...)` ahead of time. Pre-computation keeps
+ *    the example clean of the impedance mismatch between
+ *    `Reasoner.selectIntention` (sync) and `provider.complete`
+ *    (async). A real adapter that needs per-tick freshness would
+ *    queue the next request from the prior tick's reactive handler.
+ * 3. Feed the pre-computed decisions into a tiny synchronous
+ *    `ScriptedReasoner` driving a `createAgent` agent under
+ *    `SeededRng` + `ManualClock` for 5 ticks.
+ * 4. Repeat the run from scratch with a freshly-constructed provider
+ *    + reasoner and assert that the two `DecisionTrace[]` arrays are
+ *    byte-identical — proving determinism through an LLM-backed
  *    reasoning path.
  *
  * No network, no real provider key, no `Date.now()`. The mock honours
@@ -26,66 +32,41 @@ import {
   type Intention,
   type LlmProviderPort,
   type Reasoner,
-  type ReasonerContext,
 } from 'agentonomous';
 
-// ── 1. Build the mock provider ──────────────────────────────────────────
-//
-// Three scripts: an "eat" decision, a "rest" decision, then a
-// "no-op" decision that yields null. The 4th and 5th ticks fall through
-// the queue → the provider rejects them, which the reasoner catches and
-// returns null for. That keeps the example small while still exercising
-// queue-exhaustion error handling.
-const provider: LlmProviderPort = new MockLlmProvider({
-  defaultModel: 'mock-llm-1',
-  scripts: [{ text: 'feed' }, { text: 'rest' }, { text: 'noop' }],
-});
+const TICKS = 5;
+const PROVIDER_SCRIPTS = [{ text: 'feed' }, { text: 'rest' }, { text: 'noop' }] as const;
 
-// ── 2. The reasoner: one provider.complete call per tick ───────────────
-//
-// In a real adapter you'd have a system prompt, a perception block, and
-// a structured-output schema. Here we just route plain text → intention
-// to keep the wiring legible.
-class LlmReasoner implements Reasoner {
-  // Manual field + assignment instead of a parameter property: Node's
-  // `--experimental-strip-types` mode (used by `npm run start`) parses
-  // TS-only syntax with a strip-only path that cannot handle parameter
-  // properties. See https://nodejs.org/api/typescript.html.
-  readonly provider: LlmProviderPort;
-  constructor(provider: LlmProviderPort) {
-    this.provider = provider;
-  }
+function buildProvider(): LlmProviderPort {
+  return new MockLlmProvider({
+    defaultModel: 'mock-llm-1',
+    scripts: PROVIDER_SCRIPTS.map((s) => ({ ...s })),
+  });
+}
 
-  selectIntention(_ctx: ReasonerContext): Intention | null {
-    // Reasoner.selectIntention is sync; the LLM is async. For a real
-    // adapter you'd queue work to the next tick. Here we cheat by
-    // pre-warming a single-completion result via a synchronous deferred
-    // so the example stays linear.
-    void this.runAsync().then((text) => {
-      lastDecision = text;
-    });
-    const decision = lastDecision;
-    lastDecision = null;
-    return decisionToIntention(decision);
-  }
-
-  private async runAsync(): Promise<string> {
+/**
+ * Pre-compute one decision per tick by awaiting `provider.complete`
+ * sequentially. Returns `''` for ticks past the script queue so the
+ * scripted reasoner produces a null intention (`noop`).
+ */
+async function precomputeDecisions(provider: LlmProviderPort, n: number): Promise<string[]> {
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
     try {
-      const completion = await this.provider.complete([
+      const completion = await provider.complete([
         { role: 'system', content: 'You are a pet care assistant. Reply with one verb.' },
         { role: 'user', content: 'What should the pet do next?' },
       ]);
-      return completion.text;
+      out.push(completion.text);
     } catch {
-      // Queue exhausted on tick 4+ — reasoner returns null on next tick.
-      return '';
+      // Queue exhausted past tick 3 — null intention on this tick.
+      out.push('');
     }
   }
+  return out;
 }
 
-let lastDecision: string | null = null;
-
-function decisionToIntention(text: string | null): Intention | null {
+function decisionToIntention(text: string): Intention | null {
   switch (text) {
     case 'feed':
       return { kind: 'satisfy', type: 'feed' };
@@ -96,67 +77,47 @@ function decisionToIntention(text: string | null): Intention | null {
   }
 }
 
-// ── 3. Run an agent for 5 ticks under fixed seed + manual clock ────────
+/**
+ * Synchronous reasoner backed by a pre-computed decision list. One
+ * instance per agent run — its cursor is private state so two parallel
+ * runs cannot interfere.
+ */
+class ScriptedReasoner implements Reasoner {
+  private cursor = 0;
+  readonly decisions: readonly string[];
+  constructor(decisions: readonly string[]) {
+    this.decisions = decisions;
+  }
+  selectIntention(): Intention | null {
+    const text = this.decisions[this.cursor++] ?? '';
+    return decisionToIntention(text);
+  }
+}
+
 async function runOnce(): Promise<DecisionTrace[]> {
-  const traces: DecisionTrace[] = [];
+  const provider = buildProvider();
+  const decisions = await precomputeDecisions(provider, TICKS);
   const cat = defineSpecies({ id: 'cat' });
   const agent = createAgent({
     id: 'whiskers',
     species: cat,
     rng: new SeededRng(0xc0ffee),
     clock: new ManualClock(0),
-    reasoner: new LlmReasoner(provider),
+    reasoner: new ScriptedReasoner(decisions),
     persistence: false,
   });
-  for (let i = 0; i < 5; i++) {
+  const traces: DecisionTrace[] = [];
+  for (let i = 0; i < TICKS; i++) {
     traces.push(await agent.tick(0.1));
   }
   return traces;
 }
 
-// ── 4. Two runs under identical seed + provider script → identical traces
 const runA = await runOnce();
+const runB = await runOnce();
 
-// Reset the provider's script cursor by constructing a fresh one with the
-// same scripts. (MockLlmProvider doesn't expose a `reset()` — building a
-// new instance with identical opts is the canonical way to replay.)
-const providerB: LlmProviderPort = new MockLlmProvider({
-  defaultModel: 'mock-llm-1',
-  scripts: [{ text: 'feed' }, { text: 'rest' }, { text: 'noop' }],
-});
-class LlmReasonerB implements Reasoner {
-  selectIntention(_ctx: ReasonerContext): Intention | null {
-    void providerB
-      .complete([
-        { role: 'system', content: 'You are a pet care assistant. Reply with one verb.' },
-        { role: 'user', content: 'What should the pet do next?' },
-      ])
-      .then((c) => {
-        lastDecision = c.text;
-      })
-      .catch(() => undefined);
-    const decision = lastDecision;
-    lastDecision = null;
-    return decisionToIntention(decision);
-  }
-}
-
-const traces2: DecisionTrace[] = [];
-{
-  const cat = defineSpecies({ id: 'cat' });
-  const agent = createAgent({
-    id: 'whiskers',
-    species: cat,
-    rng: new SeededRng(0xc0ffee),
-    clock: new ManualClock(0),
-    reasoner: new LlmReasonerB(),
-    persistence: false,
-  });
-  for (let i = 0; i < 5; i++) traces2.push(await agent.tick(0.1));
-}
-
-const a = JSON.stringify(runA, replacer);
-const b = JSON.stringify(traces2, replacer);
+const a = JSON.stringify(runA);
+const b = JSON.stringify(runB);
 if (a !== b) {
   // eslint-disable-next-line no-console
   console.error('DETERMINISM VIOLATED — traces differ between runs.');
@@ -164,16 +125,4 @@ if (a !== b) {
 }
 
 // eslint-disable-next-line no-console
-console.log(`OK — ${runA.length} ticks, byte-identical across two runs.`);
-
-/**
- * `JSON.stringify` replacer that strips fields the LLM-driven path
- * can't make deterministic across instances (object identity for
- * `perceived` payloads carrying `Date`-derived fields, etc.).
- *
- * For this example all paths are deterministic already so the replacer
- * is a no-op — kept here to make the determinism boundary explicit.
- */
-function replacer(_key: string, value: unknown): unknown {
-  return value;
-}
+console.log(`OK — ${TICKS} ticks, byte-identical across two runs.`);
