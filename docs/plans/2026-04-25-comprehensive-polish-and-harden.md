@@ -85,6 +85,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
 | 3   | TBD | `chore/ci-actions-sha-pinning`               | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
 | 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
+| 11  | #109 | `refactor/persona-bias-extract-helper`      | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
 
 ---
 
@@ -349,12 +350,20 @@ similar to row 7's pattern.
 Split queue-mode vs match-or-error strategies into two functions; the
 single 80-line body mixes both.
 
-### 11 — `personaBias` arrow complexity 16
+### 11 — `personaBias` arrow complexity 16 — **shipped**
 
 **Branch:** `refactor/persona-bias-extract-helper`
 
-Extract inner weight calculation as a named helper so the main arrow
-becomes a `map` over scored candidates.
+**As shipped:** the per-rule weight calculation in
+`src/cognition/personaBias.ts` was lifted into a module-level
+`weightForRule(rule, intentionType, traits): number` helper. The
+exported `defaultPersonaBias` arrow now reads as a flat
+`TRAIT_RULES.reduce((bias, rule) => bias + weightForRule(...), 0)` over
+the existing data-driven trait table — the same shape the row description
+called for, with the helper fronting the per-candidate evaluation. Public
+surface (the `defaultPersonaBias` export, the `PersonaBiasFn` type, and
+the `TRAIT_RULES` table) is byte-identical. No test changes (coverage
+flows through the existing `UrgencyReasoner` suite). No changeset.
 
 ### 12 — Non-null assertions cleanup
 
