@@ -50,14 +50,17 @@ const TRAIT_RULES: readonly TraitRule[] = [
   },
 ];
 
+// Per-rule contribution: zero when the matcher misses, otherwise the
+// trait's value scaled by its tuned weight. Pulled out so the dispatcher
+// stays a flat `reduce` and ESLint's complexity rule doesn't need to
+// climb back toward the 15-branch ceiling as new rules land.
+function weightForRule(rule: TraitRule, intentionType: string, traits: Persona['traits']): number {
+  if (!rule.matches(intentionType)) return 0;
+  return (traits[rule.trait] ?? 0) * PERSONA_TRAIT_WEIGHTS[rule.trait];
+}
+
 export const defaultPersonaBias: PersonaBiasFn = (intentionType, persona) => {
   if (!persona) return 0;
   const traits = persona.traits;
-  let bias = 0;
-  for (const rule of TRAIT_RULES) {
-    if (rule.matches(intentionType)) {
-      bias += (traits[rule.trait] ?? 0) * PERSONA_TRAIT_WEIGHTS[rule.trait];
-    }
-  }
-  return bias;
+  return TRAIT_RULES.reduce((bias, rule) => bias + weightForRule(rule, intentionType, traits), 0);
 };
