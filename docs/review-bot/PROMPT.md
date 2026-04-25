@@ -100,23 +100,40 @@ git diff <last-sha>..origin/develop
 
 # Output format
 
-Per finding:
+Compute a stable ID per finding before writing: `<head-sha[:7]>.<idx>`,
+where `idx` is 1-based within this run, assigned **after** counter-arg
+pruning, in the priority order findings are written.
 
-```
-[SEVERITY] path/to/file.ts:42
-Problem: <one line>
-Why it matters: <one line, concrete failure mode>
-Fix:
-```
+Per finding (Markdown checklist item with embedded ID marker):
 
+````markdown
+- [ ] **[SEVERITY]** `path/to/file.ts:42` — short title <!-- f:<sha7>.<idx> -->
+  <details><summary>details</summary>
+
+  **Problem:** <one line>
+
+  **Why it matters:** <one line, concrete failure mode>
+
+  **Fix:**
+
+  ```diff
+  - bad
+  + good
+  ```
+
+  </details>
 ````
-```diff
-- bad
-+ good
-```
-````
 
-End with:
+Rules:
+- The HTML comment marker `<!-- f:... -->` MUST be the last token on
+  the checklist line. Renderers hide it; the `review-fix-shipped`
+  Action keys off it.
+- Severity in bold + brackets: `**[BLOCKER]**`, `**[MAJOR]**`,
+  `**[MINOR]**`, `**[NIT]**`.
+- The short title is the first line of the original `Problem:`,
+  trimmed to ≤ 80 chars, no trailing period.
+
+End the comment with the run footer:
 
 - Reviewed range: `<last-sha>..<head-sha>` (`<N>` commits, `<M>` files)
 - Blockers: N
@@ -140,7 +157,9 @@ End with:
   Reviewed: <last-sha>..<head-sha> (<N> commits)
   Blockers: N | Majors: N | Minors: N | Nits: N
 
-  <full findings block>
+  <checklist of findings, see Output format>
+
+  <run footer>
   ```
 
 - If no new commits: append a one-line comment
@@ -165,7 +184,11 @@ End with:
   ---
   ```
 
-- Body: full findings block (same content as the issue comment).
+- Body: full findings block (same content as the issue comment —
+  checklist of findings + run footer).
+- The daily doc is an immutable snapshot of that run; the
+  `review-fix-shipped` Action edits the rolling issue comment only,
+  never the daily doc.
 - If no new commits: skip file creation. Do NOT commit an empty doc.
 
 ## Commit + PR flow (NEVER push direct to develop)
