@@ -136,6 +136,12 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Activates the matrix-selected tfjs backend (see
+    // `tests/setup/tfjsBackend.ts`) BEFORE any test file's static
+    // imports run. No-op for non-tfjs tests — the import is cheap and
+    // the side effect (registering a backend factory) is harmless when
+    // no `TfjsReasoner` is constructed.
+    setupFiles: ['./tests/setup/tfjsBackendSetup.ts'],
     // Resolve `agentonomous` + its adapter subpaths against `src/` at test
     // time. Without this, vitest hits the root `package.json` exports
     // map (→ `./dist/*`), which requires a prior `npm run build` — but

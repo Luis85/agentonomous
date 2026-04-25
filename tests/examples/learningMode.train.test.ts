@@ -3,9 +3,12 @@
  * DOM test for the demo's Train button + learning-mode training
  * persistence flow. Mounts the real cognitionSwitcher against a fake
  * agent and drives the train → persist → rehydrate → reset lifecycle
- * end-to-end against the real tfjs adapter (CPU backend).
+ * end-to-end against the real tfjs adapter (matrix-selected backend —
+ * cpu by default; wasm under `TFJS_BACKEND=wasm`).
  */
-import '@tensorflow/tfjs-backend-cpu';
+// Backend package is side-effect-imported by `tests/setup/tfjsBackendSetup.ts`
+// before this file's static imports run, so the `tf.getBackend()` assertion
+// in `beforeAll` is the only thing left to align.
 import * as tf from '@tensorflow/tfjs-core';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -16,6 +19,7 @@ import {
   SOFTMAX_SKILL_IDS,
 } from '../../examples/nurture-pet/src/cognition/learning.js';
 import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
+import { TEST_BACKEND } from '../setup/tfjsBackend.js';
 
 type FakeAgent = {
   setReasoner: Mock<(r: unknown) => void>;
@@ -36,7 +40,7 @@ type FakeAgent = {
 };
 
 beforeAll(async () => {
-  await tf.setBackend('cpu');
+  await tf.setBackend(TEST_BACKEND);
   await tf.ready();
 });
 
