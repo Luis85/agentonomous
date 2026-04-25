@@ -26,7 +26,13 @@ concurrency:
 
 jobs:
   flip-tracker-checkbox:
-    if: github.event.pull_request.merged == true
+    # Only fire on PRs merged INTO develop. The tracker (#87
+    # "Daily code review — develop") is explicitly scoped to that
+    # branch. A hotfix-to-main or demo-promotion PR carrying a copied
+    # `Refs #87 finding:<id>` line would otherwise flip the tracker
+    # even though the fix never landed on develop, creating a false
+    # shipped state.
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'develop'
     runs-on: ubuntu-latest
     steps:
       - name: Flip tracker checkbox(es) for shipped finding(s)
