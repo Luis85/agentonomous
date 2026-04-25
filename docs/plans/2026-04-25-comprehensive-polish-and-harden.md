@@ -83,6 +83,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 18  | #96 | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; small library addition (`details.preModifierCount` snapshot). |
 | 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
 | 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
+| 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
 | 11  | TBD | `refactor/persona-bias-extract-helper`       | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
 
 ---
