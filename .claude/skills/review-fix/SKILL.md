@@ -80,6 +80,15 @@ Three pagination / shape subtleties matter:
 3. The newest comment may be a no-op summary with no findings. Filter
    to comments whose body contains `<!-- f:` _before_ taking `last`,
    so sweep mode picks the most recent comment that has work to do.
+4. When `last` is applied to an empty array it returns `null`, but a
+   bare `| {id, body}` projection turns that into the misleading
+   `{"id":null,"body":null}` — i.e. truthy JSON. Guard the projection
+   with `if . == null then empty else {id, body} end` so an
+   "everything is no-op" run yields a genuinely empty `LAST_COMMENT`.
+5. Finding-marker text can legitimately appear inside a finding's
+   `<details>` body or diff block (the bot quotes other comments).
+   Parse IDs only from checklist lines (`- [ ]` / `- [x]`) so quoted
+   marker templates inside bodies are not mistaken for real findings.
 
 ```bash
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
@@ -89,9 +98,16 @@ LAST_COMMENT="$(gh api "repos/${REPO}/issues/87/comments" \
         | map(select(.body | contains("<!-- f:")))
         | sort_by(.created_at)
         | last
-        | {id, body}')"
+        | if . == null then empty else {id, body} end')"
+
+if [ -z "${LAST_COMMENT}" ] || [ "${LAST_COMMENT}" = "null" ]; then
+  echo "No comment on #87 contains findings — nothing to sweep" >&2
+  exit 1
+fi
+
 echo "${LAST_COMMENT}" | jq -r '.body' \
-  | grep -oE '<!-- f:[^ ]+ -->' \
+  | grep -E '^- \[[ x]\] ' \
+  | grep -oE '<!-- f:[A-Za-z0-9]+\.[0-9]+ -->' \
   | sed -E 's/<!-- f:(.+) -->/\1/'
 ```
 
@@ -103,10 +119,6 @@ For each ID returned:
 - Skip if `.worktrees/fix-review-<slug>` already exists (log
   `Skipping <id> (worktree exists at <path>)` and continue).
 - Otherwise, run steps 2 → 5 for that finding.
-
-If `LAST_COMMENT` is empty / `null` (every comment on `#87` is a
-no-op or the issue has no comments at all), hard-fail with
-`No comment on #87 contains findings — nothing to sweep`.
 
 ### 2. Extract finding fields
 
