@@ -17,7 +17,8 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "reserved"
   },
   "keywords": [
     "agent",
