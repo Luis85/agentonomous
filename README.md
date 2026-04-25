@@ -283,6 +283,40 @@ The listener fires synchronously on every event and receives the current
 `getState()` slice (`id`, `stage`, `needs`, `modifiers`, `mood`,
 `animation`, `halted`, `ageSeconds`). Call `unsubscribe()` to detach.
 
+## LLM provider port (preview)
+
+Agent reasoning can be backed by an LLM via the `LlmProviderPort`
+contract. v1.0 ships the completion-only surface (one
+`complete(messages, opts)` call → one `LlmCompletion`); streaming +
+tool-use land in Phase B as additive methods on the same port —
+existing adapters keep working unchanged.
+
+The library ships **`MockLlmProvider`** for deterministic playback in
+tests and golden-trace replays. Concrete `AnthropicLlmProvider` /
+`OpenAiLlmProvider` adapters are deferred to Phase B; for now consumers
+either wrap their own provider against the port or run against the
+mock.
+
+```ts
+import { MockLlmProvider, type LlmProviderPort } from 'agentonomous';
+
+const provider: LlmProviderPort = new MockLlmProvider({
+  defaultModel: 'mock-llm-1',
+  scripts: [{ text: 'feed' }, { text: 'rest' }, { text: 'noop' }],
+});
+
+const completion = await provider.complete([
+  { role: 'system', content: 'You are a pet care assistant. Reply with one verb.' },
+  { role: 'user', content: 'What should the pet do next?' },
+]);
+// completion.text === 'feed'
+```
+
+A full end-to-end runnable example — `MockLlmProvider` →
+`LlmReasoner` → `createAgent` under `SeededRng` + `ManualClock`,
+asserting byte-identical traces across two runs — lives in
+[`examples/llm-mock/`](./examples/llm-mock/README.md).
+
 ## Development
 
 ```bash

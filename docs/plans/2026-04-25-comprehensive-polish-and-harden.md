@@ -59,6 +59,25 @@ pre-1.0 PRs ship clean-break shape changes, never compat shims. PR
 #72 burned 11 fixups defending against a v1 layout no consumer had on
 disk.
 
+### B — 2026-04-25 batch (PRs #76 → #84 + #85, merged 2026-04-25)
+
+The current session shipped 9 rows from this roadmap. The recommended
+order (1 → 2 → 5 → 6 → 7 → 8 → 9 → 13 → 14 → 15) was followed
+end-to-end, with each PR Codex-reviewed and resolved before the next.
+
+| Row | PR  | Branch                                       | Outcome                                                                                |
+| --- | --- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | #76 | `chore/ci-dry-release-and-size-comment`      | release.yml DRY'd via `npm run verify`; size-limit-action posts gzip delta on PR CI.   |
+| 2   | #77 | `chore/ci-npm-audit-gate`                    | `npm audit --omit=dev --audit-level=high` job chained into `test.needs`.               |
+| 5   | #78 | `docs/codebase-review-fixups`                | README pre-v1 banner, CONTRIBUTING commit-rule cleanup, vite stale extern, CLAUDE.md.  |
+| 6   | #79 | `chore/changeset-base-branch`                | `.changeset/config.json` baseBranch flipped `main` → `develop`.                        |
+| 7   | #80 | `refactor/createAgent-buildAgentDeps`        | `createAgent` cyclomatic 59 → <15 via `internal/buildAgentDeps.ts`.                    |
+| 8   | #81 | `refactor/agent-tick-helper-split`           | `Agent.tick` 21 → <15 via `internal/tickHelpers.ts`.                                   |
+| 9   | #82 | `refactor/agent-restore-and-constructor`     | constructor 23 + `runRestore` 23 → <15 via `internal/agentDepsResolver.ts` + per-slice helpers. |
+| 13  | #83 | `feat/demo-loss-curve`                       | SVG sparkline of `history.loss` under Train button.                                    |
+| 14  | #84 | `feat/demo-train-epoch-progress`             | `TfjsReasoner.train` `onEpochEnd` callback (minor bump); demo HUD goes live mid-fit.   |
+| 15  | #85 | `feat/llm-port-example-and-readme`           | README LLM section, `examples/llm-mock/` deterministic playback example, vision spec status update. |
+
 ---
 
 ## Verify gate (baseline)
@@ -597,6 +616,14 @@ versions).
 5. **Owner merges.** Don't merge your own PRs. After merge: `git
 switch develop && git pull --ff-only origin develop && git fetch
 --prune origin && git branch -d <topic>`.
+6. **Plan + docs ride with the PR.** When a PR completes a row in
+   this plan, mark it shipped (or move it under "What's already
+   shipped") IN THE SAME PR. When the PR changes user-visible surface
+   (`README.md`, `STYLE_GUIDE.md`, `PUBLISHING.md`, the matching
+   spec), update those docs in the same diff. No "docs catch-up"
+   follow-up PRs — stale plans force a second review cycle and
+   degrade Codex review quality. Captured in `MEMORY.md →
+   feedback_docs_alongside_pr.md`.
 
 The full loop is captured in `MEMORY.md → feedback_pr_workflow.md`.
 

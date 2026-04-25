@@ -1,0 +1,13 @@
+{
+  "name": "agentonomous-llm-mock-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal Node example: deterministic LLM-backed reasoner via MockLlmProvider.",
+  "scripts": {
+    "start": "node --experimental-strip-types index.ts"
+  },
+  "dependencies": {
+    "agentonomous": "file:../.."
+  }
+}
