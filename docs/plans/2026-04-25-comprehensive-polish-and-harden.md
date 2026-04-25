@@ -83,8 +83,9 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 18  | #96 | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; small library addition (`details.preModifierCount` snapshot). |
 | 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
 | 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
+| 3   | TBD | `chore/ci-actions-sha-pinning`               | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
 | 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
-| 11  | TBD | `refactor/persona-bias-extract-helper`       | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
+| 11  | #109 | `refactor/persona-bias-extract-helper`      | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
 
 ---
 
@@ -207,16 +208,30 @@ time.
 **DoD:** A test PR adding a known-vulnerable dep fails the gate.
 Current `develop` (post-tfjs swap) passes.
 
-### 3 — Actions SHA pinning
+### 3 — Actions SHA pinning — **shipped**
 
 **Branch:** `chore/ci-actions-sha-pinning`
 
-Replace mutable tags (`actions/checkout@v6`, etc.) with full 40-char
-commit SHAs. Add a one-line bumper script under `scripts/` so future
-updates don't bit-rot.
+**As shipped:**
 
-**When:** Low priority until 1.0 is on the horizon — supply-chain
-rigor for a published library, not a development necessity.
+- Every `uses:` reference across `ci.yml`, `pages.yml`, `release.yml`,
+  `release-candidate.yml`, and `review-fix-shipped.yml` was pinned to
+  a full 40-char commit SHA with the version label preserved as a
+  trailing `# <vX.Y.Z>` comment. Tags resolved via `gh api
+  repos/<owner>/<repo>/git/ref/tags/<tag>`, peeling annotated tags
+  through `git/tags/<sha>` where required. Eight unique actions, 31
+  total references.
+- `scripts/bump-actions.mjs` (Node ESM, no deps; shells out to `gh
+  api`) walks every workflow, parses each pin via regex, queries each
+  action's latest release tag, and prints a status table with
+  `up-to-date` / `PENDING` / `unresolved` / `no-releases` rows. Exits
+  non-zero when any pin lags behind its repo's latest release so the
+  signal is easy to wire into a future scheduled bot. Read-only — no
+  auto-write; humans re-resolve via `gh api` and edit the workflow.
+- Header comment added to `ci.yml` documenting the pin convention so
+  future readers don't reach for tag bumps directly.
+
+**No changeset** — CI-only. **No library change.**
 
 ### 4 — Backend + OS matrix
 

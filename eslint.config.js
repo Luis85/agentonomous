@@ -40,7 +40,12 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['eslint.config.js', 'vite.config.ts', '*.config.ts'],
+          allowDefaultProject: [
+            'eslint.config.js',
+            'vite.config.ts',
+            '*.config.ts',
+            'scripts/*.mjs',
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -265,6 +270,38 @@ export default tseslint.config(
       'max-nested-callbacks': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+  // Node-only one-shot ESM scripts under `scripts/*.mjs`. They run via
+  // plain `node`, never through the lib's TS toolchain, so the
+  // type-checked rules from `recommendedTypeChecked` either misfire
+  // (no `tsconfig` covers them) or false-positive on `JSON.parse` and
+  // `execFileSync` returns. Treat them like config files: Node
+  // globals on, type-aware rules off.
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+      },
+    },
+    rules: {
+      'no-restricted-globals': 'off',
+      'no-restricted-syntax': 'off',
+      'no-console': 'off',
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
+      complexity: 'off',
+      'max-depth': 'off',
+      'max-nested-callbacks': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
     },
   },
   // Allow Date/Math.random inside the concrete system port adapters.
