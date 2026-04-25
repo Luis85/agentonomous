@@ -7,7 +7,12 @@ import type { Intention } from './Intention.js';
  */
 export interface IntentionCandidate {
   intention: Intention;
-  /** Urgency / priority in [0, 1]. Higher is better. */
+  /**
+   * Urgency / priority in `[0, 1]` — urgency-aligned, larger means more
+   * urgent. Acts as the primary discriminant when the reasoner picks a
+   * winner: when two candidates have equal `score`, the policy's source
+   * order wins (first contributor's candidate beats later contributors).
+   */
   score: number;
   /** Origin of this candidate — helps debugging and trace inspection. */
   source: 'needs' | 'task' | 'reactive' | 'plugin' | (string & {});

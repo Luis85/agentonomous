@@ -29,6 +29,15 @@ MVP is a virtual-pet nurture demo (`examples/nurture-pet`).
   after the fact means cherry-picking, three parallel review rounds, and
   three verify cycles. Only share a branch when a later task genuinely
   depends on an earlier unmerged one (rare).
+- **Worktrees per topic branch.** All feature / refactor / chore work
+  happens in an isolated `git worktree` under `.worktrees/<branch-slug>`.
+  Worktree directory is `.worktrees/` (gitignored). This keeps
+  `D:\Projects\agent-library` itself on `develop` so multiple parallel
+  agents (one per worktree) can each run `npm install` / `npm test` /
+  `npm run dev` without stepping on each other's `node_modules` or vite
+  caches. After PR merges: prune the worktree via
+  `git worktree remove .worktrees/<branch-slug>` then delete the local
+  branch. Never edit `develop` directly outside of post-merge pulls.
 - **Post-merge cleanup.** After a PR merges: `git switch develop && git
 pull origin develop && git branch -d <topic>`. Delete the remote topic
   branch via the merged-PR UI (or `git push origin --delete <topic>` if

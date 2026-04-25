@@ -59,9 +59,12 @@ export class SkillRegistry {
   }
 
   /**
-   * Invoke a skill by id. Throws `SkillInvocationError` if the skill isn't
-   * registered (infrastructure failure). Returns the skill's `Result` for
-   * domain-level success/failure.
+   * Invoke a skill by id. Returns the skill's `Result` for domain-level
+   * success/failure; infrastructure failures (unregistered id) throw.
+   *
+   * @throws {SkillInvocationError} If no skill is registered under `id`.
+   *   Unregistered invocation is a wiring bug, not a domain error, so it
+   *   surfaces as a typed `AgentError` rather than an `err(...)`.
    */
   async invoke(
     id: string,
