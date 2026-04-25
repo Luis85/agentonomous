@@ -22,6 +22,36 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Filter paths (code vs docs-only)
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'tests/**'
+              - 'examples/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'vite.config.*'
+              - 'vitest.config.*'
+              - 'eslint.config.*'
+              - '.github/workflows/**'
+              - 'size-limit.config.*'
+              - '.size-limit.*'
+
   format-check:
     name: Format (Prettier)
     runs-on: ubuntu-latest
@@ -40,6 +70,8 @@ jobs:
 
   lint:
     name: Lint (ESLint)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -56,6 +88,8 @@ jobs:
 
   typecheck:
     name: Typecheck (tsc --noEmit)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -103,6 +137,8 @@ jobs:
 
   docs:
     name: API docs (typedoc)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -126,7 +162,8 @@ jobs:
   test:
     name: Test (Vitest + coverage)
     runs-on: ubuntu-latest
-    needs: [format-check, lint, typecheck, actionlint, audit, docs]
+    needs: [changes, format-check, lint, typecheck, actionlint, audit, docs]
+    if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -143,7 +180,8 @@ jobs:
   build:
     name: Build & size budget
     runs-on: ubuntu-latest
-    needs: test
+    needs: [changes, test]
+    if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -162,12 +200,15 @@ jobs:
   size-limit-comment:
     name: Size-limit PR comment (gzip delta)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [changes, build]
     # Run after build for ordering, but post the delta comment
     # regardless of build outcome — the size-budget failure is exactly
-    # when the reviewer needs to see which bytes regressed.
+    # when the reviewer needs to see which bytes regressed. Skip on
+    # docs-only PRs since `build` is skipped there and there are no
+    # bundle bytes to compare.
     if: |
       always()
+      && needs.changes.outputs.code == 'true'
       && github.event_name == 'pull_request'
       && needs.build.result != 'cancelled'
       && needs.build.result != 'skipped'
@@ -192,7 +233,8 @@ jobs:
   demo-build:
     name: Demo build (examples/nurture-pet)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -211,3 +253,31 @@ jobs:
       - name: Build demo (vite build)
         working-directory: examples/nurture-pet
         run: npm run build
+
+  ci-gate:
+    # Single required status check on `develop` / `main` / `demo`. Treats
+    # legitimately-skipped jobs (docs-only PRs) as success while still
+    # failing on any actual job failure or cancellation. Wire branch
+    # protection to require ONLY this check — keeps the gate stable when
+    # adding/removing jobs above.
+    name: CI gate (required check)
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - format-check
+      - lint
+      - typecheck
+      - actionlint
+      - audit
+      - docs
+      - test
+      - build
+      - demo-build
+    if: always()
+    steps:
+      - name: Verify all needed jobs succeeded or were skipped
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          echo "$NEEDS_JSON"
+          echo "$NEEDS_JSON" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")'
