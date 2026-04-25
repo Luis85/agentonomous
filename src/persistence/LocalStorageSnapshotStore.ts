@@ -16,13 +16,13 @@ const META_INDEX_KEY = '__agentonomous/meta/index';
 const DATA_PREFIX = '__agentonomous/data/';
 
 /** Minimal storage contract; browser `Storage` satisfies this. */
-export interface StorageLike {
+export type StorageLike = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
-}
+};
 
-export interface LocalStorageSnapshotStoreOptions {
+export type LocalStorageSnapshotStoreOptions = {
   /** Prefix for keys. Defaults to `'agentonomous/'`. */
   prefix?: string;
   /**
@@ -30,7 +30,7 @@ export interface LocalStorageSnapshotStoreOptions {
    * consumers can inject `sessionStorage` or a stub in tests.
    */
   storage?: StorageLike;
-}
+};
 
 /**
  * Snapshot store backed by a `Storage`-like object (typically

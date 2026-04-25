@@ -12,18 +12,18 @@ import { OFFLINE_CATCHUP_DEFAULTS } from '../cognition/tuning.js';
  * Works for any subsystem that respects determinism — a fixed seed + a
  * fixed chunk size produce byte-identical traces.
  */
-export interface CatchUpOptions {
+export type CatchUpOptions = {
   /** Fixed chunk size in virtual seconds. Default: 0.5. */
   chunkVirtualSeconds?: number;
   /** Hard cap on chunks processed per call — guards against pathological deltas. */
   maxChunks?: number;
-}
+};
 
-export interface CatchUpResult {
+export type CatchUpResult = {
   chunksProcessed: number;
   totalVirtualSeconds: number;
   truncated: boolean;
-}
+};
 
 /**
  * Split `totalVirtualDtSeconds` into fixed chunks and invoke `step` for each.

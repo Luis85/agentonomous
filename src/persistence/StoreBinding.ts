@@ -28,13 +28,13 @@ import type { AgentState } from './AgentState.js';
  */
 export type AgentStateListener = (state: AgentState, event: DomainEvent) => void;
 
-export interface BindOptions {
+export type BindOptions = {
   /**
    * Emit an initial state snapshot synchronously. Defaults to `true` so the
    * consumer store is hydrated before any event arrives.
    */
   emitInitial?: boolean;
-}
+};
 
 /**
  * Subscribe to agent state changes, invoking `listener` on every event
