@@ -86,6 +86,8 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 3   | TBD | `chore/ci-actions-sha-pinning`               | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
 | 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
 | 11  | #109 | `refactor/persona-bias-extract-helper`      | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
+| 12  | —   | `refactor/non-null-assertion-cleanups`       | Closed as obsolete. All 4 target sites (`TfjsReasoner.ts:34`, `TfjsSnapshot.ts:45`, `MockLlmProvider.ts:166,173`) already non-null-assertion-free post-PR #108 (`MockLlmProvider` split) and earlier tfjs cleanups. `npm run lint` reports 0 non-null-assertion warnings repo-wide. No code change needed. |
+| 22  | TBD | `chore/peer-deps-pin-minimums`               | Replaced `"*"` peer ranges for `@anthropic-ai/sdk` / `openai` / `sim-ecs` / `excalibur` with real semver minimums. `excalibur` pinned to `^0.32.0` (matches devDeps). The other three are aspirational forward-compat hooks (no actual `import` from `src/` / `tests/` / `examples/`); pinned to latest stable major (`@anthropic-ai/sdk ^0.91.0`, `openai ^6.0.0`, `sim-ecs ^0.6.0`) so consumers don't accept arbitrary majors. No changeset (pre-1.0 metadata-only). |
 
 ---
 
@@ -365,16 +367,17 @@ surface (the `defaultPersonaBias` export, the `PersonaBiasFn` type, and
 the `TRAIT_RULES` table) is byte-identical. No test changes (coverage
 flows through the existing `UrgencyReasoner` suite). No changeset.
 
-### 12 — Non-null assertions cleanup
+### 12 — Non-null assertions cleanup — **shipped (obsolete)**
 
 **Branch:** `refactor/non-null-assertion-cleanups`
 
-Four sites: `TfjsReasoner.ts:34` (shuffle), `TfjsSnapshot.ts:45`
-(byte copy), `MockLlmProvider.ts:166,173` (post-length-check). All
-idiomatic under `noUncheckedIndexedAccess`. Either rewrite as
-`for…of` (eliminates the index-access narrowing) or wrap in an
-`assertDefined` helper for documentation value. Not urgent — kept on
-the menu so the lint warning count keeps shrinking.
+**As shipped:** all four target sites — `TfjsReasoner.ts:34`,
+`TfjsSnapshot.ts:45`, `MockLlmProvider.ts:166,173` — were already
+non-null-assertion-free as of develop @ f6e4464. PR #108
+(`MockLlmProvider.completeSync` split) removed the two `MockLlm`
+sites; the tfjs sites had been cleaned in earlier adapter work.
+`npm run lint` reports 0 `@typescript-eslint/no-non-null-assertion`
+warnings repo-wide. Closed as obsolete; no code change needed.
 
 ---
 
@@ -702,15 +705,27 @@ baseline, set at -2% floor.
 
 **Cost:** XS.
 
-### 22 — Peer deps pin minimums
+### 22 — Peer deps pin minimums — **shipped**
 
 **Branch:** `chore/peer-deps-pin-minimums`
 
-`package.json:117,123,124,120` — `@anthropic-ai/sdk`, `openai`,
-`sim-ecs`, `excalibur` all declare `"*"`. Allowing any major version
-is risky for consumers. Pin minimums (e.g. `^0.32.0` for excalibur,
-`^0.27.0` for Anthropic SDK, etc. — match the actually-tested
-versions).
+**As shipped:** `package.json#peerDependencies` no longer accepts
+arbitrary majors for the four wide-open peers.
+
+- `excalibur`: `*` → `^0.32.0` (matches `devDependencies` floor —
+  the version the integrations adapter is actually tested against).
+- `@anthropic-ai/sdk`: `*` → `^0.91.0` (latest stable; not in
+  `devDependencies` because no concrete `AnthropicLlmProvider`
+  ships in v1 — port + `MockLlmProvider` only).
+- `openai`: `*` → `^6.0.0` (same rationale; no concrete OpenAI
+  adapter ships in v1).
+- `sim-ecs`: `*` → `^0.6.0` (forward-compat hook; no `sim-ecs`
+  integration ships in v1, only mentioned as a future Phase B
+  surface).
+
+The latter three remain in `peerDependenciesMeta` as `optional` so
+consumers without an LLM / ECS path don't see install warnings.
+Metadata-only change; pre-1.0 has no consumers, so no changeset.
 
 **Cost:** S.
 
