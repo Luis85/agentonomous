@@ -3,6 +3,12 @@
 Project memory for Claude Code. Keep this file terse — details belong in
 `CONTRIBUTING.md`, `STYLE_GUIDE.md`, `PUBLISHING.md`, and the source.
 
+> **Shared project memory lives in [`.claude/memory/`](./.claude/memory/).**
+> Start with [`.claude/memory/MEMORY.md`](./.claude/memory/MEMORY.md) for
+> the index. Those files capture release posture, review workflow, and
+> conventions every contributor (human or agent) should know about — they
+> supplement, not duplicate, this file.
+
 ## What this repo is
 
 `agentonomous` — a TypeScript library for autonomous agents in browser /
