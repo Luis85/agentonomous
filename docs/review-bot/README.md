@@ -97,3 +97,5 @@ just noisy in the rolling issue.
 - Output dumps: `docs/daily-reviews/YYYY-MM-DD.md`
 - CI workflow: `.github/workflows/ci.yml`
 - Branch policy + workflow rules: `CLAUDE.md`, `CONTRIBUTING.md`
+
+<!-- smoke test for ci path filter -->
