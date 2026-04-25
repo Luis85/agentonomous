@@ -47,9 +47,50 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   process.exit(0);
 }
 
-/** @type {(args: string[]) => string} */
-function gh(args) {
-  return execFileSync('gh', args, { encoding: 'utf8' }).trim();
+/**
+ * Coerce an `execFileSync` failure's `stderr` (Buffer | string | unknown)
+ * to a plain UTF-8 string. Avoids the `String(buffer)` cast that
+ * `@typescript-eslint/no-base-to-string` flags on `unknown`.
+ */
+function stderrText(err) {
+  if (!err || typeof err !== 'object' || !('stderr' in err)) return '';
+  const raw = /** @type {{ stderr: unknown }} */ (err).stderr;
+  if (typeof raw === 'string') return raw;
+  if (raw instanceof Uint8Array) return new TextDecoder().decode(raw);
+  return '';
+}
+
+/**
+ * Run `gh api` and bucket the outcome into ok / 404 / error so callers can
+ * tell "endpoint reports nothing" apart from "tooling/auth/network failure"
+ * and surface the latter loudly instead of silently returning null.
+ *
+ * @param {string[]} args
+ * @returns {{ ok: true; value: string }
+ *   | { ok: false; kind: 'not-found' }
+ *   | { ok: false; kind: 'error'; status: number | undefined; stderr: string; cause: unknown }}
+ */
+function ghTry(args) {
+  try {
+    return { ok: true, value: execFileSync('gh', args, { encoding: 'utf8' }).trim() };
+  } catch (err) {
+    const stderr = stderrText(err);
+    const status =
+      err && typeof err === 'object' && 'status' in err
+        ? Number(/** @type {{ status: unknown }} */ (err).status) || undefined
+        : undefined;
+    if (/HTTP 404|Not Found/i.test(stderr)) {
+      return { ok: false, kind: 'not-found' };
+    }
+    const fallback = err instanceof Error ? err.message : '';
+    return {
+      ok: false,
+      kind: 'error',
+      status,
+      stderr: stderr.trim() || fallback,
+      cause: err,
+    };
+  }
 }
 
 /** Parse a single `uses:` line, returning the pin record or null. */
@@ -78,50 +119,83 @@ function listWorkflowFiles(dir) {
   return out;
 }
 
-/** Resolve the latest release tag for `owner/repo`, or null if none. */
+/**
+ * Resolve the latest release tag for `owner/repo`. Returns `null` only on
+ * a clean 404 (the project really has no GitHub Releases). On any other
+ * `gh api` failure (missing CLI, expired auth, network blip, rate limit,
+ * 5xx) this throws so the caller can fail loud — the previous "swallow
+ * everything as null" form let those errors masquerade as no-releases and
+ * silently exit 0.
+ */
 function latestReleaseTag(owner, repo) {
-  try {
-    return gh(['api', `repos/${owner}/${repo}/releases/latest`, '--jq', '.tag_name']);
-  } catch {
-    return null;
-  }
+  const r = ghTry(['api', `repos/${owner}/${repo}/releases/latest`, '--jq', '.tag_name']);
+  if (r.ok) return r.value;
+  if (r.kind === 'not-found') return null;
+  const exit = r.status !== undefined ? ` (exit ${r.status})` : '';
+  throw new Error(
+    `gh api releases/latest failed for ${owner}/${repo}${exit}: ${r.stderr || '(no stderr)'}`,
+    { cause: r.cause },
+  );
 }
 
 /**
- * Resolve a tag to its commit SHA, peeling annotated tags. Returns null on
- * 404 (tag does not exist) or when the ref points at neither a commit nor
- * a peelable tag — the caller treats those as "no comparison possible".
+ * Resolve a tag to its commit SHA, peeling annotated tags. Returns `null`
+ * only on a clean 404 (tag missing) or when the ref points at neither a
+ * commit nor a peelable tag — the caller treats those as "no comparison
+ * possible". Any other `gh api` failure throws so transient tooling /
+ * network errors surface instead of being silently coerced to "unresolved".
  */
 function tagToCommitSha(owner, repo, tag) {
-  let refJson;
-  try {
-    refJson = gh(['api', `repos/${owner}/${repo}/git/ref/tags/${tag}`]);
-  } catch {
-    return null;
+  const refRes = ghTry(['api', `repos/${owner}/${repo}/git/ref/tags/${tag}`]);
+  if (!refRes.ok) {
+    if (refRes.kind === 'not-found') return null;
+    const exit = refRes.status !== undefined ? ` (exit ${refRes.status})` : '';
+    throw new Error(
+      `gh api git/ref/tags/${tag} failed for ${owner}/${repo}${exit}: ${refRes.stderr || '(no stderr)'}`,
+      { cause: refRes.cause },
+    );
   }
   let parsed;
   try {
-    parsed = JSON.parse(refJson);
-  } catch {
-    return null;
+    parsed = JSON.parse(refRes.value);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : '';
+    throw new Error(
+      `Failed to parse gh api ref/tags/${tag} response for ${owner}/${repo}: ${detail}`,
+      { cause: err },
+    );
   }
   const obj = parsed?.object;
   if (!obj) return null;
   if (obj.type === 'commit') return obj.sha;
   if (obj.type === 'tag') {
-    try {
-      const tagJson = gh(['api', `repos/${owner}/${repo}/git/tags/${obj.sha}`]);
-      const tagParsed = JSON.parse(tagJson);
-      return tagParsed?.object?.sha ?? null;
-    } catch {
-      return null;
+    const tagRes = ghTry(['api', `repos/${owner}/${repo}/git/tags/${obj.sha}`]);
+    if (!tagRes.ok) {
+      if (tagRes.kind === 'not-found') return null;
+      const exit = tagRes.status !== undefined ? ` (exit ${tagRes.status})` : '';
+      throw new Error(
+        `gh api git/tags/${obj.sha} failed for ${owner}/${repo}${exit}: ${tagRes.stderr || '(no stderr)'}`,
+        { cause: tagRes.cause },
+      );
     }
+    let tagParsed;
+    try {
+      tagParsed = JSON.parse(tagRes.value);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : '';
+      throw new Error(
+        `Failed to parse gh api git/tags/${obj.sha} response for ${owner}/${repo}: ${detail}`,
+        { cause: err },
+      );
+    }
+    return tagParsed?.object?.sha ?? null;
   }
   return null;
 }
 
 const files = listWorkflowFiles(workflowsDir);
-/** @type {Map<string, { sha: string; label: string; sources: string[] }>} */
+/** @typedef {{ sha: string; label: string; sources: string[] }} PinVariant */
+/** @type {Map<string, PinVariant[]>} */
 const pins = new Map();
 
 for (const file of files) {
@@ -131,16 +205,17 @@ for (const file of files) {
     const parsed = parseUses(rawLine);
     if (!parsed) continue;
     const key = `${parsed.owner}/${parsed.repo}`;
-    const existing = pins.get(key);
-    if (existing) {
-      if (existing.sha !== parsed.sha || existing.label !== parsed.label) {
-        existing.sources.push(`${rel} (DIVERGENT: ${parsed.sha.slice(0, 7)} ${parsed.label})`);
-      } else {
-        existing.sources.push(rel);
-      }
-    } else {
-      pins.set(key, { sha: parsed.sha, label: parsed.label, sources: [rel] });
+    let variants = pins.get(key);
+    if (!variants) {
+      variants = [];
+      pins.set(key, variants);
     }
+    let variant = variants.find((v) => v.sha === parsed.sha && v.label === parsed.label);
+    if (!variant) {
+      variant = { sha: parsed.sha, label: parsed.label, sources: [] };
+      variants.push(variant);
+    }
+    variant.sources.push(rel);
   }
 }
 
@@ -152,29 +227,74 @@ if (pins.size === 0) {
 console.log(`Inspecting ${pins.size} unique action(s) across ${files.length} workflow file(s).`);
 console.log('');
 
+/**
+ * @typedef {{
+ *   action: string;
+ *   pinnedLabel: string;
+ *   pinnedSha: string;
+ *   latestLabel: string;
+ *   latestSha: string;
+ *   status: 'up-to-date' | 'PENDING' | 'no-releases' | 'unresolved' | 'DIVERGENT' | 'ERROR';
+ *   variants: PinVariant[];
+ *   errorMsg?: string;
+ * }} Row
+ */
+/** @type {Row[]} */
 const rows = [];
-for (const [action, { sha, label, sources }] of pins) {
+
+for (const [action, variants] of pins) {
   const [owner, repo] = action.split('/');
-  const latest = latestReleaseTag(owner, repo);
-  const latestSha = latest ? tagToCommitSha(owner, repo, latest) : null;
-  let status;
-  if (!latest) {
-    status = 'no-releases';
-  } else if (!latestSha) {
-    status = 'unresolved';
-  } else if (latestSha === sha) {
-    status = 'up-to-date';
-  } else {
-    status = 'PENDING';
+  let latest = null;
+  /** @type {string | null} */
+  let latestSha = null;
+  /** @type {string | undefined} */
+  let errorMsg;
+  try {
+    latest = latestReleaseTag(owner, repo);
+    if (latest) latestSha = tagToCommitSha(owner, repo, latest);
+  } catch (err) {
+    errorMsg = err instanceof Error ? err.message : String(err);
   }
+  if (errorMsg !== undefined) {
+    rows.push({
+      action,
+      pinnedLabel: variants.length === 1 ? variants[0].label : `(${variants.length} variants)`,
+      pinnedSha: variants.length === 1 ? variants[0].sha.slice(0, 7) : '—',
+      latestLabel: '—',
+      latestSha: '—',
+      status: 'ERROR',
+      variants,
+      errorMsg,
+    });
+    continue;
+  }
+  if (variants.length > 1) {
+    rows.push({
+      action,
+      pinnedLabel: `(${variants.length} variants)`,
+      pinnedSha: '—',
+      latestLabel: latest ?? '—',
+      latestSha: latestSha ? latestSha.slice(0, 7) : '—',
+      status: 'DIVERGENT',
+      variants,
+    });
+    continue;
+  }
+  const v = variants[0];
+  /** @type {Row['status']} */
+  let status;
+  if (!latest) status = 'no-releases';
+  else if (!latestSha) status = 'unresolved';
+  else if (latestSha === v.sha) status = 'up-to-date';
+  else status = 'PENDING';
   rows.push({
     action,
-    pinnedLabel: label,
-    pinnedSha: sha.slice(0, 7),
+    pinnedLabel: v.label,
+    pinnedSha: v.sha.slice(0, 7),
     latestLabel: latest ?? '—',
     latestSha: latestSha ? latestSha.slice(0, 7) : '—',
     status,
-    sources,
+    variants,
   });
 }
 
@@ -212,19 +332,43 @@ for (const r of rows) {
 }
 
 const pending = rows.filter((r) => r.status === 'PENDING');
+const divergent = rows.filter((r) => r.status === 'DIVERGENT');
+const errored = rows.filter((r) => r.status === 'ERROR');
 console.log('');
-if (pending.length === 0) {
-  console.log('All pinned actions match their latest release.');
-} else {
+if (pending.length > 0) {
   console.log(`${pending.length} pending bump(s):`);
   for (const r of pending) {
+    const v = r.variants[0];
     console.log(`  - ${r.action}: ${r.pinnedLabel} → ${r.latestLabel}`);
     console.log(
-      `      gh api repos/${r.action}/git/ref/tags/${r.latestLabel}  # peel + verify, then edit ${r.sources[0]}`,
+      `      gh api repos/${r.action}/git/ref/tags/${r.latestLabel}  # peel + verify, then edit ${v.sources[0]}`,
     );
   }
 }
+if (divergent.length > 0) {
+  if (pending.length > 0) console.log('');
+  console.log(`${divergent.length} divergent pin(s) (same action, multiple SHA/label tuples):`);
+  for (const r of divergent) {
+    console.log(`  - ${r.action}: latest=${r.latestLabel} (${r.latestSha})`);
+    for (const v of r.variants) {
+      console.log(`      ${v.sha.slice(0, 7)}  # ${v.label}`);
+      for (const s of v.sources) console.log(`        ${s}`);
+    }
+  }
+}
+if (errored.length > 0) {
+  if (pending.length > 0 || divergent.length > 0) console.log('');
+  console.log(`${errored.length} action(s) failed to resolve:`);
+  for (const r of errored) {
+    console.log(`  - ${r.action}: ${r.errorMsg ?? '(no message)'}`);
+  }
+}
+if (pending.length === 0 && divergent.length === 0 && errored.length === 0) {
+  console.log('All pinned actions match their latest release.');
+}
 
-// Exit non-zero on PENDING so this script can gate a CI bot if desired
-// later; today it's run by humans on demand.
-process.exit(pending.length === 0 ? 0 : 1);
+// Exit non-zero on PENDING/DIVERGENT/ERROR so this script can gate a CI
+// bot if desired later; today it's run by humans on demand. Failing on
+// ERROR (rather than treating tooling/auth/network failures as "no
+// releases") keeps the gate honest under broken-tooling conditions.
+process.exit(pending.length === 0 && divergent.length === 0 && errored.length === 0 ? 0 : 1);
