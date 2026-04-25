@@ -29,9 +29,15 @@ function makeLcg(seed: number): () => number {
  * permuted but reuses the same element references.
  */
 function seededShuffle<T>(arr: T[], rng: () => number): void {
+  // `noUncheckedIndexedAccess` widens `arr[i]` to `T | undefined`. The
+  // loop bounds keep both indices in range, so the cast back to `T` is
+  // safe and avoids non-null assertions.
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+    const a = arr[i] as T;
+    const b = arr[j] as T;
+    arr[i] = b;
+    arr[j] = a;
   }
 }
 
