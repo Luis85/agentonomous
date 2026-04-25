@@ -44,12 +44,17 @@ jobs:
 
             const prNumber = context.payload.pull_request.number;
 
-            // Track write-side failures separately so the run fails at the
-            // end if any flip could not be persisted. Read-side failures
-            // (listComments 404, etc.) stay soft — a finding pointing at
-            // a non-existent issue is a content bug in the PR body, not
-            // a problem with the automation.
-            let writeFailures = 0;
+            // Track hard failures across both read and write phases so the
+            // run fails at the end if any flip could not be persisted or
+            // any non-404 API error masked a flip. Only "expected content
+            // misses" stay soft:
+            //   - listComments 404 (target issue does not exist — PR-body
+            //     content bug, not an automation problem),
+            //   - finding not present in the comment body,
+            //   - line already shipped or shape unexpected.
+            // Everything else (403/429/5xx/network on either read or write)
+            // increments hardFailures and triggers core.setFailed at the end.
+            let hardFailures = 0;
 
             for (const m of matches) {
               const [, issueStr, sha7, idxStr] = m;
@@ -116,14 +121,23 @@ jobs:
                   });
                   core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
                 } catch (writeErr) {
-                  writeFailures++;
+                  hardFailures++;
                   core.error(`Failed to write flip for ${findingId} in #${issueNumber}: ${writeErr.message}`);
                 }
               } catch (readErr) {
-                core.warning(`Failed to read comments for #${issueNumber} (finding ${findingId}): ${readErr.message}. Continuing with remaining matches.`);
+                // 404 on listComments = "target issue does not exist" =
+                // soft (PR-body content bug). Anything else (403, 429,
+                // 5xx, network) is a transient/permissions failure that
+                // would silently drop a valid flip — fail loudly.
+                if (readErr.status === 404) {
+                  core.warning(`Issue #${issueNumber} not found (finding ${findingId}). Skipping.`);
+                } else {
+                  hardFailures++;
+                  core.error(`Failed to read comments for #${issueNumber} (finding ${findingId}): ${readErr.message} (status ${readErr.status ?? 'n/a'})`);
+                }
               }
             }
 
-            if (writeFailures > 0) {
-              core.setFailed(`${writeFailures} flip write(s) failed; tracker comment is out of sync. Review run logs and re-run after fixing the underlying issue.`);
+            if (hardFailures > 0) {
+              core.setFailed(`${hardFailures} flip(s) failed (read or write); tracker comment is out of sync. Review run logs and re-run after fixing the underlying issue.`);
             }
