@@ -438,6 +438,13 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
    * indicates a broken environment.
    */
   static async detectBestBackend(): Promise<'webgl' | 'wasm' | 'cpu'> {
+    // Snapshot the prior backend (may be empty string when tf hasn't
+    // initialized any backend yet). If every probe fails, attempt to
+    // restore it before throwing — a failed `tf.setBackend` can leave
+    // `engine.backendInstance` cleared, so a later inference call from
+    // an unrelated code path would otherwise hit a broken global state
+    // (Codex P1 round 10).
+    const prior = tf.getBackend();
     for (const name of BACKEND_PROBE_ORDER) {
       try {
         await loadBackendModule(name);
@@ -448,6 +455,21 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
         }
       } catch {
         // Factory threw (e.g. WebGL in headless Node). Try next.
+      }
+    }
+    // All-failed path: best-effort restore of the prior backend so the
+    // rejection doesn't silently corrupt global tf state. If `prior`
+    // was empty (no backend ever initialized) or the restore itself
+    // throws, leave tf in whatever state the loop ended on — the
+    // caller's `cpu`-bundled invariant has already been violated, so
+    // there is no clean fallback.
+    if (prior !== '') {
+      try {
+        await tf.setBackend(prior);
+        await tf.ready();
+      } catch {
+        // Best-effort — surfacing this as a separate error would mask
+        // the more useful rejection below.
       }
     }
     throw new Error(
