@@ -127,6 +127,16 @@ export type TrainOptions = {
   learningRate?: number;
   shuffle?: boolean;
   seed?: number;
+  /**
+   * Per-epoch progress callback. Fires synchronously after each
+   * `model.fit` epoch completes with the 0-indexed epoch number and
+   * that epoch's loss. Use it to drive a progress UI ("Training… 42/100")
+   * or a live loss-curve renderer.
+   *
+   * @remarks Determinism note: the callback runs on the same backend +
+   * microtask stage as the rest of the fit; no scheduling is added.
+   */
+  onEpochEnd?: (epoch: number, loss: number) => void;
 };
 
 /**
@@ -247,12 +257,22 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
     const featuresTensor = tf.tensor(shuffled.map((p) => p.features) as never);
     const labelsTensor = tf.tensor(shuffled.map((p) => p.label) as never);
 
+    const onEpochEnd = opts.onEpochEnd;
     try {
       const history = await this.model.fit(featuresTensor, labelsTensor, {
         epochs,
         batchSize,
         shuffle: false,
         verbose: 0,
+        ...(onEpochEnd
+          ? {
+              callbacks: {
+                onEpochEnd: (epoch: number, logs?: { loss?: number }) => {
+                  if (logs?.loss !== undefined) onEpochEnd(epoch, logs.loss);
+                },
+              },
+            }
+          : {}),
       });
       const lossHistory = (history.history.loss as number[]).slice();
       return {

@@ -20,7 +20,13 @@ type TrainResultLike = {
 type TrainableReasoner = {
   train: (
     pairs: Array<{ features: number[]; label: number[] }>,
-    opts?: { epochs?: number; learningRate?: number; seed?: number; shuffle?: boolean },
+    opts?: {
+      epochs?: number;
+      learningRate?: number;
+      seed?: number;
+      shuffle?: boolean;
+      onEpochEnd?: (epoch: number, loss: number) => void;
+    },
   ) => Promise<TrainResultLike>;
   toJSON: () => unknown;
   dispose?: () => void;
@@ -251,10 +257,25 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         const urgency = 1 - min;
         return { features, label: [urgency] };
       });
+      // Live mid-fit progress: update the button text + push points
+      // into the sparkline as each epoch completes. Both branches are
+      // gated on the run still owning the active reasoner so a stale
+      // callback after a mode switch doesn't leak into the new HUD.
+      const liveLosses: number[] = [];
       const result = await reasoner.train!(pairs, {
         epochs: TRAIN_EPOCHS,
         learningRate: 0.1,
         seed: Math.floor(trainRng() * 0x7fff_ffff),
+        onEpochEnd: (epoch, loss) => {
+          if (disposed) return;
+          if (reasonerHandle !== activeReasoner || activeModeId !== 'learning') return;
+          // `epoch` is 0-indexed; show 1-indexed N/M.
+          trainBtn.textContent = `Training… ${epoch + 1}/${TRAIN_EPOCHS}`;
+          liveLosses.push(loss);
+          if (sparkline && liveLosses.length >= 2) {
+            renderLossSparkline(sparkline, liveLosses);
+          }
+        },
       });
       try {
         const snapshot = reasoner.toJSON!();
