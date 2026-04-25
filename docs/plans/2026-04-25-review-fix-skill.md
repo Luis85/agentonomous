@@ -677,6 +677,13 @@ finding body byte-for-byte — no paraphrasing, no reflowing, no
 cosmetic edits. The point of the migration is structural (add
 checklist + ID markers) only; content stays as the bot wrote it.
 
+One safety check: scan the verbatim bodies for any stray
+`<!-- f:...-->` token. The Action's marker search would match the
+first occurrence in the comment, so a nested marker (highly
+unlikely, but possible if the bot ever quoted itself) would point
+the flip at the wrong line. If you find one, escape it (e.g.
+`<!-- f-quoted:... -->`) before pasting.
+
 In a scratch file `/tmp/issue87-new-body.md`, paste the original
 header (`## YYYY-MM-DD — <head-sha>` + `Reviewed:` + counts), then
 rewrite the two findings as checklist items:
@@ -717,7 +724,8 @@ jq -Rs '{body: .}' < /tmp/issue87-new-body.md \
       --input -
 ```
 
-Expected: 200 OK with the new body echoed.
+Expected: `gh` prints the updated comment JSON (no error). HTTP
+errors surface as non-zero exit.
 
 - [ ] **Step 5.4: Visually verify the rendered comment**
 
@@ -803,9 +811,9 @@ gh pr create --base develop \
 - One-time migration of issue #87's latest comment to the new format (synthetic IDs `682b557.1`, `682b557.2`).
 
 ## Migration
-- Edited comment ID: \`<COMMENT_ID>\` on issue #87.
+- Edited comment ID: `<COMMENT_ID>` on issue #87.
 - Synthetic IDs assigned: `682b557.1` (BLOCKER, interface→type sweep), `682b557.2` (MINOR, MockLlmProvider eager validation).
-- Pre-edit snapshot kept at \`/tmp/issue87-last-comment.json\` on the author's machine; reviewers can request it for diffing.
+- Pre-edit snapshot kept at `/tmp/issue87-last-comment.json` on the author's machine; reviewers can request it for diffing.
 
 ## Test plan
 - [ ] `npm run verify` green (doc-only diff outside `.github/` so most stages are no-ops; `actionlint` enforces the workflow YAML).
