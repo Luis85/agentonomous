@@ -1,0 +1,95 @@
+name: review-fix-shipped
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: review-fix-shipped-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  flip-tracker-checkbox:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flip tracker checkbox(es) for shipped finding(s)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const re = /^Refs #(\d+) finding:([0-9a-f]{7})\.(\d+)\s*$/gm;
+            const matches = [...body.matchAll(re)];
+
+            if (matches.length === 0) {
+              core.info('No "Refs #<n> finding:<sha7>.<idx>" line in PR body. Nothing to flip.');
+              return;
+            }
+
+            const prNumber = context.payload.pull_request.number;
+
+            for (const m of matches) {
+              const [, issueStr, sha7, idxStr] = m;
+              const issueNumber = Number(issueStr);
+              const findingId = `${sha7}.${idxStr}`;
+              const marker = `<!-- f:${findingId} -->`;
+
+              core.info(`Looking for ${marker} in #${issueNumber} comments...`);
+
+              const iterator = github.paginate.iterator(
+                github.rest.issues.listComments,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  per_page: 100,
+                },
+              );
+
+              let hit = null;
+              for await (const { data: page } of iterator) {
+                hit = page.find((c) => c.body && c.body.includes(marker));
+                if (hit) break;
+              }
+
+              if (!hit) {
+                core.warning(`Finding ${findingId} not found in #${issueNumber}. Skipping.`);
+                continue;
+              }
+
+              // Locate the line containing the marker by string ops (no
+              // regex escaping needed). Markers are unique per finding ID,
+              // so a single substring search is sufficient.
+              const markerIdx = hit.body.indexOf(marker);
+              const lineStart = hit.body.lastIndexOf('\n', markerIdx) + 1;
+              const lineEndRaw = hit.body.indexOf('\n', markerIdx);
+              const lineEnd = lineEndRaw === -1 ? hit.body.length : lineEndRaw;
+              const line = hit.body.slice(lineStart, lineEnd);
+
+              if (line.startsWith('- [x] ')) {
+                core.warning(`Finding ${findingId} already shipped. Skipping.`);
+                continue;
+              }
+              if (!line.startsWith('- [ ] ')) {
+                core.warning(`Marker ${marker} found but checklist line shape unexpected: ${line.slice(0, 40)}... Skipping.`);
+                continue;
+              }
+
+              const newLine = line
+                .replace('- [ ] ', '- [x] ')
+                .replace(` ${marker}`, ` (shipped in #${prNumber}) ${marker}`);
+              const newBody = hit.body.slice(0, lineStart) + newLine + hit.body.slice(lineEnd);
+
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: hit.id,
+                body: newBody,
+              });
+
+              core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
+            }
