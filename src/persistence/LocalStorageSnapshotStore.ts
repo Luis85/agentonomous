@@ -123,6 +123,14 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
     }
     this.storage.setItem(encoded, JSON.stringify(snapshot));
     this.appendIndex(key);
+    // Lazily stamp the re-entrance sentinel on the first write. The
+    // constructor deliberately skips this for empty stores so
+    // read-only / quota-exceeded backends can still construct a load-
+    // only store. Once the consumer does write, we have to record
+    // that the store is in v2 shape — otherwise a subsequent
+    // construction would scan the new-layout entries we just wrote
+    // and mis-migrate them as v1 user keys.
+    this.ensureMigrationMarker();
     return Promise.resolve();
   }
 
@@ -175,6 +183,15 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
 
   private indexKey(): string {
     return this.prefix + META_INDEX_KEY;
+  }
+
+  private ensureMigrationMarker(): void {
+    // Idempotent: read first so a backend that rejects duplicate
+    // writes doesn't re-stamp on every save.
+    if (this.storage.getItem(this.prefix + META_MIGRATED_KEY) === MIGRATED_MARKER_VALUE) {
+      return;
+    }
+    this.storage.setItem(this.prefix + META_MIGRATED_KEY, MIGRATED_MARKER_VALUE);
   }
 
   private appendIndex(key: string): void {

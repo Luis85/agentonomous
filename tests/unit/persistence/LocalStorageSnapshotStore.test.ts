@@ -511,6 +511,35 @@ describe('LocalStorageSnapshotStore — keyspace split (PR #2 remediation)', () 
     expect(await store.load('good')).toMatchObject({ identity: { id: 'good' } });
   });
 
+  it('construct → save → construct → load round-trips cleanly on iterable backend', async () => {
+    // Codex P0 on f8930fd: the prior fresh-install-no-writes fix
+    // left the migrated sentinel unset, so a subsequent construction
+    // re-scanned the v2 entries saved in between and mis-migrated
+    // them as if they were v1 user keys. The marker must be stamped
+    // lazily on the first save so subsequent constructions
+    // short-circuit before their orphan scan runs.
+    const storage = new FakeStorage();
+
+    // First construction — fresh empty store.
+    const store1 = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+    await store1.save('alpha', snap('alpha', 1));
+    expect(await store1.load('alpha')).toMatchObject({ identity: { id: 'alpha' } });
+    expect([...(await store1.list())]).toEqual(['alpha']);
+
+    // Sanity: marker is now present in raw storage.
+    expect(storage.getItem('p/__agentonomous/meta/migrated')).not.toBeNull();
+
+    // Second construction over the same storage — simulates a page
+    // reload or fresh process. Must see the saved data intact.
+    const store2 = new LocalStorageSnapshotStore({ storage, prefix: 'p/' });
+    expect(await store2.load('alpha')).toMatchObject({ identity: { id: 'alpha' } });
+    expect([...(await store2.list())]).toEqual(['alpha']);
+
+    // Raw storage shape should not have changed across reconstruction.
+    expect(storage.getItem('p/__agentonomous/data/alpha')).not.toBeNull();
+    expect(storage.getItem('p/__agentonomous/meta/index')).not.toBeNull();
+  });
+
   it('fresh install does not perform any storage writes during construction', () => {
     // A store constructed against empty storage must not call setItem
     // at all. Otherwise a read-only / quota-exceeded backend would
