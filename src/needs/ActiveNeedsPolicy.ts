@@ -13,12 +13,12 @@ import type { NeedsPolicy } from './NeedsPolicy.js';
  * The policy does not verify preconditions (e.g., "food in inventory") —
  * that's the behavior runner's job in M7+.
  */
-export interface ActiveNeedsPolicyOptions {
+export type ActiveNeedsPolicyOptions = {
   /** Urgency floor. Default: 0.3. */
   minUrgency?: number;
   /** Per-need intention type override. */
   satisfierByNeed?: Readonly<Record<string, string>>;
-}
+};
 
 /** Emits `kind: 'satisfy'` intentions for self-directed agents. */
 export class ActiveNeedsPolicy implements NeedsPolicy {

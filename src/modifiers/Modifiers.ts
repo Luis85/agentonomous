@@ -7,10 +7,10 @@ import { NumericModifierResolver } from './NumericModifierResolver.js';
  * Reason a modifier left the collection — used by `Modifiers.tick(...)` to
  * report expirations upstream.
  */
-export interface ModifierRemoval {
+export type ModifierRemoval = {
   modifier: Modifier;
   reason: 'expired' | 'removed' | 'replaced';
-}
+};
 
 /**
  * Cross-cutting buff/debuff collection. Consulted every tick by Needs,

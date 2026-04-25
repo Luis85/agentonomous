@@ -14,8 +14,8 @@ import type { ModifierTarget } from './ModifierTarget.js';
  *   3. `add` effects are summed onto the result.
  *   4. `clamp` effects bound the output (lowest `clamp` wins as ceiling).
  */
-export interface ModifierEffect {
+export type ModifierEffect = {
   target: ModifierTarget;
   kind: 'add' | 'multiply' | 'clamp' | 'set';
   value: number;
-}
+};

@@ -2,14 +2,14 @@ import { DECEASED_STAGE, type LifeStage } from './LifeStage.js';
 import type { LifeStageSchedule } from './LifeStageSchedule.js';
 
 /** Result of a single AgeModel.advance() call. */
-export interface LifeStageTransition {
+export type LifeStageTransition = {
   from: LifeStage;
   to: LifeStage;
   atAgeSeconds: number;
-}
+};
 
 /** Construction options for AgeModel. */
-export interface AgeModelOptions {
+export type AgeModelOptions = {
   /** Wall-clock ms at which the agent was born. Used for snapshot rebinding. */
   bornAt: number;
   /** Ordered schedule of age → stage transitions. */
@@ -18,7 +18,7 @@ export interface AgeModelOptions {
   initialAgeSeconds?: number;
   /** Current life stage. Defaults to the first schedule entry (or 'egg'). */
   initialStage?: LifeStage;
-}
+};
 
 /**
  * Tracks an agent's virtual age and advances its life stage on thresholds.
