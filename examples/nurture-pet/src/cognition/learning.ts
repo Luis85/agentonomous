@@ -39,6 +39,15 @@ export const SOFTMAX_SKILL_IDS = [
 const SOFTMAX_DIM = SOFTMAX_SKILL_IDS.length;
 
 /**
+ * Input feature width — matches `featuresFromNeeds`'s return length (the
+ * 5 normalized need levels). Hydration rejects snapshots whose model's
+ * input layer expects a different last-dim so a width mismatch fails
+ * fast at construct() rather than at runtime when `model.predict` first
+ * receives a 5-element vector.
+ */
+const FEATURE_DIM = 5;
+
+/**
  * Idle floor for the learning-mode `interpret()` gate. The network's
  * softmax output is a probability distribution over the 7 active-care
  * skills — when the max probability sits below this floor the pet idles
@@ -179,17 +188,25 @@ export const learningMode: CognitionModeSpec = {
         featuresOf: featuresFromNeeds,
         interpret: (output) => interpretSoftmax(output),
       });
-      // Reject snapshots whose output dimension doesn't match the
-      // bundled topology. A pre-row-17 snapshot (single sigmoid output,
-      // length 1) loads fine through `fromJSON` but its scalar urgency
-      // bears no resemblance to a 7-way softmax — silently treating
-      // `output[0]` as the `feed` probability would produce a "trained"
-      // pet that always feeds whenever the old scalar exceeded the
-      // idle floor. Throw so the caller falls back to the bundled
+      // Reject snapshots whose output OR input dimension doesn't match
+      // the bundled topology. A pre-row-17 snapshot (single sigmoid
+      // output, length 1) loads fine through `fromJSON` but its scalar
+      // urgency bears no resemblance to a 7-way softmax — silently
+      // treating `output[0]` as the `feed` probability would produce a
+      // "trained" pet that always feeds whenever the old scalar
+      // exceeded the idle floor. Likewise an output-7 snapshot whose
+      // input layer expects a different last-dim would only blow up at
+      // runtime when `featuresFromNeeds` first hands it a 5-element
+      // vector — Learning mode would then throw on every intention
+      // selection instead of falling back to the baseline. Throw on
+      // either mismatch so the caller falls back to the bundled
       // baseline.
-      const outShape = r.getModel().outputs[0]?.shape;
-      const lastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
-      if (lastDim !== SOFTMAX_DIM) {
+      const model = r.getModel();
+      const outShape = model.outputs[0]?.shape;
+      const outLastDim = outShape && outShape.length > 0 ? outShape[outShape.length - 1] : null;
+      const inShape = model.inputs[0]?.shape;
+      const inLastDim = inShape && inShape.length > 0 ? inShape[inShape.length - 1] : null;
+      if (outLastDim !== SOFTMAX_DIM || inLastDim !== FEATURE_DIM) {
         // Free the rebuilt-but-incompatible model's tensors before the
         // catch path constructs the bundled baseline. Without this,
         // re-entering Learning mode with an incompatible persisted
@@ -197,7 +214,7 @@ export const learningMode: CognitionModeSpec = {
         // attempt.
         r.dispose();
         throw new Error(
-          `learning: persisted snapshot has output dim ${String(lastDim)}, expected ${SOFTMAX_DIM} — rebuilding from bundled baseline.`,
+          `learning: persisted snapshot has shape [${String(inLastDim)}, ${String(outLastDim)}], expected [${FEATURE_DIM}, ${SOFTMAX_DIM}] — rebuilding from bundled baseline.`,
         );
       }
       // The rebuilt Sequential ships uncompiled; compile with a default
