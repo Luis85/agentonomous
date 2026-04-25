@@ -44,6 +44,22 @@ describe('runCatchUp', () => {
     expect(step).not.toHaveBeenCalled();
   });
 
+  it('throws RangeError on non-positive / non-finite chunkVirtualSeconds', async () => {
+    const step = vi.fn().mockResolvedValue(undefined);
+    for (const bad of [0, -1, NaN, Infinity, -Infinity]) {
+      await expect(runCatchUp(2, step, { chunkVirtualSeconds: bad })).rejects.toThrow(RangeError);
+    }
+    expect(step).not.toHaveBeenCalled();
+  });
+
+  it('throws RangeError on non-positive / non-integer maxChunks', async () => {
+    const step = vi.fn().mockResolvedValue(undefined);
+    for (const bad of [0, -1, 1.5, NaN, Infinity]) {
+      await expect(runCatchUp(2, step, { maxChunks: bad })).rejects.toThrow(RangeError);
+    }
+    expect(step).not.toHaveBeenCalled();
+  });
+
   it('preserves total virtual-dt under long, tiny-chunk catch-up (no float drift)', async () => {
     // Pathological case: 10 000 virtual seconds split into 0.001 s chunks
     // is 10 million iterations of repeated subtraction. We assert the sum

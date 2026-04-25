@@ -57,4 +57,22 @@ describe('AutoSaveTracker', () => {
     t.advance(1);
     expect(t.shouldSave()).toBe(true);
   });
+
+  it('treats negative / zero / NaN / Infinity everyTicks as disabled', () => {
+    for (const bad of [-1, 0, NaN, Infinity, -Infinity]) {
+      const t = new AutoSaveTracker({ enabled: true, everyTicks: bad });
+      t.advance(1);
+      expect(t.shouldSave()).toBe(false);
+      t.advance(1000);
+      expect(t.shouldSave()).toBe(false);
+    }
+  });
+
+  it('treats negative / zero / NaN / Infinity everyVirtualSeconds as disabled', () => {
+    for (const bad of [-5, 0, NaN, Infinity, -Infinity]) {
+      const t = new AutoSaveTracker({ enabled: true, everyVirtualSeconds: bad });
+      t.advance(10);
+      expect(t.shouldSave()).toBe(false);
+    }
+  });
 });

@@ -31,7 +31,13 @@ export function migrateSnapshot(
     throw new SnapshotRestoreError('Snapshot payload is not an object');
   }
   const versionRaw = (raw as { schemaVersion?: unknown }).schemaVersion;
-  const currentVersion = typeof versionRaw === 'number' ? versionRaw : 0;
+  let currentVersion = 0;
+  if (typeof versionRaw === 'number') {
+    if (!Number.isInteger(versionRaw) || versionRaw < 0) {
+      throw new SnapshotRestoreError(`Invalid schemaVersion: ${String(versionRaw)}`);
+    }
+    currentVersion = versionRaw;
+  }
   if (currentVersion > target) {
     throw new SnapshotRestoreError(
       `Snapshot schemaVersion (${currentVersion}) is newer than supported (${target}). ` +
