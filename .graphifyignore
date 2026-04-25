@@ -12,6 +12,9 @@ tests
 examples
 scripts
 
+# generated TypeDoc HTML — regenerated each build, no graph value
+docs/api
+
 CLAUDE.md
 AGENTS.md
 

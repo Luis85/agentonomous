@@ -1,177 +1,309 @@
-# Graph Report - agent-library  (2026-04-25)
+# Graph Report - .  (2026-04-25)
 
 ## Corpus Check
-- 131 files · ~107,883 words
+- 165 files · ~124,428 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 611 nodes · 1184 edges · 20 communities detected
-- Extraction: 83% EXTRACTED · 17% INFERRED · 0% AMBIGUOUS · INFERRED: 196 edges (avg confidence: 0.8)
+- 935 nodes · 1673 edges · 39 communities detected
+- Extraction: 83% EXTRACTED · 17% INFERRED · 0% AMBIGUOUS · INFERRED: 278 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Community 0|Community 0]]
-- [[_COMMUNITY_Community 1|Community 1]]
-- [[_COMMUNITY_Community 2|Community 2]]
-- [[_COMMUNITY_Community 3|Community 3]]
-- [[_COMMUNITY_Community 4|Community 4]]
-- [[_COMMUNITY_Community 5|Community 5]]
-- [[_COMMUNITY_Community 6|Community 6]]
-- [[_COMMUNITY_Community 7|Community 7]]
-- [[_COMMUNITY_Community 8|Community 8]]
-- [[_COMMUNITY_Community 9|Community 9]]
-- [[_COMMUNITY_Community 10|Community 10]]
-- [[_COMMUNITY_Community 11|Community 11]]
-- [[_COMMUNITY_Community 12|Community 12]]
-- [[_COMMUNITY_Community 13|Community 13]]
-- [[_COMMUNITY_Community 14|Community 14]]
-- [[_COMMUNITY_Community 15|Community 15]]
-- [[_COMMUNITY_Community 16|Community 16]]
-- [[_COMMUNITY_Community 17|Community 17]]
-- [[_COMMUNITY_Community 18|Community 18]]
-- [[_COMMUNITY_Community 20|Community 20]]
+- [[_COMMUNITY_Agent Core & Tick|Agent Core & Tick]]
+- [[_COMMUNITY_Agent Module Files|Agent Module Files]]
+- [[_COMMUNITY_Needs & Age Pipeline|Needs & Age Pipeline]]
+- [[_COMMUNITY_Persistence & FS|Persistence & FS]]
+- [[_COMMUNITY_Design Decisions & Demo|Design Decisions & Demo]]
+- [[_COMMUNITY_Events & Excalibur Bridge|Events & Excalibur Bridge]]
+- [[_COMMUNITY_Homeostatic Models|Homeostatic Models]]
+- [[_COMMUNITY_Roadmap Plans|Roadmap Plans]]
+- [[_COMMUNITY_Public Agent API|Public Agent API]]
+- [[_COMMUNITY_TFJS Cognition Adapter|TFJS Cognition Adapter]]
+- [[_COMMUNITY_Agent Construction|Agent Construction]]
+- [[_COMMUNITY_Modifier Definition|Modifier Definition]]
+- [[_COMMUNITY_Recent Refactor Notes|Recent Refactor Notes]]
+- [[_COMMUNITY_Errors & LLM Port|Errors & LLM Port]]
+- [[_COMMUNITY_Body & Locomotion|Body & Locomotion]]
+- [[_COMMUNITY_Default Skills Bundle|Default Skills Bundle]]
+- [[_COMMUNITY_Review Bot Workflow|Review Bot Workflow]]
+- [[_COMMUNITY_Tick Subsystems|Tick Subsystems]]
+- [[_COMMUNITY_Snapshot Persistence|Snapshot Persistence]]
+- [[_COMMUNITY_Branch & Release Process|Branch & Release Process]]
+- [[_COMMUNITY_Urgency & Modifier Resolution|Urgency & Modifier Resolution]]
+- [[_COMMUNITY_Species Definition|Species Definition]]
+- [[_COMMUNITY_Console Logger|Console Logger]]
+- [[_COMMUNITY_Scripted Controller|Scripted Controller]]
+- [[_COMMUNITY_Behavior Runner|Behavior Runner]]
+- [[_COMMUNITY_LLM Port Types|LLM Port Types]]
+- [[_COMMUNITY_Random Events|Random Events]]
+- [[_COMMUNITY_Logger Interface|Logger Interface]]
+- [[_COMMUNITY_Validator Port|Validator Port]]
+- [[_COMMUNITY_JS-Son Type Stub|JS-Son Type Stub]]
+- [[_COMMUNITY_Excalibur Type Stubs|Excalibur Type Stubs]]
+- [[_COMMUNITY_Interaction Event|Interaction Event]]
+- [[_COMMUNITY_Agent Input Type|Agent Input Type]]
+- [[_COMMUNITY_Agent Output Type|Agent Output Type]]
+- [[_COMMUNITY_TFJS Reasoner Options|TFJS Reasoner Options]]
+- [[_COMMUNITY_Standard Events|Standard Events]]
+- [[_COMMUNITY_Input Source Type|Input Source Type]]
+- [[_COMMUNITY_Catchup Options|Catchup Options]]
+- [[_COMMUNITY_Default Active Skills|Default Active Skills]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Agent` - 25 edges
-2. `createAgent()` - 16 edges
-3. `TfjsReasoner` - 16 edges
-4. `runRestore()` - 15 edges
-5. `Modifiers` - 14 edges
-6. `Needs` - 13 edges
-7. `TfjsLearner` - 12 edges
-8. `LocalStorageSnapshotStore` - 12 edges
-9. `AnimationStateMachine` - 11 edges
-10. `map()` - 10 edges
+1. `Agent` - 27 edges
+2. `Agent (orchestrator)` - 19 edges
+3. `TfjsReasoner` - 15 edges
+4. `DomainEvent` - 15 edges
+5. `buildAgentDeps()` - 14 edges
+6. `Modifiers` - 14 edges
+7. `Needs` - 13 edges
+8. `Skill interface` - 13 edges
+9. `agentonomous Product Vision` - 13 edges
+10. `TfjsLearner` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `createAgent()` --calls--> `map()`  [INFERRED]
-  src\agent\createAgent.ts → src\agent\result.ts
-- `runRestore()` --calls--> `map()`  [INFERRED]
-  src\agent\internal\RestoreCoordinator.ts → src\agent\result.ts
-- `resolvePersistence()` --calls--> `pickDefaultSnapshotStore()`  [INFERRED]
-  src\agent\createAgent.ts → src\persistence\pickDefaultSnapshotStore.ts
-- `runRestore()` --calls--> `isInMemoryMemoryAdapter()`  [INFERRED]
-  src\agent\internal\RestoreCoordinator.ts → src\memory\InMemoryMemoryAdapter.ts
-- `runRestore()` --calls--> `runCatchUp()`  [INFERRED]
-  src\agent\internal\RestoreCoordinator.ts → src\persistence\offlineCatchUp.ts
+- `tfjs cognition adapter plan` --references--> `TfjsReasoner adapter class`  [INFERRED]
+  docs/plans/2026-04-24-tfjs-cognition-adapter.md → src/cognition/adapters/tfjs/TfjsReasoner.ts
+- `Post-tfjs improvements roadmap` --references--> `Learner interface (Stage-8 score)`  [EXTRACTED]
+  docs/specs/2026-04-24-post-tfjs-improvements.md → src/cognition/learning/Learner.ts
+- `agentonomous Product Vision` --references--> `LlmProviderPort`  [EXTRACTED]
+  docs/specs/vision.md → src/ports/LlmProviderPort.ts
+- `Track A â€” Remediation (4 persistence/restore findings)` --references--> `Agent.restore() (replace, not merge, modifier state)`  [EXTRACTED]
+  docs/plans/2026-04-24-polish-and-harden.md → src/agent/Agent.ts
+- `Track A â€” Remediation (4 persistence/restore findings)` --references--> `LocalStorageSnapshotStore`  [EXTRACTED]
+  docs/plans/2026-04-24-polish-and-harden.md → src/persistence/LocalStorageSnapshotStore.ts
 
 ## Hyperedges (group relationships)
-- **Four-cognition-mode switcher ensemble** — heuristic_mode, bt_mode_mistreevous, bdi_mode_jsson, learning_mode_brainjs, mount_cognition_switcher, cognition_mode_spec [EXTRACTED 1.00]
-- **Reasoner port â€” 3 adapter implementations + reset call sites** — reasoner_port, mistreevous_reasoner, js_son_reasoner, tfjs_reasoner, reasoner_reset_method, agent_set_reasoner, agent_restore [EXTRACTED 1.00]
-- **Stages skipped at setTimeScale(0) (Option A)** — modifiers_ticker, mood_reconciler, animation_reconciler, set_timescale, option_a_skip_stages [EXTRACTED 1.00]
+- **Agent.tick() pipeline stages** — agent_Agent, internal_LifecycleTicker, internal_ModifiersTicker, internal_MoodReconciler, internal_AnimationReconciler, internal_DeathCoordinator_runDeath, agent_DecisionTrace [EXTRACTED 1.00]
+- **ControlMode dispatch (autonomous/scripted/remote)** — agent_ControlMode, agent_RemoteController, agent_ScriptedController, agent_Agent, agent_AgentAction [EXTRACTED 1.00]
+- **Agent identity assembly (role + species + persona)** — createAgent_createAgent, agent_AgentIdentity, agent_AgentRole, agent_Species, agent_Persona [EXTRACTED 1.00]
+- **Agent.tick pipeline stages (NeedsTicker -> CognitionPipeline -> tickHelpers)** —  [INFERRED 0.90]
+- **Snapshot capture/restore symmetry** —  [INFERRED 0.90]
+- **Embodiment composition (Transform + Appearance + LocomotionMode)** —  [EXTRACTED 1.00]
+- **Reasoner port implementations** — reasoner_port, noop_reasoner, urgency_reasoner, mistreevous_reasoner, tfjs_reasoner [EXTRACTED 1.00]
+- **Phase A no-op default ports for tick pipeline seams** — noop_reasoner, noop_behavior, noop_learner [INFERRED 0.85]
+- **TfjsReasoner deterministic persistence + training pipeline** — tfjs_reasoner, tfjs_learner, tfjs_snapshot, tfjs_encode_weights, tfjs_decode_weights [EXTRACTED 1.00]
+- **needs_policy_strategy_family** — active_needs_policy, expressive_needs_policy, composed_needs_policy, needs_policy [EXTRACTED 1.00]
+- **modifier_system_core** — modifier, modifier_effect, modifier_target, modifiers, numeric_modifier_resolver [EXTRACTED 1.00]
+- **lifecycle_aging_system** — age_model, life_stage, life_stage_schedule, stage_capability_map, lifecycle_descriptor [EXTRACTED 1.00]
+- **** — in_memory_snapshot_store, fs_snapshot_store, local_storage_snapshot_store [EXTRACTED 1.00]
+- **** — manual_clock, system_clock, wall_clock_port [EXTRACTED 1.00]
+- **** — seeded_rng, manual_clock, snapshot_store_port [INFERRED 0.80]
+- **default active skill bundle (FeedSkill, CleanSkill, PlaySkill, RestSkill, ScoldSkill, PetSkill, MedicateSkill all implement Skill and ship in defaultPetInteractionModule)** —  [INFERRED 0.90]
+- **expression skill family (Meow/Sad/Sleepy share createExpressionSkill factory and emit ExpressionEmitted events)** —  [INFERRED 0.95]
+- **need-satisfying skills (FeedSkill, PetSkill, PlaySkill, RestSkill all call satisfyNeed via SkillContext to alter homeostatic needs)** —  [INFERRED 0.85]
+- **Cognition switcher + reasoner adapter rollout** —  [INFERRED 0.85]
+- **Release + publishing workflow** —  [INFERRED 0.90]
+- **Polish & harden remediation cluster** —  [INFERRED 0.90]
+- **review-fix end-to-end pipeline (prompt â†’ skill â†’ workflow)** —  [EXTRACTED 1.00]
+- **Pre-1.0 polish + harden multi-track program (remediation, CI, demo, lib seams)** —  [EXTRACTED 1.00]
+- **tfjs learning-mode arc (adapter â†’ learner â†’ softmax â†’ richer features â†’ prediction strip)** —  [EXTRACTED 1.00]
 
 ## Communities
 
-### Community 0 - "Community 0"
-Cohesion: 0.06
-Nodes (4): NoopBehavior, NoopReasoner, NumericModifierResolver, PassthroughValidator
-
-### Community 1 - "Community 1"
+### Community 0 - "Agent Core & Tick"
 Cohesion: 0.04
-Nodes (75): Rationale: adapter owns full model lifecycle (Q2), Agent.restore (+ catch-up), Agent.setReasoner, AgentSnapshot, ApproachTreatSkill (examples-local), Rationale: async import() probe at mount time, TfjsReasoner.detectBestBackend + demo picker, Batch inference across agents (+67 more)
+Nodes (24): Agent, assertRequiredDeps(), resolveCognition(), resolveCorePorts(), resolveSubsystems(), AutoSaveTracker, ExcaliburAnimationBridge, InMemoryEventBus (+16 more)
 
-### Community 2 - "Community 2"
-Cohesion: 0.05
-Nodes (13): Agent, AutoSaveTracker, ExcaliburAnimationBridge, isInMemoryMemoryAdapter(), matchesFilter(), NullLogger, MistreevousReasoner, runCatchUp() (+5 more)
-
-### Community 3 - "Community 3"
-Cohesion: 0.05
-Nodes (14): AgeModel, isInvokeSkillAction(), CognitionPipeline, ComposedNeedsPolicy, runDeath(), ExpressiveNeedsPolicy, InMemoryEventBus, LifecycleTicker (+6 more)
-
-### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (6): InMemoryMemoryAdapter, InMemorySnapshotStore, LocalStorageSnapshotStore, ManualClock, InMemoryRemoteController, SkillRegistry
-
-### Community 5 - "Community 5"
+### Community 1 - "Agent Module Files"
 Cohesion: 0.06
-Nodes (40): Agent (class), AgentFacade, Agent.tick() pipeline, AgentTickedEvent, AnimationReconciler (Stage 2.8), AutoSaveTracker, Chapter A â€” Living agent, Chapter B â€” Why this action? (Decision Trace) (+32 more)
+Nodes (3): ExcaliburAgentActor, NoopReasoner, PassthroughValidator
 
-### Community 6 - "Community 6"
-Cohesion: 0.08
-Nodes (10): ActiveNeedsPolicy, AnimationReconciler, AnimationStateMachine, applyModifierBias(), computeAvgUrgency(), DefaultMoodModel, pickBaseCategory(), clamp01() (+2 more)
+### Community 2 - "Needs & Age Pipeline"
+Cohesion: 0.04
+Nodes (21): ActiveNeedsPolicy, AgeModel, isInvokeSkillAction(), AnimationReconciler, AnimationStateMachine, CognitionPipeline, ComposedNeedsPolicy, runDeath() (+13 more)
 
-### Community 7 - "Community 7"
+### Community 3 - "Persistence & FS"
+Cohesion: 0.05
+Nodes (13): decodeKey(), encodeKey(), FsSnapshotStore, InMemoryMemoryAdapter, InMemorySnapshotStore, LifecycleTicker, LocalStorageSnapshotStore, resolveBrowserStorage() (+5 more)
+
+### Community 4 - "Design Decisions & Demo"
+Cohesion: 0.04
+Nodes (60): Agent.restore() (replace, not merge, modifier state), CognitionPipeline.invokeSkillAction, examples/llm-mock deterministic playback example, examples/nurture-pet demo, FsSnapshotStore.list deterministic ordering, Learner interface (Stage-8 score), LlmProviderPort, LocalStorageSnapshotStore (+52 more)
+
+### Community 5 - "Events & Excalibur Bridge"
+Cohesion: 0.05
+Nodes (51): AgentDiedEvent, AgentTickedEvent, BehaviorRunner, DirectBehaviorRunner, DirectBehaviorRunnerOptions, DomainEvent, EventBusPort, ExcaliburAgentActor (+43 more)
+
+### Community 6 - "Homeostatic Models"
+Cohesion: 0.06
+Nodes (47): ActiveNeedsPolicy, AgeModel, AgeModelOptions, clamp01, ComposedNeedsPolicy, DecayMultiplierFn, DECEASED_STAGE, DefaultMoodModel (+39 more)
+
+### Community 7 - "Roadmap Plans"
+Cohesion: 0.07
+Nodes (38): AGENT_TICKED constant + AgentTickedEvent, ApproachTreatSkill (examples-local), Train button + localStorage persistence for trained network, BT reactive interrupt on surpriseTreat, Async import() peer-dep capability probe, Demo snapshot Export / Import, Modifier expiry deferred to first post-resume tick, P0 â€” Need-decay calibration (+30 more)
+
+### Community 8 - "Public Agent API"
 Cohesion: 0.09
-Nodes (9): map(), ok(), TfjsLearner, makeLcg(), seededShuffle(), TfjsBackendNotRegisteredError, TfjsReasoner, decodeWeights() (+1 more)
+Nodes (37): Agent (orchestrator), AgentAction (union), AgentDependencies, AgentFacade, AgentIdentity, AgentModule, AgentRole, ArrayScriptedController (+29 more)
 
-### Community 8 - "Community 8"
+### Community 9 - "TFJS Cognition Adapter"
+Cohesion: 0.09
+Nodes (10): map(), ok(), TfjsLearner, makeLcg(), seededShuffle(), TfjsBackendNotRegisteredError, TfjsReasoner, decodeWeights() (+2 more)
+
+### Community 10 - "Agent Construction"
+Cohesion: 0.11
+Nodes (25): buildAgeModel(), buildAgentDeps(), buildIdentity(), cognitionOptions(), installModuleSkills(), lifecycleOptions(), persistenceOptions(), portOptions() (+17 more)
+
+### Community 11 - "Modifier Definition"
+Cohesion: 0.15
+Nodes (3): NumericModifierResolver, err(), mapErr()
+
+### Community 12 - "Recent Refactor Notes"
+Cohesion: 0.07
+Nodes (32): Agent.ts extractions (RestoreCoordinator, DeathCoordinator, SnapshotAssembler), DuplicateSkillError type + replace() escape hatch, createExpressionSkill factory consolidates 3 express skills, facade.publishEvent bypassed trace + autosave hooks, _internalPublish / _internalDie rename (breaking), MockLlmProvider, pendingEvents was dead field â€” never populated/read, Percent-encoding for filename-safe reversible keys (+24 more)
+
+### Community 13 - "Errors & LLM Port"
 Cohesion: 0.08
-Nodes (12): defineSpecies(), AgentError, BudgetExceededError, DuplicateSkillError, InvalidSpeciesError, InvalidTimeScaleError, MissingDependencyError, SkillInvocationError (+4 more)
+Nodes (13): AgentError, BudgetExceededError, DuplicateSkillError, InvalidSpeciesError, InvalidTimeScaleError, MissingDependencyError, SkillInvocationError, SnapshotRestoreError (+5 more)
 
-### Community 9 - "Community 9"
-Cohesion: 0.19
-Nodes (2): err(), mapErr()
+### Community 14 - "Body & Locomotion"
+Cohesion: 0.1
+Nodes (9): defaultAppearance(), defaultEmbodiment(), ExcaliburRemoteController, isIntentionAction(), JsSonReasoner, hashSeed(), SeededRng, identityTransform() (+1 more)
 
-### Community 10 - "Community 10"
-Cohesion: 0.16
-Nodes (7): resolvePersistence(), decodeKey(), encodeKey(), FsSnapshotStore, resolveBrowserStorage(), hasBrowserLocalStorage(), pickDefaultSnapshotStore()
+### Community 15 - "Default Skills Bundle"
+Cohesion: 0.15
+Nodes (27): CleanSkill, createExpressionSkill(), defaultExpressionSkills, defaultPetInteractionModule, effectivenessFor(), ExpressMeowSkill, ExpressSadSkill, ExpressSleepySkill (+19 more)
 
-### Community 11 - "Community 11"
-Cohesion: 0.16
-Nodes (16): createAgent, defineSpecies, DuplicateSkillError, encodeKey / decodeKey (percent-encoding), Rationale: silent overwrite masks bugs â†’ fail-fast, FsAdapter (injectable), FsSnapshotStore, Plan: FsSnapshotStore reversible keys (0.9.7 fix) (+8 more)
+### Community 16 - "Review Bot Workflow"
+Cohesion: 0.1
+Nodes (27): CI workflow (ci.yml), Release workflow (release.yml), review-fix-shipped.yml workflow, review-fix SKILL.md, Changeset process gate (library behavior change requires .changeset/*.md), ci-gate aggregator + doc-only short-circuit via dorny/paths-filter, Counter-argument check (self-rebuttal of top BLOCKER), Dual sink: rolling issue comment + immutable daily doc (+19 more)
 
-### Community 12 - "Community 12"
-Cohesion: 0.2
-Nodes (4): isIntentionAction(), JsSonReasoner, hashSeed(), SeededRng
+### Community 17 - "Tick Subsystems"
+Cohesion: 0.14
+Nodes (22): agentDepsResolver, AnimationState, AnimationStateMachine, AnimationTransitionEvent, Appearance, buildAgentDeps, CognitionPipeline, cognition/tuning (+14 more)
 
-### Community 13 - "Community 13"
-Cohesion: 0.2
-Nodes (10): createAgent(), resolveLifecycle(), resolveMoodModel(), resolveNeeds(), resolveNeedsPolicy(), resolveRandomEvents(), resolveRng(), resolveSkills() (+2 more)
+### Community 18 - "Snapshot Persistence"
+Cohesion: 0.14
+Nodes (22): AgentSnapshot, AgentState, AgentStateListener, AutoSavePolicy, AutoSaveTracker, bindAgentToStore, CURRENT_SNAPSHOT_VERSION, decodeKey (+14 more)
 
-### Community 14 - "Community 14"
-Cohesion: 0.21
+### Community 19 - "Branch & Release Process"
+Cohesion: 0.11
+Nodes (19): Branch model (main/develop/demo), Branch protection checklist, Changesets (semver bump + summary), Demo deployment (GitHub Pages), First release v1.0.0 setup, Husky + lint-staged pre-commit hooks, No --no-verify bypass, npm provenance attestation (+11 more)
+
+### Community 20 - "Urgency & Modifier Resolution"
+Cohesion: 0.23
 Nodes (2): Modifiers, UrgencyReasoner
 
-### Community 15 - "Community 15"
-Cohesion: 0.22
-Nodes (5): defaultAppearance(), defaultEmbodiment(), ExcaliburRemoteController, identityTransform(), translate()
+### Community 21 - "Species Definition"
+Cohesion: 0.18
+Nodes (13): createAgent overrides species defaults per-agent, passiveModifiers (species-level buffs/debuffs), SpeciesRegistry string-lookup convenience, defineSpecies, How to add a species, InvalidSpeciesError, defineSpecies validates duplicate need ids and lifecycle stages, Registry is deliberately local (no global singleton) (+5 more)
 
-### Community 16 - "Community 16"
+### Community 22 - "Console Logger"
 Cohesion: 0.39
 Nodes (1): ConsoleLogger
 
-### Community 17 - "Community 17"
+### Community 23 - "Scripted Controller"
+Cohesion: 0.4
+Nodes (1): ArrayScriptedController
+
+### Community 24 - "Behavior Runner"
 Cohesion: 0.5
 Nodes (1): DirectBehaviorRunner
 
-### Community 18 - "Community 18"
-Cohesion: 0.67
-Nodes (1): ExcaliburAgentActor
+### Community 25 - "LLM Port Types"
+Cohesion: 0.5
+Nodes (4): LlmBudget, LlmCompletion, LlmMessage, LlmProviderPort
 
-### Community 20 - "Community 20"
+### Community 26 - "Random Events"
+Cohesion: 0.67
+Nodes (3): RandomEventContext, RandomEventDef, RandomEventTicker
+
+### Community 27 - "Logger Interface"
+Cohesion: 1.0
+Nodes (3): ConsoleLogger, Logger, NullLogger
+
+### Community 28 - "Validator Port"
+Cohesion: 0.67
+Nodes (3): PassthroughValidator, ValidationResult, Validator
+
+### Community 29 - "JS-Son Type Stub"
 Cohesion: 1.0
 Nodes (1): Agent
 
+### Community 30 - "Excalibur Type Stubs"
+Cohesion: 1.0
+Nodes (2): ActorLike, Vector2Like
+
+### Community 31 - "Interaction Event"
+Cohesion: 1.0
+Nodes (2): INTERACTION_REQUESTED, InteractionRequestedEvent
+
+### Community 38 - "Agent Input Type"
+Cohesion: 1.0
+Nodes (1): AgentInput
+
+### Community 39 - "Agent Output Type"
+Cohesion: 1.0
+Nodes (1): AgentOutput
+
+### Community 40 - "TFJS Reasoner Options"
+Cohesion: 1.0
+Nodes (1): TfjsReasonerOptions
+
+### Community 41 - "Standard Events"
+Cohesion: 1.0
+Nodes (1): standardEvents
+
+### Community 42 - "Input Source Type"
+Cohesion: 1.0
+Nodes (1): InputSourceLike
+
+### Community 43 - "Catchup Options"
+Cohesion: 1.0
+Nodes (1): CatchUpOptions
+
+### Community 44 - "Default Active Skills"
+Cohesion: 1.0
+Nodes (1): defaultActiveSkills
+
 ## Knowledge Gaps
-- **43 isolated node(s):** `Agent`, `species.schema.json`, `Agent (class)`, `standardEvents.ts (event vocabulary)`, `Rationale: snapshot-copy trace.emitted at assembly` (+38 more)
+- **178 isolated node(s):** `Agent`, `isInvokeSkillAction`, `isEmitEventAction`, `MissingDependencyError`, `SnapshotRestoreError` (+173 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 9`** (28 nodes): `result.ts`, `tuning.ts`, `defineModifier()`, `effectivenessFor()`, `createExpressionSkill()`, `defineModifier.ts`, `andThen()`, `err()`, `isErr()`, `isOk()`, `mapErr()`, `unwrap()`, `CleanSkill.ts`, `effectiveness.ts`, `ExpressionSkill.ts`, `ExpressMeowSkill.ts`, `ExpressSadSkill.ts`, `ExpressSleepySkill.ts`, `FeedSkill.ts`, `index.ts`, `MedicateSkill.ts`, `PetSkill.ts`, `PlaySkill.ts`, `RestSkill.ts`, `ScoldSkill.ts`, `Skill.ts`, `SkillContext.ts`, `SkillRegistry.ts`
+- **Thin community `Urgency & Modifier Resolution`** (13 nodes): `Modifiers`, `.decayMultiplier()`, `.has()`, `.intentionBonus()`, `.iterEffects()`, `.locomotionSpeedMultiplier()`, `.moodBias()`, `.resolveNumeric()`, `.skillEffectiveness()`, `.tick()`, `UrgencyReasoner`, `.constructor()`, `.selectIntention()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 14`** (14 nodes): `Modifiers`, `.decayMultiplier()`, `.has()`, `.intentionBonus()`, `.iterEffects()`, `.locomotionSpeedMultiplier()`, `.moodBias()`, `.removeAll()`, `.resolveNumeric()`, `.skillEffectiveness()`, `.tick()`, `UrgencyReasoner`, `.constructor()`, `.selectIntention()`
+- **Thin community `Console Logger`** (8 nodes): `ConsoleLogger`, `.constructor()`, `.debug()`, `.error()`, `.info()`, `.warn()`, `.write()`, `ConsoleLogger.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 16`** (8 nodes): `ConsoleLogger`, `.constructor()`, `.debug()`, `.error()`, `.info()`, `.warn()`, `.write()`, `ConsoleLogger.ts`
+- **Thin community `Scripted Controller`** (5 nodes): `ArrayScriptedController`, `.constructor()`, `.isExhausted()`, `.next()`, `.reset()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 17`** (4 nodes): `DirectBehaviorRunner`, `.constructor()`, `.mapIntention()`, `.run()`
+- **Thin community `Behavior Runner`** (4 nodes): `DirectBehaviorRunner`, `.constructor()`, `.mapIntention()`, `.run()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 18`** (3 nodes): `ExcaliburAgentActor`, `.constructor()`, `.sync()`
+- **Thin community `JS-Son Type Stub`** (2 nodes): `js-son-agent.d.ts`, `Agent`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 20`** (2 nodes): `js-son-agent.d.ts`, `Agent`
+- **Thin community `Excalibur Type Stubs`** (2 nodes): `ActorLike`, `Vector2Like`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Interaction Event`** (2 nodes): `INTERACTION_REQUESTED`, `InteractionRequestedEvent`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Agent Input Type`** (1 nodes): `AgentInput`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Agent Output Type`** (1 nodes): `AgentOutput`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `TFJS Reasoner Options`** (1 nodes): `TfjsReasonerOptions`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Standard Events`** (1 nodes): `standardEvents`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Input Source Type`** (1 nodes): `InputSourceLike`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Catchup Options`** (1 nodes): `CatchUpOptions`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Default Active Skills`** (1 nodes): `defaultActiveSkills`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Agent` connect `Community 2` to `Community 0`, `Community 3`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `map()` connect `Community 7` to `Community 9`, `Community 2`, `Community 3`, `Community 13`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Why does `Modifiers` connect `Community 14` to `Community 0`, `Community 2`, `Community 7`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Are the 6 inferred relationships involving `createAgent()` (e.g. with `.now()` and `map()`) actually correct?**
-  _`createAgent()` has 6 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 2 inferred relationships involving `TfjsReasoner` (e.g. with `BrainJsReasoner (deprecated)` and `Pillar: Peer-optional brains`) actually correct?**
-  _`TfjsReasoner` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 14 inferred relationships involving `runRestore()` (e.g. with `.restore()` and `.setTimeScale()`) actually correct?**
-  _`runRestore()` has 14 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Agent`, `species.schema.json`, `Agent (class)` to the rest of the system?**
-  _43 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `Agent` connect `Agent Core & Tick` to `Agent Module Files`, `Needs & Age Pipeline`?**
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+- **Why does `Polish + harden â€” pre-1.0 increments` connect `Design Decisions & Demo` to `Review Bot Workflow`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Are the 3 inferred relationships involving `TfjsReasoner` (e.g. with `TfjsLearner` and `MistreevousReasoner`) actually correct?**
+  _`TfjsReasoner` has 3 INFERRED edges - model-reasoned connections that need verification._
+- **What connects `Agent`, `isInvokeSkillAction`, `isEmitEventAction` to the rest of the system?**
+  _178 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Agent Core & Tick` be split into smaller, more focused modules?**
+  _Cohesion score 0.04 - nodes in this community are weakly interconnected._
+- **Should `Agent Module Files` be split into smaller, more focused modules?**
+  _Cohesion score 0.06 - nodes in this community are weakly interconnected._
+- **Should `Needs & Age Pipeline` be split into smaller, more focused modules?**
+  _Cohesion score 0.04 - nodes in this community are weakly interconnected._
