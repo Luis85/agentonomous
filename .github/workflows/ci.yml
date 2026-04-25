@@ -21,13 +21,6 @@ concurrency:
 permissions:
   contents: read
 
-# Force third-party JavaScript actions still pinned to Node 20
-# (dorny/paths-filter@v3, andresz1/size-limit-action@v1) onto Node 24
-# until upstream releases tag a Node 24 build. Removes the GitHub
-# Actions deprecation annotations on every CI run.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   changes:
     name: Detect changed paths
@@ -38,25 +31,32 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      # Inline path filter via the GitHub API. Replaces
+      # `dorny/paths-filter@v3` (still pinned to Node 20 — emits a
+      # deprecation annotation on every run with no Node 24 release
+      # available). For non-PR events (push to main/develop/demo) we
+      # always treat the change as code-touching and run the full gate.
       - name: Filter paths (code vs docs-only)
         id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            code:
-              - 'src/**'
-              - 'tests/**'
-              - 'examples/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'tsconfig*.json'
-              - 'vite.config.*'
-              - 'vitest.config.*'
-              - 'eslint.config.*'
-              - 'typedoc.json'
-              - '.github/workflows/**'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "Non-PR event ($GITHUB_EVENT_NAME) — defaulting code=true."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pr_number="${{ github.event.pull_request.number }}"
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr_number/files" --jq '.[].filename')
+          echo "Changed files in PR #$pr_number:"
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -E '^(src/|tests/|examples/|\.github/workflows/|package(-lock)?\.json|tsconfig[^/]*\.json|vite\.config\.|vitest\.config\.|eslint\.config\.|typedoc\.json)' >/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
 
   format-check:
     name: Format (Prettier)
@@ -227,6 +227,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # andresz1/size-limit-action@v1 is the only remaining Node 20
+      # action in this workflow — no Node 24 fork exists yet, and the
+      # sticky-comment delta UX is high value, so we accept the single
+      # residual deprecation annotation until upstream cuts a Node 24
+      # release. Path-filter has been inlined; this is the only one left.
       - name: Size Limit (sticky PR comment with gzip delta)
         uses: andresz1/size-limit-action@v1
         with:
