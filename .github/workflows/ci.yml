@@ -175,11 +175,18 @@ jobs:
   #   matrix. Coverage upload still happens here once per push because
   #   `test-tfjs` re-runs the same tfjs files under different backends
   #   and would only inflate runtime, not coverage.
-  # - `test-tfjs` runs ONLY `tests/**/cognition/adapters/tfjs/**` and
-  #   `tests/examples/learningMode.train.test.ts` under the
+  # - `test-tfjs` runs ONLY `tests/**/cognition/adapters/tfjs/**` under the
   #   `cpu` × `wasm` backend axis. The matrix-selected backend is
   #   activated by `tests/setup/tfjsBackendSetup.ts` via the
   #   `TFJS_BACKEND` env var (see `tests/setup/tfjsBackend.ts`).
+  #
+  #   `tests/examples/learningMode.train.test.ts` deliberately stays out
+  #   of `test-tfjs`: the demo's switcher probes cpu first then promotes
+  #   the persisted backend, so under `TFJS_BACKEND=wasm` the suite still
+  #   exercises the cpu-fallback flow (the demo's intended user path).
+  #   Adding it to the wasm cell would burn runtime without catching new
+  #   regressions; reasoner-level wasm coverage already lives in
+  #   `tests/unit/cognition/adapters/Tfjs*.test.ts`.
   #
   # `fail-fast: false` keeps platform-specific failures from suppressing
   # other cells — a windows-only flake should not hide a wasm-only one.
@@ -245,7 +252,6 @@ jobs:
           tests/unit/cognition/adapters/TfjsReasoner.test.ts
           tests/unit/cognition/adapters/TfjsLearner.test.ts
           tests/unit/cognition/adapters/TfjsSnapshot.test.ts
-          tests/examples/learningMode.train.test.ts
 
   build:
     name: Build & size budget
