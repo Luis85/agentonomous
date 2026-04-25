@@ -40,35 +40,27 @@ async function loadBackendModule(name: 'cpu' | 'wasm' | 'webgl'): Promise<void> 
 }
 
 /**
- * Inquiry-only probe: try to register and activate `name`, then restore
- * the prior backend regardless of outcome. Resolves `true` iff
- * `tf.setBackend(name)` returns truthy (the backend's `kernel:setup`
- * succeeded). The non-committing semantics let a UI probe all three
- * backends in sequence without leaving tfjs on whichever one ran last.
+ * True inquiry-only probe: side-effect-import the backend's package
+ * (which calls `tf.registerBackend(...)` at module top, populating
+ * `tf.engine().registryFactory`) and resolve `true` iff the factory
+ * is now present in the registry.
  *
- * Caller commits separately via `tf.setBackend(name)` once it knows
- * which backend it wants. `detectBestBackend` does this on its own
- * trailing path.
+ * No `tf.setBackend` call, no kernel `setupFunc` reinit, no factory
+ * invocation, no GPU/WASM allocation. Calling this while a live
+ * `TfjsReasoner` is mid-`fit()` cannot disturb its active backend
+ * instance, kernels, or tensor data.
+ *
+ * Caveat: a registered factory does NOT guarantee the backend can
+ * actually activate on this device. The factory itself may throw on
+ * first use (e.g. WebGL in headless Node — no GL context). For the
+ * strictest "this WILL work" check, attempt `tf.setBackend(name)` and
+ * inspect the boolean return; that is what `detectBestBackend` does.
  */
 async function probeBackendInternal(name: 'cpu' | 'wasm' | 'webgl'): Promise<boolean> {
-  const prior = tf.getBackend();
   try {
     await loadBackendModule(name);
-    const ok = await tf.setBackend(name);
-    // Restore prior unconditionally — `probeBackend` is inquiry-only.
-    // If the probe succeeded but the caller wants this backend, they
-    // call `tf.setBackend(name)` themselves (which is now a fast path
-    // since the package is already registered).
-    if (prior && prior !== name) {
-      await tf.setBackend(prior).catch(() => undefined);
-    }
-    if (!ok) return false;
-    await tf.ready();
-    return true;
+    return tf.findBackendFactory(name) !== null;
   } catch {
-    if (prior && prior !== name) {
-      await tf.setBackend(prior).catch(() => undefined);
-    }
     return false;
   }
 }
@@ -411,56 +403,97 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
 
   /**
    * Probe `webgl → wasm → cpu` in that order and return the first
-   * backend that registers + activates without throwing. Side-effect-
-   * imports the matching `@tensorflow/tfjs-backend-*` package via lazy
-   * dynamic `import()`. On return, `tf.backend()` is the value reported
-   * — pass it straight to the constructor's `backend` option to commit.
+   * backend that **activates** without throwing — i.e. its factory
+   * runs successfully and `tf.setBackend(name)` resolves `true`.
+   * Side-effect-imports the matching `@tensorflow/tfjs-backend-*`
+   * package via lazy dynamic `import()`. On resolve, `tf.backend()`
+   * is the value reported.
    *
    * Use this when a consumer has no preference (e.g. demo HUD that
-   * opportunistically takes WebGL for speed). For a per-option
-   * "available?" check in a UI that lets the user pick a specific
-   * backend, see `probeBackend(name)`.
+   * opportunistically takes WebGL for speed). For a per-option "is
+   * this backend's factory registered" check in a UI, see
+   * `probeBackend(name)` — it is cheaper but does NOT verify the
+   * factory will succeed on this device (WebGL registers fine in
+   * headless Node but throws at first use).
    *
-   * **Determinism caveat.** GPU backends (`webgl`) are NOT determinism-
-   * preserving — replay parity (`SeededRng` + `ManualClock` →
-   * byte-identical `DecisionTrace`s) holds only on the `cpu` backend.
-   * `wasm` reproduces across same-host runs but float-rounding differs
-   * from `cpu`. Pass `'cpu'` explicitly to the constructor for any
-   * session whose trace must be reproducible across machines.
+   * **Side effect on tfjs state.** This method DOES change
+   * `tf.engine().backend` to whichever backend wins the chain. If a
+   * `TfjsReasoner` is mid-`fit()` when this runs, the kernels and
+   * `backendInstance` it relies on can flip out from under it. Per
+   * `engine.ts:274-294` (tfjs 4.22) `setBackend` does NOT dispose
+   * tensors — they lazy-migrate via `moveData` on next reuse — but
+   * mid-fit kernel-setup churn is still a perf cliff. Call this at
+   * boot, before any reasoner is constructed, when possible.
    *
-   * Rejects with an `Error` if every probe fails — `cpu` is bundled
-   * with `@tensorflow/tfjs-backend-cpu` and should always succeed, so
-   * the rejection indicates a broken environment.
+   * **Determinism caveat.** GPU backends (`webgl`) are NOT
+   * determinism-preserving — replay parity (`SeededRng` +
+   * `ManualClock` → byte-identical `DecisionTrace`s) holds only on
+   * the `cpu` backend. `wasm` reproduces across same-host runs but
+   * float-rounding differs from `cpu`. Pass `'cpu'` explicitly to
+   * the constructor for any session whose trace must be reproducible
+   * across machines.
+   *
+   * Rejects with an `Error` if every backend fails to activate —
+   * `cpu` is bundled and should always succeed, so the rejection
+   * indicates a broken environment.
    */
   static async detectBestBackend(): Promise<'webgl' | 'wasm' | 'cpu'> {
     for (const name of BACKEND_PROBE_ORDER) {
-      if (await probeBackendInternal(name)) {
-        // Probe is inquiry-only; commit explicitly here so the contract
-        // "on return, tf.backend() is the value reported" holds. The
-        // matching backend package is already loaded by the probe, so
-        // this is a fast registry lookup, not a re-import.
-        await tf.setBackend(name);
-        await tf.ready();
-        return name;
+      try {
+        await loadBackendModule(name);
+        const ok = await tf.setBackend(name);
+        if (ok) {
+          await tf.ready();
+          return name;
+        }
+      } catch {
+        // Factory threw (e.g. WebGL in headless Node). Try next.
       }
     }
     throw new Error(
-      'TfjsReasoner.detectBestBackend: every backend (webgl, wasm, cpu) failed to register. ' +
+      'TfjsReasoner.detectBestBackend: every backend (webgl, wasm, cpu) failed to activate. ' +
         'cpu is bundled and should always succeed — reaching this error indicates a broken environment.',
     );
   }
 
   /**
-   * Inquiry-only probe of a single tfjs backend. Side-effect-imports the
-   * matching `@tensorflow/tfjs-backend-*` package and attempts
-   * `tf.setBackend(name)`; resolves `true` iff registration + activation
-   * succeed. The prior backend — if any — is restored regardless of
-   * outcome, so probing all three in sequence to populate a picker's
-   * disabled-option state doesn't leave tfjs on whichever one ran last.
+   * Pure-inquiry probe of a single tfjs backend. Side-effect-imports
+   * the matching `@tensorflow/tfjs-backend-*` package — which calls
+   * `tf.registerBackend(name, factory, priority)` at module top — and
+   * resolves `true` iff the factory is afterwards present in
+   * `tf.engine().registryFactory`.
    *
-   * To commit, follow up with `tf.setBackend(name)` (now a fast registry
-   * lookup since `probeBackend` already loaded the package), or pass
-   * `name` to the `TfjsReasoner` constructor / `fromJSON` factory.
+   * **No `tf.setBackend` call. No factory invocation. No
+   * GPU/WASM/CPU resource allocation. No kernel reinit.** Calling
+   * this while a live `TfjsReasoner` is mid-`fit()` cannot disturb
+   * its tensors, kernels, or active backend instance. Safe to call
+   * any time, in parallel, without coordinating with model
+   * lifecycles.
+   *
+   * Use this to drive a per-option "is this backend's factory
+   * available" check in a picker UI — the cheap, side-effect-free
+   * way to enable / disable list items.
+   *
+   * **Limitation.** A registered factory does NOT guarantee the
+   * backend can actually activate on this device. Two distinct
+   * cases:
+   *
+   * 1. The package may decline to register at all in unsuitable
+   *    environments — `@tensorflow/tfjs-backend-webgl@4.22` wraps
+   *    its `registerBackend` call in `if (isBrowser())`, so the
+   *    factory is never put into the registry under Node. The
+   *    probe correctly reports `false` here.
+   * 2. The package may register unconditionally but its factory
+   *    throws at first use — `@tensorflow/tfjs-backend-wasm@4.22`
+   *    behaves this way under runtime constraints (missing fetch
+   *    shim, WebAssembly disabled). The probe reports `true`
+   *    here even though `tf.setBackend(name)` would later fail.
+   *
+   * For the strictest "this WILL work" check, attempt
+   * `tf.setBackend(name)` and inspect the boolean return; that is
+   * what `detectBestBackend` does. UIs that need accurate disabled
+   * state for case (2) should fall back via the try-and-revert
+   * pattern on commit.
    */
   static async probeBackend(name: 'cpu' | 'wasm' | 'webgl'): Promise<boolean> {
     return probeBackendInternal(name);
