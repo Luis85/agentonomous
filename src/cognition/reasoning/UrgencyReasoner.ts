@@ -13,12 +13,12 @@ import type { Reasoner, ReasonerContext } from './Reasoner.js';
  * nurture-pet; consumers who want BDI / planning can plug in a richer
  * `Reasoner` implementation through the same port.
  */
-export interface UrgencyReasonerOptions {
+export type UrgencyReasonerOptions = {
   /** Minimum weighted score to commit to an intention. Default: 0. */
   threshold?: number;
   /** Override the persona bias function. */
   personaBias?: PersonaBiasFn;
-}
+};
 
 export class UrgencyReasoner implements Reasoner {
   private readonly threshold: number;

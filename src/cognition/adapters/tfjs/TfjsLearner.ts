@@ -5,14 +5,14 @@ import type { TrainOptions, TrainResult } from './TfjsReasoner.js';
  * Minimum training surface the learner actually uses. `TfjsReasoner`
  * satisfies this, but tests can pass a fake without a live tfjs backend.
  */
-export interface TrainableReasoner<In, Out> {
+export type TrainableReasoner<In, Out> = {
   train(pairs: Array<{ features: In; label: Out }>, opts?: TrainOptions): Promise<TrainResult>;
-}
+};
 
 /**
  * Construction options for `TfjsLearner`.
  */
-export interface TfjsLearnerOptions<In, Out> {
+export type TfjsLearnerOptions<In, Out> = {
   /**
    * The reasoner whose weights this learner trains. Usually a
    * `TfjsReasoner`, but any object implementing `train(pairs, opts)` with
@@ -63,7 +63,7 @@ export interface TfjsLearnerOptions<In, Out> {
    * still reject normally.
    */
   readonly onTrainError?: (error: unknown) => void;
-}
+};
 
 /**
  * Closes Stage 8 (score) of the tick pipeline by turning `Learner` into

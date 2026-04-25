@@ -5,7 +5,7 @@ import type { Intention } from './Intention.js';
  * task queue, ...). The `Reasoner` combines candidates from all sources,
  * applies `personaBias`, and picks the top one.
  */
-export interface IntentionCandidate {
+export type IntentionCandidate = {
   intention: Intention;
   /**
    * Urgency / priority in `[0, 1]` — urgency-aligned, larger means more
@@ -16,4 +16,4 @@ export interface IntentionCandidate {
   score: number;
   /** Origin of this candidate — helps debugging and trace inspection. */
   source: 'needs' | 'task' | 'reactive' | 'plugin' | (string & {});
-}
+};

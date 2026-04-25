@@ -13,7 +13,7 @@ import type { IntentionCandidate } from '../IntentionCandidate.js';
  * determinism of the inputs — needs, modifiers, persona all behave
  * predictably under fixed seeds.
  */
-export interface ReasonerContext {
+export type ReasonerContext = {
   perceived: readonly DomainEvent[];
   needs: Needs | undefined;
   modifiers: Modifiers;
@@ -24,9 +24,9 @@ export interface ReasonerContext {
    * with its own judgement to make a final pick.
    */
   candidates: readonly IntentionCandidate[];
-}
+};
 
-export interface Reasoner {
+export type Reasoner = {
   /** Choose an intention this tick, or `null` for idle. */
   selectIntention(ctx: ReasonerContext): Intention | null;
 
@@ -47,4 +47,4 @@ export interface Reasoner {
    * Stateless reasoners can omit this method entirely.
    */
   reset?(): void;
-}
+};

@@ -27,7 +27,7 @@ import type { Intention } from '../Intention.js';
  * hunger → feed" pair would push the network the wrong way). The
  * field is omitted when the agent has no `Needs` subsystem.
  */
-export interface LearningOutcome {
+export type LearningOutcome = {
   intention: Intention;
   actions: readonly AgentAction[];
   /** Consumer-defined reward signal. Positive = good, negative = bad. */
@@ -40,8 +40,8 @@ export interface LearningOutcome {
    * whenever a `Needs` subsystem is wired — see Stage 8 contract above.
    */
   details?: Record<string, unknown>;
-}
+};
 
-export interface Learner {
+export type Learner = {
   score(outcome: LearningOutcome): void;
-}
+};
