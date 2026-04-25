@@ -136,8 +136,15 @@ If the line shows `- [x]` instead of `- [ ]`: hard-fail
 
 ### 3. Compute slug + paths
 
+The slug always ends with the finding's `<sha7>-<idx>` so two
+findings in the same tracker comment that happen to share a
+severity + first-4-title-words prefix get distinct paths. Without
+that suffix, sweep mode would create the worktree for finding A,
+then silently skip finding B as an "existing worktree" collision.
+
 ```text
-slug          = kebab(severity-lowercased + first 4 words of title), trim ≤ 50 chars
+slug-base     = kebab(severity-lowercased + first 4 words of title), trim ≤ 38 chars
+slug          = <slug-base>-<sha7>-<idx>
 worktree-dir  = .worktrees/fix-review-<slug>
 branch        = fix/review-bot-<slug>
 plan-path     = docs/plans/YYYY-MM-DD-review-bot-<slug>.md   (UTC date)
@@ -146,10 +153,11 @@ plan-path     = docs/plans/YYYY-MM-DD-review-bot-<slug>.md   (UTC date)
 Example for `682b557.1` (`[BLOCKER]` `LlmProviderPort.ts` interface→type sweep):
 
 ```text
-slug          = blocker-llmproviderport-interface-to-type
-worktree-dir  = .worktrees/fix-review-blocker-llmproviderport-interface-to-type
-branch        = fix/review-bot-blocker-llmproviderport-interface-to-type
-plan-path     = docs/plans/2026-04-25-review-bot-blocker-llmproviderport-interface-to-type.md
+slug-base     = blocker-llmproviderport-interface-to-type
+slug          = blocker-llmproviderport-interface-to-type-682b557-1
+worktree-dir  = .worktrees/fix-review-blocker-llmproviderport-interface-to-type-682b557-1
+branch        = fix/review-bot-blocker-llmproviderport-interface-to-type-682b557-1
+plan-path     = docs/plans/2026-04-25-review-bot-blocker-llmproviderport-interface-to-type-682b557-1.md
 ```
 
 ### 4. Create the worktree + branch
