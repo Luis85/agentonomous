@@ -3,6 +3,13 @@
 Thanks for helping out. This document captures the workflow we've converged on
 for branches, commits, releases, and local development.
 
+> **Working with an AI coding assistant?** See
+> [`.claude/memory/`](./.claude/memory/) — a checked-in, project-wide
+> memory bank covering release posture, review workflow, and the
+> conventions Codex / maintainer reviews assume. Same baseline for every
+> contributor and every agent. Start with
+> [`.claude/memory/MEMORY.md`](./.claude/memory/MEMORY.md).
+
 ## Branch model
 
 We follow a [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/)–flavored
