@@ -120,7 +120,7 @@ jobs:
   test:
     name: Test (Vitest + coverage)
     runs-on: ubuntu-latest
-    needs: [format-check, lint, typecheck, actionlint, docs]
+    needs: [format-check, lint, typecheck, actionlint, audit, docs]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
