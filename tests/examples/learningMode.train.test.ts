@@ -12,7 +12,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock }
 import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
 import {
   interpretSoftmax,
-  setLearningAgentId,
+  setLearningAgent,
   SOFTMAX_SKILL_IDS,
 } from '../../examples/nurture-pet/src/cognition/learning.js';
 import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
@@ -20,7 +20,12 @@ import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
 interface FakeAgent {
   setReasoner: Mock<(r: unknown) => void>;
   setLearner: Mock<(l: unknown) => void>;
-  getState: () => { needs: Record<string, number> };
+  getState: () => {
+    needs: Record<string, number>;
+    modifiers: ReadonlyArray<{ id: string }>;
+    mood?: { category: string; updatedAt: number };
+  };
+  subscribe: (handler: (e: { type: string }) => void) => () => void;
   identity: { id: string; name: string };
   rng: {
     next: () => number;
@@ -97,16 +102,22 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
 }> {
   const agentId = opts.agentId ?? 'test-pet';
   const root = renderRoot();
-  setLearningAgentId(agentId);
   const fakeAgent: FakeAgent = {
     setReasoner: vi.fn(),
     setLearner: vi.fn(),
     getState: () => ({
       needs: { hunger: 0.5, cleanliness: 0.5, happiness: 0.5, energy: 0.5, health: 0.5 },
+      modifiers: [],
     }),
+    // No-op event subscription. The learning module's `setLearningAgent`
+    // wires real handlers when running against a live `Agent`; the test
+    // double exercises the localStorage-scoping side without driving the
+    // mood / event-count state.
+    subscribe: () => () => undefined,
     identity: { id: agentId, name: agentId },
     rng: makeFakeRng(),
   };
+  setLearningAgent(fakeAgent as never);
   mountCognitionSwitcher(fakeAgent as never, root);
   mountResetButton(fakeAgent as never);
   const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
@@ -247,12 +258,13 @@ describe('Train click handler', () => {
     expect(typeof parsed.weights).toBe('string');
     expect(parsed.weights!.length).toBeGreaterThan(0);
     expect(Array.isArray(parsed.weightsShapes)).toBe(true);
-    // Topology contract: [5, 16] kernel + [16] bias on the hidden dense
-    // layer, then [16, 7] kernel + [7] bias on the softmax head. Locks
-    // the post-train snapshot to the row-17 shape so a topology drift
-    // can't sneak past review.
+    // Topology contract: [13, 16] kernel + [16] bias on the hidden
+    // dense layer, then [16, 7] kernel + [7] bias on the softmax head.
+    // 13 = 5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event
+    // counts (row 18). Locks the post-train snapshot shape so a
+    // topology drift can't sneak past review.
     expect(parsed.weightsShapes).toEqual([
-      [5, 16],
+      [13, 16],
       [16],
       [16, SOFTMAX_SKILL_IDS.length],
       [SOFTMAX_SKILL_IDS.length],

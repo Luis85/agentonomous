@@ -39,13 +39,39 @@ export const SOFTMAX_SKILL_IDS = [
 const SOFTMAX_DIM = SOFTMAX_SKILL_IDS.length;
 
 /**
- * Input feature width — matches `featuresFromNeeds`'s return length (the
- * 5 normalized need levels). Hydration rejects snapshots whose model's
+ * Mood categories surfaced as one-hot dims in the feature vector.
+ * Order is load-bearing — matches the bundled baseline + Train button
+ * generator. Off-roster moods (`content`, `angry`, `bored`, `sick`, …)
+ * collapse to the all-zero one-hot. Picked to cover the four most
+ * narratively-distinct demo states; richer mood encoding can grow this
+ * roster in lockstep with the seed script + tests.
+ */
+const MOOD_KEYS = ['happy', 'sad', 'sleepy', 'playful'] as const;
+
+/**
+ * Sliding window (in `AgentTicked` ticks) over which `featuresFromNeeds`
+ * counts `SkillCompleted` / `SkillFailed` / `NeedCritical` events. 30
+ * ticks ≈ 30 × default 200 ms tick budget = 6 s of subjective-time
+ * activity at base speed.
+ */
+const EVENT_WINDOW_TICKS = 30;
+
+/**
+ * Cap used to normalize event counts and modifier counts into [0, 1].
+ * Counts above this saturate to 1.0 — five completions / failures /
+ * criticals / active modifiers in a 30-tick window is already
+ * exceptional in the demo's pacing, so the cap is the right ceiling.
+ */
+const COUNT_NORM_CAP = 5;
+
+/**
+ * Input feature width: 5 needs + 4 mood one-hot + 1 modifier-count + 3
+ * recent-event counts = 13. Hydration rejects snapshots whose model's
  * input layer expects a different last-dim so a width mismatch fails
  * fast at construct() rather than at runtime when `model.predict` first
- * receives a 5-element vector.
+ * receives a 13-element vector.
  */
-const FEATURE_DIM = 5;
+const FEATURE_DIM = 5 + MOOD_KEYS.length + 1 + 3;
 
 /**
  * Idle floor for the learning-mode `interpret()` gate. The network's
@@ -63,16 +89,84 @@ const IDLE_THRESHOLD = 0.2;
 
 /**
  * Module-scoped agent id used as the localStorage key scope when
- * hydrating the trained network. Set once from `main.ts` after the
- * agent is created. Kept module-scoped (rather than widening
- * `CognitionModeSpec.construct(agentId)`) because no other mode needs
- * agent-id scoping.
+ * hydrating the trained network. Set by `setLearningAgent` from
+ * `main.ts` after the agent is created. Kept module-scoped (rather
+ * than widening `CognitionModeSpec.construct(agentId)`) because no
+ * other mode needs agent-id scoping.
  */
 let agentIdForHydration: string | null = null;
 
-/** Inject the agent id used as the localStorage key scope when hydrating. */
-export function setLearningAgentId(id: string | null): void {
-  agentIdForHydration = id;
+/**
+ * Module-scoped recent state used by `featuresFromNeeds` to build the
+ * mood / modifier-count / event-count dims. Populated via the agent
+ * subscription wired up in `setLearningAgent`. Kept module-scoped so
+ * the consumer-supplied `featuresOf` callback (which only receives
+ * `ReasonerContext` + `helpers`) can read it without widening the
+ * adapter's helpers shape.
+ */
+let currentMood: string | null = null;
+let currentTick = 0;
+type RecentEventKind = 'completed' | 'failed' | 'critical';
+let recentEvents: Array<{ tick: number; kind: RecentEventKind }> = [];
+let unsubscribers: Array<() => void> = [];
+
+/**
+ * Wire the learning mode to `agent`: store its id for the persisted-
+ * network localStorage scope AND subscribe to the standard event bus
+ * to feed the mood / modifier-count / event-count dims of
+ * `featuresFromNeeds`. Pass `null` to tear down (idempotent).
+ *
+ * The subscription tracks:
+ * - `MoodChanged` → `currentMood` (collapsed to one-hot via `MOOD_KEYS`)
+ * - `AgentTicked` → `currentTick` and prunes events older than
+ *   `EVENT_WINDOW_TICKS`
+ * - `SkillCompleted` / `SkillFailed` / `NeedCritical` → push into
+ *   `recentEvents`
+ */
+export function setLearningAgent(
+  agent: {
+    identity: { id: string };
+    subscribe(handler: (e: { type: string }) => void): () => void;
+  } | null,
+): void {
+  for (const u of unsubscribers) u();
+  unsubscribers = [];
+  currentMood = null;
+  currentTick = 0;
+  recentEvents = [];
+  agentIdForHydration = agent?.identity.id ?? null;
+  if (agent === null) return;
+  unsubscribers.push(
+    agent.subscribe((event) => {
+      switch (event.type) {
+        case 'MoodChanged': {
+          const e = event as { to?: string };
+          if (typeof e.to === 'string') currentMood = e.to;
+          return;
+        }
+        case 'AgentTicked': {
+          const e = event as { tickNumber?: number };
+          if (typeof e.tickNumber === 'number') {
+            currentTick = e.tickNumber;
+            const cutoff = currentTick - EVENT_WINDOW_TICKS;
+            // Prune in place — `recentEvents` is append-then-filter so
+            // a per-tick scan is O(window) and stable.
+            recentEvents = recentEvents.filter((r) => r.tick > cutoff);
+          }
+          return;
+        }
+        case 'SkillCompleted':
+          recentEvents.push({ tick: currentTick, kind: 'completed' });
+          return;
+        case 'SkillFailed':
+          recentEvents.push({ tick: currentTick, kind: 'failed' });
+          return;
+        case 'NeedCritical':
+          recentEvents.push({ tick: currentTick, kind: 'critical' });
+          return;
+      }
+    }),
+  );
 }
 
 function storageKey(agentId: string): string {
@@ -90,17 +184,51 @@ function loadPersistedSnapshot(agentId: string | null): unknown {
   }
 }
 
+/**
+ * Build the 13-dim feature vector consumed by Learning mode's network:
+ *
+ * - 5 need levels (hunger / cleanliness / happiness / energy / health)
+ * - 4 mood one-hot dims indexed by `MOOD_KEYS` (off-roster moods → all
+ *   zero on this section; the network treats it as "uninformative")
+ * - 1 active-modifier count, normalized to `[0, 1]` via
+ *   `min(count, COUNT_NORM_CAP) / COUNT_NORM_CAP`
+ * - 3 recent-event counts (`SkillCompleted` / `SkillFailed` /
+ *   `NeedCritical` in the last `EVENT_WINDOW_TICKS` ticks), each
+ *   normalized via the same cap
+ *
+ * Mood + event counts come from module-scoped state populated by the
+ * `setLearningAgent` subscription rather than via `helpers` — the
+ * adapter's helper shape only exposes `needsLevels()`, and widening
+ * that surface for one consumer would force every reasoner adapter to
+ * track per-agent mood + event windows.
+ */
 function featuresFromNeeds(
-  _ctx: ReasonerContext,
+  ctx: ReasonerContext,
   helpers: { needsLevels(): Record<string, number> },
 ): number[] {
   const levels = helpers.needsLevels();
+  const moodOneHot = MOOD_KEYS.map((key) => (currentMood === key ? 1 : 0));
+  const modCount = Math.min(ctx.modifiers.list().length, COUNT_NORM_CAP) / COUNT_NORM_CAP;
+  let completed = 0;
+  let failed = 0;
+  let critical = 0;
+  for (const e of recentEvents) {
+    if (e.kind === 'completed') completed += 1;
+    else if (e.kind === 'failed') failed += 1;
+    else critical += 1;
+  }
+  const norm = (n: number): number => Math.min(n, COUNT_NORM_CAP) / COUNT_NORM_CAP;
   return [
     levels.hunger ?? 0,
     levels.cleanliness ?? 0,
     levels.happiness ?? 0,
     levels.energy ?? 0,
     levels.health ?? 0,
+    ...moodOneHot,
+    modCount,
+    norm(completed),
+    norm(failed),
+    norm(critical),
   ];
 }
 
@@ -234,19 +362,28 @@ export const learningMode: CognitionModeSpec = {
 
 /**
  * Project a `LearningOutcome` from the cognition pipeline's Stage 8 hook
- * into a 5-dim `(features, oneHotLabel)` training pair for the bundled
- * `learning.network.json` topology.
+ * into a 13-dim `(features, oneHotLabel)` training pair matching the
+ * bundled `learning.network.json` topology.
  *
- * - Features = `details.preNeeds` snapshot — the pre-skill need levels
- *   captured by `CognitionPipeline.invokeSkillAction` BEFORE the skill
- *   runs. Reading post-skill levels (e.g. via `agent.getState().needs`
- *   right now) would invert the policy direction: `feed` raises hunger
- *   from low → high, so a label of "feed" against post-feed features
- *   trains the network on "high hunger → feed" instead of the intended
- *   "low hunger → feed". Falls back to current `agent.getState().needs`
- *   only if the outcome arrived without a `preNeeds` snapshot, for
- *   defensive compatibility with consumer-emitted outcomes (the
- *   library's own pipeline always populates it).
+ * - Need-level dims = `details.preNeeds` snapshot — the pre-skill need
+ *   levels captured by `CognitionPipeline.invokeSkillAction` BEFORE the
+ *   skill runs. Reading post-skill levels (e.g. via
+ *   `agent.getState().needs` right now) would invert the policy
+ *   direction: `feed` raises hunger from low → high, so a label of
+ *   "feed" against post-feed features trains the network on "high
+ *   hunger → feed" instead of the intended "low hunger → feed". Falls
+ *   back to current `agent.getState().needs` only if the outcome
+ *   arrived without a `preNeeds` snapshot, for defensive compatibility
+ *   with consumer-emitted outcomes (the library's own pipeline always
+ *   populates it).
+ * - Mood / modifier-count / event-count dims = current module-scoped
+ *   state at outcome time. Mood lags need changes (the reconciler runs
+ *   after Stage 7), modifier counts only shift when a skill applies /
+ *   removes one, and the event-count window includes this outcome's
+ *   own emission. The first two are stable across a single skill
+ *   invocation; the self-emission inflates the matching count by 1
+ *   uniformly across every training pair, so the net signal is
+ *   consistent.
  * - Label = one-hot 7-vector for SUCCESSFUL outcomes only. Successes
  *   for skill `id` set `label[SOFTMAX_SKILL_IDS.indexOf(id)] = 1`.
  *
@@ -256,9 +393,7 @@ export const learningMode: CognitionModeSpec = {
  * - **Failed outcomes.** An all-zero target under
  *   `categoricalCrossentropy` (`-Σ y_i log p_i`) yields zero loss and
  *   zero gradient — the network would silently ignore failure samples,
- *   so the buffer slot is wasted. Skipping them keeps the loss honest;
- *   when row 18 lifts the failure signal into a richer feature set
- *   (negative `reward` field) we can revisit.
+ *   so the buffer slot is wasted. Skipping them keeps the loss honest.
  * - Successes with non-positive or non-finite `effectiveness`.
  */
 function projectLearningOutcome(
@@ -285,12 +420,30 @@ function projectLearningOutcome(
   // would invert the training direction.
   const preNeeds = (details as { preNeeds?: Record<string, number> }).preNeeds;
   const levels = preNeeds ?? agent.getState().needs;
+  const state = agent.getState();
+  const moodCategory = state.mood?.category;
+  const moodOneHot = MOOD_KEYS.map((key) => (moodCategory === key ? 1 : 0));
+  const modCount = Math.min(state.modifiers.length, COUNT_NORM_CAP) / COUNT_NORM_CAP;
+  let completed = 0;
+  let failedCount = 0;
+  let critical = 0;
+  for (const e of recentEvents) {
+    if (e.kind === 'completed') completed += 1;
+    else if (e.kind === 'failed') failedCount += 1;
+    else critical += 1;
+  }
+  const norm = (n: number): number => Math.min(n, COUNT_NORM_CAP) / COUNT_NORM_CAP;
   const features = [
     levels.hunger ?? 0,
     levels.cleanliness ?? 0,
     levels.happiness ?? 0,
     levels.energy ?? 0,
     levels.health ?? 0,
+    ...moodOneHot,
+    modCount,
+    norm(completed),
+    norm(failedCount),
+    norm(critical),
   ];
   const label = new Array<number>(SOFTMAX_DIM).fill(0);
   label[skillIdx] = 1;
