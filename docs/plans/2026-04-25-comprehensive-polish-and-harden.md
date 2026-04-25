@@ -84,6 +84,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
 | 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
 | 3   | TBD | `chore/ci-actions-sha-pinning`               | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
+| 4   | TBD | `chore/ci-backend-and-os-matrix`             | `test` job split into `test-core` (OS matrix only — ubuntu/macos/windows) and `test-tfjs` (OS × backend matrix — `cpu` × `wasm`). `tests/setup/tfjsBackend{,Setup}.ts` reads `TFJS_BACKEND` env, side-effect-imports the matching tfjs-backend package before any test imports run, and exposes `TEST_BACKEND` so adapter test files inject the matching `backend:` opt into every `new TfjsReasoner` / `TfjsReasoner.fromJSON` call. `fail-fast: false`; webgl dropped (needs headless-runner setup). |
 | 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
 | 11  | #109 | `refactor/persona-bias-extract-helper`      | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
 
@@ -233,20 +234,43 @@ Current `develop` (post-tfjs swap) passes.
 
 **No changeset** — CI-only. **No library change.**
 
-### 4 — Backend + OS matrix
+### 4 — Backend + OS matrix — **shipped**
 
 **Branch:** `chore/ci-backend-and-os-matrix`
 
-**Depends on:** row 20 (backend picker) so the matrix defends a real
-consumer surface.
+**As shipped:**
 
-- tfjs job runs under `cpu` AND `wasm` backends (drop `webgl` —
-  needs significant headless-runner work).
-- Test matrix expands to `macos-latest` + `windows-latest`. tfjs is
-  pure-JS so the matrix is now cheap.
+- `.github/workflows/ci.yml` `test` job split in two (shape b from the
+  row-4 brief): `test-core` runs the full vitest suite across the
+  ubuntu / macos / windows OS matrix (coverage on ubuntu only —
+  identical report across OSes; v8 instrumentation triples runtime
+  on the other cells for no signal); `test-tfjs` runs the four
+  backend-touching tests (`TfjsReasoner.test.ts`,
+  `TfjsLearner.test.ts`, `TfjsSnapshot.test.ts`, and the
+  `learningMode.train.test.ts` DOM test) under the `cpu` × `wasm`
+  backend axis on the same OS matrix.
+- `strategy.fail-fast: false` on both so a windows-only flake or a
+  wasm-only kernel issue does not suppress unrelated cells.
+- `tests/setup/tfjsBackend.ts` exports `TEST_BACKEND` derived from
+  `process.env.TFJS_BACKEND` (default `'cpu'`, `'wasm'` recognised);
+  `tests/setup/tfjsBackendSetup.ts` is wired in `vite.config.ts` as a
+  vitest `setupFiles` entry and side-effect-imports the matching
+  `@tensorflow/tfjs-backend-*` package + calls `tf.setBackend(...)` +
+  `tf.ready()` BEFORE any test file's static imports run. Test files
+  pass `backend: TEST_BACKEND` into every `new TfjsReasoner(...)` /
+  `TfjsReasoner.fromJSON(...)` via local `newReasoner` /
+  `fromJSONReasoner` helpers, so the constructor's "requested backend
+  must match active backend" guard passes on every matrix cell.
+- `webgl` dropped from the axis — its factory throws on first use in
+  headless Node and a real GPU runner is out of scope. The activation-
+  based `detectBestBackend` chain that already covers webgl in src is
+  unaffected. **No `src/` library change** — env-var wire lives
+  entirely under `tests/setup/`.
+- Depends on row 20 (`probeBackend` / `detectBestBackend` already
+  shipped) so the matrix defends a real consumer surface.
 
-**Cost:** ~1 extra runner-minute per push. Catches platform
-surprises early.
+**Cost:** ~1 extra runner-minute per push (3 OSes × 2 backends ×
+small adapter-only test slice). **No changeset** — CI-only.
 
 ---
 

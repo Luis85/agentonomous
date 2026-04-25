@@ -1,4 +1,8 @@
-import '@tensorflow/tfjs-backend-cpu';
+// The matrix-selected backend (`TFJS_BACKEND` env, default `cpu`) is
+// already imported + activated by `tests/setup/tfjsBackendSetup.ts`
+// before this file's static imports run. Importing
+// `@tensorflow/tfjs-backend-cpu` here unconditionally would still be
+// safe (factory registration is idempotent) but is no longer required.
 import * as tf from '@tensorflow/tfjs-core';
 import { layers, sequential, type Sequential } from '@tensorflow/tfjs-layers';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -9,11 +13,34 @@ import {
 import type { IntentionCandidate } from '../../../../src/cognition/IntentionCandidate.js';
 import type { ReasonerContext } from '../../../../src/cognition/reasoning/Reasoner.js';
 import { Modifiers } from '../../../../src/modifiers/Modifiers.js';
+import { TEST_BACKEND } from '../../../setup/tfjsBackend.js';
 
 beforeAll(async () => {
-  await tf.setBackend('cpu');
+  await tf.setBackend(TEST_BACKEND);
   await tf.ready();
 });
+
+/**
+ * Construct a `TfjsReasoner` pinned to the matrix-selected backend so
+ * the constructor's "requested backend must match active backend"
+ * guard passes whether the CI cell selected `cpu` or `wasm`.
+ */
+function newReasoner<In, Out>(
+  opts: ConstructorParameters<typeof TfjsReasoner<In, Out>>[0],
+): TfjsReasoner<In, Out> {
+  return new TfjsReasoner<In, Out>({ ...opts, backend: TEST_BACKEND });
+}
+
+/**
+ * Same idea for the `fromJSON` factory — inject the matrix-selected
+ * backend so the snapshot rehydrates onto whatever `tf.setBackend` is
+ * holding active for this run.
+ */
+function fromJSONReasoner<In, Out>(
+  ...[snapshot, opts]: Parameters<typeof TfjsReasoner.fromJSON<In, Out>>
+): ReturnType<typeof TfjsReasoner.fromJSON<In, Out>> {
+  return TfjsReasoner.fromJSON<In, Out>(snapshot, { ...opts, backend: TEST_BACKEND });
+}
 
 function ctx(candidates: readonly IntentionCandidate[] = []): ReasonerContext {
   return {
@@ -59,7 +86,7 @@ function makeInferenceOnlyModel(): Sequential {
 describe('TfjsReasoner — inference', () => {
   it('selectIntention returns null when interpret yields null', () => {
     const model = makeLinearModel();
-    const reasoner = new TfjsReasoner({
+    const reasoner = newReasoner({
       model,
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -74,7 +101,7 @@ describe('TfjsReasoner — inference', () => {
       { intention: { kind: 'satisfy', type: 'rest' }, score: 0.2, source: 'needs' },
     ];
     const model = makeLinearModel();
-    const reasoner = new TfjsReasoner({
+    const reasoner = newReasoner({
       model,
       featuresOf: () => [1, 0],
       interpret: (_out, _ctx, helpers) => helpers.topCandidate()?.intention ?? null,
@@ -90,7 +117,7 @@ describe('TfjsReasoner — inference', () => {
     const [dense] = model.layers;
     dense!.setWeights([tf.tensor2d([[0.5], [0.25]]), tf.tensor1d([0.1])]);
     let lastOutput: number | null = null;
-    const reasoner = new TfjsReasoner<number[], number[]>({
+    const reasoner = newReasoner<number[], number[]>({
       model,
       featuresOf: () => [2, 4],
       interpret: (out) => {
@@ -110,7 +137,7 @@ describe('TfjsReasoner — inference', () => {
 
   it('getModel returns the same Sequential instance', () => {
     const model = makeLinearModel();
-    const reasoner = new TfjsReasoner({
+    const reasoner = newReasoner({
       model,
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -139,14 +166,14 @@ describe('TfjsReasoner — inference', () => {
     // the model-tensor lifecycle the adapter actually controls.
     {
       const model = makeInferenceOnlyModel();
-      const r = new TfjsReasoner({ model, featuresOf: () => [0, 0], interpret: () => null });
+      const r = newReasoner({ model, featuresOf: () => [0, 0], interpret: () => null });
       r.selectIntention(ctx());
       r.dispose();
     }
     const baseline = tf.memory().numTensors;
     for (let i = 0; i < 10; i++) {
       const model = makeInferenceOnlyModel();
-      const r = new TfjsReasoner({ model, featuresOf: () => [0, 0], interpret: () => null });
+      const r = newReasoner({ model, featuresOf: () => [0, 0], interpret: () => null });
       r.selectIntention(ctx());
       r.dispose();
     }
@@ -163,7 +190,7 @@ describe('TfjsReasoner — inference', () => {
 
   it('selectIntention throws a typed error when featuresOf returns an object map', () => {
     const model = makeInferenceOnlyModel();
-    const reasoner = new TfjsReasoner<Record<string, number>, number[]>({
+    const reasoner = newReasoner<Record<string, number>, number[]>({
       model,
       // Simulates a naïve brain.js migration where features is Record<string,number>.
       featuresOf: () => ({ hunger: 1, cleanliness: 0 }),
@@ -176,7 +203,7 @@ describe('TfjsReasoner — inference', () => {
 
   it('selectIntention does not leak input tensors when featuresOf returns a tf.Tensor', () => {
     const model = makeInferenceOnlyModel();
-    const reasoner = new TfjsReasoner({
+    const reasoner = newReasoner({
       model,
       featuresOf: () => tf.tensor2d([[0.5, 0.5]]),
       interpret: () => null,
@@ -206,7 +233,7 @@ describe('TfjsReasoner — training', () => {
 
   it('train(pairs) reduces loss on a trivially-learnable mapping', async () => {
     const model = makeLinearModel();
-    const reasoner = new TfjsReasoner<number[], number[]>({
+    const reasoner = newReasoner<number[], number[]>({
       model,
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -224,7 +251,7 @@ describe('TfjsReasoner — training', () => {
   it('same pairs + same seed → same final loss (deterministic training)', async () => {
     const pairs = makeConvergingPairs();
     const model1 = makeLinearModel();
-    const r1 = new TfjsReasoner({
+    const r1 = newReasoner({
       model: model1,
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -232,7 +259,7 @@ describe('TfjsReasoner — training', () => {
     const result1 = await r1.train(pairs, { epochs: 50, learningRate: 0.1, seed: 7 });
 
     const model2 = makeLinearModel();
-    const r2 = new TfjsReasoner({
+    const r2 = newReasoner({
       model: model2,
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -247,10 +274,10 @@ describe('TfjsReasoner — training', () => {
   it('train with fixed seed yields reproducible per-epoch loss trajectories', async () => {
     const pairs = makeConvergingPairs();
     const m1 = makeLinearModel();
-    const r1 = new TfjsReasoner({ model: m1, featuresOf: () => [0, 0], interpret: () => null });
+    const r1 = newReasoner({ model: m1, featuresOf: () => [0, 0], interpret: () => null });
     const h1 = await r1.train(pairs, { epochs: 20, learningRate: 0.1, seed: 1 });
     const m2 = makeLinearModel();
-    const r2 = new TfjsReasoner({ model: m2, featuresOf: () => [0, 0], interpret: () => null });
+    const r2 = newReasoner({ model: m2, featuresOf: () => [0, 0], interpret: () => null });
     const h2 = await r2.train(pairs, { epochs: 20, learningRate: 0.1, seed: 1 });
     for (let i = 0; i < h1.history.loss.length; i++) {
       expect(h1.history.loss[i]!).toBeCloseTo(h2.history.loss[i]!, 3);
@@ -261,7 +288,7 @@ describe('TfjsReasoner — training', () => {
 
   it('onEpochEnd fires once per epoch with monotonic 0-indexed epoch + numeric loss', async () => {
     const pairs = makeConvergingPairs();
-    const r = new TfjsReasoner({
+    const r = newReasoner({
       model: makeLinearModel(),
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -284,7 +311,7 @@ describe('TfjsReasoner — training', () => {
   });
 
   it('train without onEpochEnd does not throw (callback is optional)', async () => {
-    const r = new TfjsReasoner({
+    const r = newReasoner({
       model: makeLinearModel(),
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -309,7 +336,7 @@ describe('TfjsReasoner — persistence', () => {
         return null;
       };
     const bag1 = { v: null as number | null };
-    const r1 = new TfjsReasoner<number[], number[]>({
+    const r1 = newReasoner<number[], number[]>({
       model: model1,
       featuresOf: () => [0.7, 0.9],
       interpret: captureOut(bag1),
@@ -321,7 +348,7 @@ describe('TfjsReasoner — persistence', () => {
     expect(snapshot.weightsShapes.length).toBeGreaterThan(0);
 
     const bag2 = { v: null as number | null };
-    const r2 = await TfjsReasoner.fromJSON<number[], number[]>(snapshot, {
+    const r2 = await fromJSONReasoner<number[], number[]>(snapshot, {
       featuresOf: () => [0.7, 0.9],
       interpret: captureOut(bag2),
     });
@@ -340,16 +367,16 @@ describe('TfjsReasoner — persistence', () => {
       weightsShapes: [[5, 1], [1]] as readonly (readonly number[])[],
     };
     await expect(
-      TfjsReasoner.fromJSON(bogus, {
+      fromJSONReasoner(bogus, {
         featuresOf: () => [0],
         interpret: () => null,
       }),
     ).rejects.toThrow();
   });
 
-  it('fromJSON is tolerant of the currently-active backend (no throw for cpu)', async () => {
+  it('fromJSON is tolerant of the currently-active backend (no throw)', async () => {
     const model = makeLinearModel();
-    const r = new TfjsReasoner({
+    const r = newReasoner({
       model,
       featuresOf: () => [0, 0],
       interpret: () => null,
@@ -357,7 +384,7 @@ describe('TfjsReasoner — persistence', () => {
     const snapshot = r.toJSON();
     r.dispose();
 
-    const r2 = await TfjsReasoner.fromJSON(snapshot, {
+    const r2 = await fromJSONReasoner(snapshot, {
       featuresOf: () => [0, 0],
       interpret: () => null,
     });
@@ -395,7 +422,7 @@ describe('TfjsReasoner — bundled demo baseline', () => {
     // uninformative, so the column ordering still favors `feed` here.
     const featureVec = [0.05, 0.6, 0.6, 0.6, 0.6, 0, 0, 0, 0, 0, 0, 0, 0];
     let captured: number[] | null = null;
-    const reasoner = await TfjsReasoner.fromJSON<number[], number[]>(snapshot, {
+    const reasoner = await fromJSONReasoner<number[], number[]>(snapshot, {
       featuresOf: () => featureVec,
       interpret: (out) => {
         captured = out;
@@ -420,13 +447,14 @@ describe('TfjsReasoner — bundled demo baseline', () => {
 describe('TfjsReasoner — backend detection', () => {
   // `detectBestBackend` walks the chain via `tf.setBackend` and
   // commits the first that activates — this can flip the active tfjs
-  // backend. Restore cpu after every case so the shared `beforeAll`
-  // invariant ("tests run on cpu") holds for any case that runs after
-  // this block. `probeBackend` does not flip backends, but the
-  // restore is cheap and idempotent, so we run it unconditionally.
+  // backend. Restore the matrix-selected backend after every case so
+  // the shared `beforeAll` invariant ("tests run on TEST_BACKEND")
+  // holds for any case that runs after this block. `probeBackend`
+  // does not flip backends, but the restore is cheap and idempotent,
+  // so we run it unconditionally.
   afterEach(async () => {
-    if (tf.getBackend() !== 'cpu') {
-      await tf.setBackend('cpu');
+    if (tf.getBackend() !== TEST_BACKEND) {
+      await tf.setBackend(TEST_BACKEND);
       await tf.ready();
     }
   });
