@@ -106,7 +106,9 @@ export class CognitionPipeline {
   /**
    * Invoke a skill through the registry, honoring stage capabilities +
    * modifier effectiveness, and emit the appropriate SkillCompleted /
-   * SkillFailed event.
+   * SkillFailed event. Every terminal branch (success or failure) hands
+   * a `LearningOutcome` to `agent.learner.score(...)` so consumers can
+   * train on both positive and negative evidence.
    */
   async invokeSkillAction(
     skillId: string,
@@ -127,6 +129,7 @@ export class CognitionPipeline {
           message: `Skill '${skillId}' is blocked at stage '${agent.ageModel.stage}'.`,
         };
         agent.publishEvent(event);
+        this.scoreFailure(skillId, params, 'stage-blocked', event.message);
         return;
       }
     }
@@ -140,6 +143,7 @@ export class CognitionPipeline {
         message: `No skill registered with id '${skillId}'.`,
       };
       agent.publishEvent(event);
+      this.scoreFailure(skillId, params, 'not-registered', event.message);
       return;
     }
     // Expose the running skill to the animation reconciler. Scoped to this
@@ -167,6 +171,7 @@ export class CognitionPipeline {
         details: { cause: message },
       };
       agent.publishEvent(event);
+      this.scoreFailure(skillId, params, 'execution-threw', message);
       return;
     }
     agent.currentActiveSkillId = previousActive;
@@ -201,7 +206,27 @@ export class CognitionPipeline {
         ...(result.error.details !== undefined ? { details: result.error.details } : {}),
       };
       agent.publishEvent(event);
+      this.scoreFailure(skillId, params, result.error.code, result.error.message);
     }
+  }
+
+  /**
+   * Common Stage-8 hook for every SkillFailed branch. Mirrors the
+   * success-side `score` call shape so consumers can switch on
+   * `details.failed` to label the outcome (negative reward, one-hot
+   * `[0]`, or skip entirely depending on policy).
+   */
+  private scoreFailure(
+    skillId: string,
+    params: Record<string, unknown> | undefined,
+    code: string,
+    message: string,
+  ): void {
+    this.agent.learner.score({
+      intention: { kind: 'satisfy', type: skillId },
+      actions: [{ type: 'invoke-skill', skillId, ...(params !== undefined ? { params } : {}) }],
+      details: { failed: true, code, message },
+    });
   }
 
   /** Build the SkillContext passed to every skill execution. */

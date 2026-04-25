@@ -172,7 +172,12 @@ export class Agent {
    */
   reasoner: Reasoner;
   readonly behavior: BehaviorRunner;
-  readonly learner: Learner;
+  /**
+   * Current Stage-8 learner. Mutable: consumers live-swap via
+   * `setLearner(learner)`. The cognition pipeline reads this field
+   * fresh each tick rather than capturing it at construction.
+   */
+  learner: Learner;
   readonly skills: SkillRegistry;
   readonly needsPolicy: NeedsPolicy | undefined;
   readonly animation: AnimationStateMachine;
@@ -553,6 +558,35 @@ export class Agent {
   /** Current cognition reasoner. */
   getReasoner(): Reasoner {
     return this.reasoner;
+  }
+
+  /**
+   * Replace the Stage-8 learner used by the cognition pipeline.
+   *
+   * Mirrors `setReasoner`: the pipeline reads `agent.learner` fresh
+   * when scoring outcomes, so the new learner takes effect on the
+   * next `score(...)` call. Nothing is transferred from the outgoing
+   * learner — buffered outcomes / inflight training stay with whoever
+   * still holds the reference. Consumers that want to drain pending
+   * evidence should call `flush()` / `dispose()` on the outgoing
+   * learner before swapping; `setLearner` itself does not call either.
+   *
+   * Throws `TypeError` if `learner` is null / undefined / lacks `score`.
+   */
+  setLearner(learner: Learner): void {
+    if (
+      learner === null ||
+      learner === undefined ||
+      typeof (learner as { score?: unknown }).score !== 'function'
+    ) {
+      throw new TypeError('setLearner: expected a Learner with a score method.');
+    }
+    this.learner = learner;
+  }
+
+  /** Current Stage-8 learner. */
+  getLearner(): Learner {
+    return this.learner;
   }
 
   // =========================================================================

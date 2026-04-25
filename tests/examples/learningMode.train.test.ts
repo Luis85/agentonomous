@@ -15,6 +15,8 @@ import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
 
 interface FakeAgent {
   setReasoner: Mock<(r: unknown) => void>;
+  setLearner: Mock<(l: unknown) => void>;
+  getState: () => { needs: Record<string, number> };
   identity: { id: string; name: string };
   rng: {
     next: () => number;
@@ -51,6 +53,7 @@ function renderRoot(): HTMLElement {
     '<span id="cognition-status" data-mode="heuristic">active</span>' +
     '<button id="train-network" type="button" hidden>Train</button>' +
     '<button id="untrain-network" type="button" hidden>Untrain</button>' +
+    '<span id="learner-buffer" hidden></span>' +
     '</div>' +
     '<button id="reset-button" type="button">Reset</button>';
   return document.querySelector<HTMLElement>('#cognition-switcher')!;
@@ -93,6 +96,10 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
   setLearningAgentId(agentId);
   const fakeAgent: FakeAgent = {
     setReasoner: vi.fn(),
+    setLearner: vi.fn(),
+    getState: () => ({
+      needs: { hunger: 0.5, cleanliness: 0.5, happiness: 0.5, energy: 0.5, health: 0.5 },
+    }),
     identity: { id: agentId, name: agentId },
     rng: makeFakeRng(),
   };
@@ -296,6 +303,150 @@ describe('learningMode.construct() hydration order', () => {
     await selectMode('learning');
     const reasoner = fakeAgent.setReasoner.mock.calls[0]?.[0] as { selectIntention?: unknown };
     expect(typeof reasoner?.selectIntention).toBe('function');
+  });
+});
+
+describe('Learner wiring (setLearner)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  it('attaches a TfjsLearner-shaped learner when learning mode is selected', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    expect(fakeAgent.setLearner.mock.calls.length).toBeGreaterThan(0);
+    const last = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score?: unknown;
+      bufferedCount?: unknown;
+      isTraining?: unknown;
+      dispose?: unknown;
+    };
+    expect(typeof last?.score).toBe('function');
+    expect(typeof last?.bufferedCount).toBe('function');
+    expect(typeof last?.isTraining).toBe('function');
+    expect(typeof last?.dispose).toBe('function');
+  });
+
+  it('falls back to NoopLearner when leaving learning mode', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const beforeLeaveCount = fakeAgent.setLearner.mock.calls.length;
+    await selectMode('heuristic');
+    expect(fakeAgent.setLearner.mock.calls.length).toBeGreaterThan(beforeLeaveCount);
+    const last = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score?: unknown;
+      bufferedCount?: unknown;
+    };
+    expect(typeof last?.score).toBe('function');
+    // NoopLearner has no bufferedCount.
+    expect(last?.bufferedCount).toBeUndefined();
+  });
+
+  it('rebuilds the learner on Untrain', async () => {
+    const { document: doc, fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const enterLearnerCount = fakeAgent.setLearner.mock.calls.length;
+
+    const untrainBtn = doc.getElementById('untrain-network') as HTMLButtonElement;
+    untrainBtn.click();
+    await waitForTrainingFlush(untrainBtn);
+
+    expect(fakeAgent.setLearner.mock.calls.length).toBeGreaterThan(enterLearnerCount);
+    const last = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      bufferedCount?: unknown;
+    };
+    expect(typeof last?.bufferedCount).toBe('function');
+  });
+
+  it('TfjsLearner triggers exactly floor(N/batchSize) background train() calls', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score: (o: unknown) => void;
+      flush: () => Promise<unknown>;
+      bufferedCount: () => number;
+    };
+    // Default LEARNER_BATCH_SIZE = 50. Push 130 outcomes; expect 2
+    // background batches (floor(130/50)) and 30 buffered remainders.
+    for (let i = 0; i < 130; i++) {
+      learner.score({
+        intention: { kind: 'satisfy', type: 'feed' },
+        actions: [],
+        details: { effectiveness: 1 },
+      });
+    }
+    // Drain any inflight background train so bufferedCount stabilises.
+    await learner.flush();
+    expect(learner.bufferedCount()).toBe(0);
+  });
+
+  it('learner-buffer readout is hidden outside learning mode', async () => {
+    const { document: doc, selectMode } = await mountDemo();
+    const span = doc.getElementById('learner-buffer')!;
+    expect(span.hasAttribute('hidden')).toBe(true);
+    await selectMode('learning');
+    expect(span.hasAttribute('hidden')).toBe(false);
+    await selectMode('bt');
+    expect(span.hasAttribute('hidden')).toBe(true);
+  });
+});
+
+describe('projectLearningOutcome (via buildLearningLearner)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  it('labels SkillCompleted outcomes as [1] (positive sample)', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score: (o: unknown) => void;
+      flush: () => Promise<unknown>;
+      bufferedCount: () => number;
+    };
+    // SkillCompleted shape: details.effectiveness > 0.
+    learner.score({
+      intention: { kind: 'satisfy', type: 'feed' },
+      actions: [],
+      details: { effectiveness: 0.8 },
+    });
+    expect(learner.bufferedCount()).toBe(1);
+  });
+
+  it('labels SkillFailed outcomes as [0] (negative sample)', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score: (o: unknown) => void;
+      bufferedCount: () => number;
+    };
+    learner.score({
+      intention: { kind: 'satisfy', type: 'feed' },
+      actions: [],
+      details: { failed: true, code: 'execution-threw', message: 'boom' },
+    });
+    expect(learner.bufferedCount()).toBe(1);
+  });
+
+  it('skips outcomes with neither failed flag nor effectiveness', async () => {
+    const { fakeAgent, selectMode } = await mountDemo();
+    await selectMode('learning');
+    const learner = fakeAgent.setLearner.mock.calls.at(-1)?.[0] as {
+      score: (o: unknown) => void;
+      bufferedCount: () => number;
+    };
+    learner.score({ intention: { kind: 'satisfy', type: 'feed' }, actions: [] });
+    expect(learner.bufferedCount()).toBe(0);
   });
 });
 

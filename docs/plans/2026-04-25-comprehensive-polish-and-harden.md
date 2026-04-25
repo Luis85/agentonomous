@@ -77,6 +77,7 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 13  | #83 | `feat/demo-loss-curve`                       | SVG sparkline of `history.loss` under Train button.                                    |
 | 14  | #84 | `feat/demo-train-epoch-progress`             | `TfjsReasoner.train` `onEpochEnd` callback (minor bump); demo HUD goes live mid-fit.   |
 | 15  | #85 | `feat/llm-port-example-and-readme`           | README LLM section, `examples/llm-mock/` deterministic playback example, vision spec status update. |
+| 16  | TBD | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner` with `Buffered: N/50` HUD. |
 
 ---
 
@@ -402,9 +403,35 @@ consumer-visible documentation beyond JSDoc. Add:
 exercises the surface end-to-end so any rough edges surface BEFORE
 the Phase B adapter work.
 
-### 16 — `TfjsLearner` wired into demo Learning mode
+### 16 — `TfjsLearner` wired into demo Learning mode — **shipped**
 
 **Branch:** `feat/tfjs-learner-in-demo`
+
+**As shipped:**
+
+- Library: added `Agent.setLearner(learner)` + `Agent.getLearner()` (mirror
+  of `setReasoner` / `getReasoner`); Stage 8 (`learner.score`) now also
+  fires from every `SkillFailed` branch with `details.failed: true` plus
+  the failure code / message. Learner JSDoc updated to document the new
+  cadence. Minor bump (additive public surface).
+- Demo: `cognition/learning.ts` exposes `buildLearningLearner(agent,
+  reasoner)` which constructs a `TfjsLearner` with a 5-dim need-level
+  feature projection and a `[1] / [0]` label drawn from
+  `details.effectiveness` (success) or `details.failed` (failure).
+- Switcher: on entering Learning mode, builds the `TfjsLearner` and
+  attaches via `agent.setLearner`. On leaving, attaches a fresh
+  `NoopLearner` and disposes the previous one. Untrain disposes too —
+  "reset to baseline" drops pending evidence rather than baking it
+  in via `flush()`.
+- HUD: a `Buffered: N/50` readout next to the Train button, with a
+  `— training…` suffix while a background batch is in flight. Polled at
+  200 ms while in Learning mode.
+
+**Open question 1 (reward source) resolved:** consumer-supplied
+projection via `toTrainingPair`. Demo's `projectLearningOutcome`
+inspects `outcome.details` rather than relying on a builtin reward
+field, leaving the `LearningOutcome.reward` slot free for richer
+consumer policies.
 
 Stage 8 (score) of the tick pipeline is currently a no-op in the
 demo (`NoopLearner`). Wire a `TfjsLearner` instance to the

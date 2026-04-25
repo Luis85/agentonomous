@@ -189,6 +189,12 @@
         margin-left: auto;
         font-variant-numeric: tabular-nums;
       }
+      .learner-buffer {
+        font-size: 12px;
+        opacity: 0.7;
+        font-variant-numeric: tabular-nums;
+        margin-left: 4px;
+      }
       .loss-sparkline {
         display: block;
         margin-top: 4px;
@@ -505,6 +511,7 @@
         <span class="cognition-status" id="cognition-status" data-mode="heuristic">active</span>
         <button id="train-network" type="button" hidden>Train</button>
         <button id="untrain-network" type="button" hidden>Untrain</button>
+        <span id="learner-buffer" class="learner-buffer" aria-live="polite" hidden></span>
         <svg
           id="loss-sparkline"
           class="loss-sparkline"
