@@ -1,9 +1,10 @@
 # CI — runs on every push and PR to main, develop, and demo.
 #
-# Static checks (format, lint, typecheck, workflow lint) run in
-# parallel for fast feedback. Tests depend on all four passing. Build +
-# bundle-size budget runs last. Mirrors the `npm run verify` pre-PR
-# gate.
+# Static checks (format, lint, typecheck, workflow lint, audit) run in
+# parallel for fast feedback. Tests depend on the static gate passing.
+# Build + bundle-size budget runs last. Mirrors the `npm run verify`
+# pre-PR gate; `audit` blocks on `high`-severity vulnerabilities in
+# production deps to close the supply-chain hole.
 
 name: CI
 
@@ -77,6 +78,22 @@ jobs:
         with:
           fail_level: error
           reporter: github-check
+
+  audit:
+    name: Audit production deps (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      - name: Audit production dependencies (high severity blocks)
+        run: npm audit --omit=dev --audit-level=high
 
   docs:
     name: API docs (typedoc)
