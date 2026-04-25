@@ -1,6 +1,24 @@
-import type { Agent, Reasoner } from 'agentonomous';
+import type { Agent, Learner, Reasoner } from 'agentonomous';
+import { NoopLearner } from 'agentonomous';
 import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
+import { buildLearningLearner } from './cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
+
+/**
+ * Match the LEARNER_BATCH_SIZE in `cognition/learning.ts`. Duplicated
+ * here so the HUD readout can render the threshold without forcing the
+ * switcher to depend on the learning module's runtime constants. The
+ * `learningMode.train.test.ts` covers the wiring; if the constants drift
+ * apart, that test will surface the mismatch.
+ */
+const LEARNER_BATCH_SIZE = 50;
+const LEARNER_READOUT_POLL_MS = 200;
+
+type DisposableLearner = Learner & {
+  bufferedCount?: () => number;
+  isTraining?: () => boolean;
+  dispose?: () => void;
+};
 
 const NEED_IDS = ['hunger', 'cleanliness', 'happiness', 'energy', 'health'] as const;
 const TRAIN_PAIR_COUNT = 30;
@@ -52,6 +70,17 @@ const trainRng = createTrainRng();
 export interface CognitionSwitcherHandle {
   /** Remove the `change` listener and mark the switcher disposed. */
   dispose(): void;
+}
+
+/**
+ * Set the agent's Stage-8 learner if `setLearner` is available. The
+ * library-side method shipped alongside this row, but tests / older
+ * consumers may pass an agent stub without it — guard rather than
+ * throw so a one-off harness doesn't have to mock the whole API.
+ */
+function maybeSetLearner(agent: Agent, learner: Learner): void {
+  const fn = (agent as unknown as { setLearner?: (l: Learner) => void }).setLearner;
+  if (typeof fn === 'function') fn.call(agent, learner);
 }
 
 /**
@@ -126,6 +155,7 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   const trainBtn = document.getElementById('train-network') as HTMLButtonElement | null;
   const untrainBtn = document.getElementById('untrain-network') as HTMLButtonElement | null;
   const sparkline = document.getElementById('loss-sparkline') as unknown as SVGSVGElement | null;
+  const learnerReadout = document.getElementById('learner-buffer') as HTMLElement | null;
   const setTrainVisibility = (modeId: CognitionModeSpec['id']): void => {
     const show = modeId === 'learning';
     if (trainBtn) {
@@ -135,6 +165,13 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     if (untrainBtn) {
       if (show) untrainBtn.removeAttribute('hidden');
       else untrainBtn.setAttribute('hidden', '');
+    }
+    if (learnerReadout) {
+      if (show) learnerReadout.removeAttribute('hidden');
+      else {
+        learnerReadout.setAttribute('hidden', '');
+        learnerReadout.textContent = '';
+      }
     }
     // Sparkline is gated on `learning` mode AND the presence of a prior
     // train run; renderLossSparkline / clearLossSparkline manage the
@@ -147,6 +184,13 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   let changeEpoch = 0;
   let activeModeId: CognitionModeSpec['id'] = 'heuristic';
   let activeReasoner: Reasoner | null = null;
+  // The Learning-mode TfjsLearner is constructed alongside the reasoner
+  // (`buildLearningLearner` in `cognition/learning.ts`) and torn down
+  // when the user switches away. Other modes leave the agent on a
+  // NoopLearner. Tracking the active instance here lets the HUD readout
+  // poll its buffer + the Untrain handler dispose it cleanly.
+  let activeLearner: DisposableLearner | null = null;
+  let learnerReadoutTimer: number | null = null;
   // If the Train button is in flight when the user swaps modes, the
   // outgoing reasoner still has a live `model.fit` running against its
   // tensors. Disposing it immediately frees those tensors mid-fit and
@@ -178,6 +222,69 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
     disposeNow(reasoner);
   };
 
+  const renderLearnerReadout = (): void => {
+    if (!learnerReadout) return;
+    const l = activeLearner;
+    if (!l || typeof l.bufferedCount !== 'function') {
+      learnerReadout.textContent = '';
+      return;
+    }
+    const buffered = l.bufferedCount();
+    const training = typeof l.isTraining === 'function' && l.isTraining();
+    learnerReadout.textContent = training
+      ? `Buffered: ${buffered}/${LEARNER_BATCH_SIZE} — training…`
+      : `Buffered: ${buffered}/${LEARNER_BATCH_SIZE}`;
+  };
+
+  const startLearnerReadout = (): void => {
+    if (learnerReadoutTimer !== null) return;
+    renderLearnerReadout();
+    learnerReadoutTimer = globalThis.setInterval(
+      renderLearnerReadout,
+      LEARNER_READOUT_POLL_MS,
+    ) as unknown as number;
+  };
+
+  const stopLearnerReadout = (): void => {
+    if (learnerReadoutTimer === null) return;
+    globalThis.clearInterval(learnerReadoutTimer);
+    learnerReadoutTimer = null;
+  };
+
+  /**
+   * Replace the agent's Stage-8 learner. For learning mode, builds a
+   * `TfjsLearner` that batch-trains the reasoner on observed outcomes;
+   * for every other mode, falls back to `NoopLearner` so accumulated
+   * outcomes from the prior mode don't bleed across switches.
+   *
+   * Returns the new learner so the caller can stash it as the in-flight
+   * reference for HUD readout / disposal coordination.
+   */
+  const swapLearner = async (
+    modeId: CognitionModeSpec['id'],
+    reasoner: Reasoner,
+  ): Promise<DisposableLearner> => {
+    if (modeId === 'learning') {
+      const learner = (await buildLearningLearner(agent, reasoner)) as DisposableLearner;
+      maybeSetLearner(agent, learner);
+      return learner;
+    }
+    const noop = new NoopLearner() as DisposableLearner;
+    maybeSetLearner(agent, noop);
+    return noop;
+  };
+
+  const disposeLearner = (l: DisposableLearner | null): void => {
+    if (!l) return;
+    if (typeof l.dispose === 'function') {
+      try {
+        l.dispose();
+      } catch {
+        // Best-effort — disposal must not block the UI.
+      }
+    }
+  };
+
   const onChange = async (): Promise<void> => {
     if (disposed) return;
     const mode = COGNITION_MODES.find((m) => m.id === select.value);
@@ -189,14 +296,26 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         disposeIfOwned(reasoner);
         return;
       }
-      const previous = activeReasoner;
+      const previousReasoner = activeReasoner;
+      const previousLearner = activeLearner;
       agent.setReasoner(reasoner);
       activeReasoner = reasoner;
       activeModeId = mode.id;
-      disposeIfOwned(previous);
+      disposeIfOwned(previousReasoner);
+      // Swap learners after the reasoner is in place — the new learner
+      // closes over the new reasoner via `buildLearningLearner`.
+      const learner = await swapLearner(mode.id, reasoner);
+      if (disposed || myEpoch !== changeEpoch) {
+        disposeLearner(learner);
+        return;
+      }
+      activeLearner = learner;
+      disposeLearner(previousLearner);
       status.dataset.mode = mode.id;
       status.textContent = 'active';
       setTrainVisibility(mode.id);
+      if (mode.id === 'learning') startLearnerReadout();
+      else stopLearnerReadout();
     } catch (err) {
       if (disposed || myEpoch !== changeEpoch) return;
       // eslint-disable-next-line no-console -- user-visible diagnostic.
@@ -387,11 +506,24 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         disposeIfOwned(reasoner);
         return;
       }
-      const previous = activeReasoner;
+      const previousReasoner = activeReasoner;
+      const previousLearner = activeLearner;
       agent.setReasoner(reasoner);
       activeReasoner = reasoner;
       activeModeId = 'learning';
-      disposeIfOwned(previous);
+      disposeIfOwned(previousReasoner);
+      // Untrain wipes accumulated buffer too — a "reset to baseline"
+      // shouldn't bake the previous run's evidence into the fresh
+      // reasoner via flush(). Drop the buffered outcomes via dispose,
+      // then rebuild a fresh learner around the new reasoner.
+      const learner = await swapLearner('learning', reasoner);
+      if (disposed || myEpoch !== changeEpoch) {
+        disposeLearner(learner);
+        return;
+      }
+      activeLearner = learner;
+      disposeLearner(previousLearner);
+      startLearnerReadout();
       flashStatus(status, 'Reset to baseline ✓', TRAINED_FLASH_MS);
     } catch (err) {
       if (disposed || myEpoch !== changeEpoch) return;
@@ -437,6 +569,9 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       if (untrainBtn) untrainBtn.removeEventListener('click', onUntrainClickWrapped);
       disposeIfOwned(activeReasoner);
       activeReasoner = null;
+      stopLearnerReadout();
+      disposeLearner(activeLearner);
+      activeLearner = null;
     },
   };
 }

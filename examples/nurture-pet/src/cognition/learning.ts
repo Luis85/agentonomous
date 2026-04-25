@@ -1,6 +1,14 @@
-import type { Reasoner, ReasonerContext } from 'agentonomous';
+import type { Agent, Learner, LearningOutcome, Reasoner, ReasonerContext } from 'agentonomous';
 import type { CognitionModeSpec } from './index.js';
 import networkJson from './learning.network.json';
+
+/**
+ * Buffer size before TfjsLearner kicks off a background train. Picked so a
+ * casually-played session sees its first reinforcement update within ~1
+ * minute of activity at default speed; small enough that the post-train
+ * weight drift is observable in the trace view.
+ */
+const LEARNER_BATCH_SIZE = 50;
 
 /**
  * Urgency floor for the learning-mode `interpret()` gate. The network's
@@ -126,3 +134,81 @@ export const learningMode: CognitionModeSpec = {
     }
   },
 };
+
+/**
+ * Project a `LearningOutcome` from the cognition pipeline's Stage 8 hook
+ * into a 5-dim `(features, label)` training pair for the bundled
+ * `learning.network.json` topology.
+ *
+ * - Features = current need levels (hunger, cleanliness, happiness,
+ *   energy, health). Read at score-time, so the snapshot reflects the
+ *   post-skill levels — that's the input the network would have to
+ *   classify "should I act?" against on the *next* tick.
+ * - Label = `[1]` when the outcome marks the skill as completed
+ *   successfully; `[0]` when it failed (`details.failed === true`,
+ *   shipped from `CognitionPipeline.scoreFailure`).
+ *
+ * Returns `null` for outcomes with no usable signal — e.g. a future
+ * shape that doesn't carry `details.failed` and has no positive
+ * effectiveness either.
+ */
+function projectLearningOutcome(
+  agent: Agent,
+  outcome: LearningOutcome,
+): { features: number[]; label: number[] } | null {
+  const levels = agent.getState().needs;
+  const features = [
+    levels.hunger ?? 0,
+    levels.cleanliness ?? 0,
+    levels.happiness ?? 0,
+    levels.energy ?? 0,
+    levels.health ?? 0,
+  ];
+  const details = outcome.details ?? {};
+  const failed = (details as { failed?: unknown }).failed === true;
+  if (failed) {
+    return { features, label: [0] };
+  }
+  // Success path: SkillCompleted with a positive effectiveness.
+  const eff = (details as { effectiveness?: unknown }).effectiveness;
+  if (typeof eff === 'number' && Number.isFinite(eff) && eff > 0) {
+    return { features, label: [1] };
+  }
+  return null;
+}
+
+/**
+ * Build the Learning-mode reinforcement learner. Dynamically imports the
+ * tfjs adapter so the peer dep stays out of the main bundle until the
+ * learning mode is selected.
+ *
+ * The returned learner buffers `LearningOutcome`s scored by Stage 8 of
+ * the cognition pipeline, batch-trains the supplied reasoner every
+ * `LEARNER_BATCH_SIZE` outcomes in the background, and stays out of the
+ * tick loop's critical path. Ownership transfers to the caller — call
+ * `dispose()` (or `flush()` first) before discarding.
+ */
+export async function buildLearningLearner(
+  agent: Agent,
+  reasoner: Reasoner,
+): Promise<Learner & { bufferedCount(): number; isTraining(): boolean; dispose(): void }> {
+  const { TfjsLearner } = await import('agentonomous/cognition/adapters/tfjs');
+  // The `Reasoner` interface is the type-system contract the switcher
+  // tracks; the runtime instance from `learningMode.construct()` is a
+  // `TfjsReasoner` and exposes `train`. Cast through `unknown` to satisfy
+  // the `TrainableReasoner` shape without re-importing `TfjsReasoner`
+  // here (its module is the dynamic import above and we don't want to
+  // double-bundle).
+  const trainable = reasoner as unknown as ConstructorParameters<
+    typeof TfjsLearner<number[], number[]>
+  >[0]['reasoner'];
+  return new TfjsLearner<number[], number[]>({
+    reasoner: trainable,
+    toTrainingPair: (outcome) => projectLearningOutcome(agent, outcome),
+    batchSize: LEARNER_BATCH_SIZE,
+    onTrainError: (err) => {
+      // eslint-disable-next-line no-console -- background-train diagnostics.
+      console.warn('learning: background train failed', err);
+    },
+  });
+}
