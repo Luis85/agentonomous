@@ -167,6 +167,17 @@ export default defineConfig({
       reporter: ['text', 'html', 'lcov'],
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/index.ts', 'src/**/*.d.ts'],
+      // Baseline 2026-04-25 (commit f6e4464): statements 76.22 / branches
+      // 66.61 / functions 85.42 / lines 77.78. Thresholds set at
+      // floor(measured - 2) so routine PRs don't trip the gate but a
+      // coverage regression beyond ~2pp fails the build. Bump these in
+      // step with measured improvements (cite the new baseline + commit).
+      thresholds: {
+        statements: 74,
+        branches: 64,
+        functions: 83,
+        lines: 75,
+      },
     },
   },
 });

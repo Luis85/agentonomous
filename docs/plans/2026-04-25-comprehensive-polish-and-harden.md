@@ -156,7 +156,7 @@ land in parallel batches. Tooling closes out.
 | 18  | demo     | `feat/demo-richer-feature-vector`                   | Add mood + modifier-count + recent-events to the feature vector                  | S     | —     |
 | 19  | demo     | `feat/demo-prediction-strip`                        | HUD strip showing last scalar output + `URGENCY_THRESHOLD` line                  | S     | —     |
 | 20  | lib      | `feat/tfjs-detect-backend-and-picker`               | `TfjsReasoner.detectBestBackend()` + demo backend dropdown                       | S+S   | minor |
-| 21  | tooling  | `chore/vitest-coverage-thresholds`                  | Set coverage floors (lines/functions/branches/statements) at current −2%        | XS    | —     |
+| 21  | tooling  | `chore/vitest-coverage-thresholds`                  | Set coverage floors (lines/functions/branches/statements) at current −2% — **shipped** | XS    | —     |
 | 22  | tooling  | `chore/peer-deps-pin-minimums`                      | `excalibur`, `openai`, `anthropic-sdk`, `sim-ecs` `*` → real semver ranges       | S     | —     |
 | 23  | docs     | `docs/result-jsdoc`                                 | JSDoc on `isOk` / `isErr` / `map` / `mapErr` / `andThen` / `unwrap`              | XS    | —     |
 | 24  | docs     | `docs/intention-candidate-discriminant`             | Semantic JSDoc on `IntentionCandidate.discriminant` (range, tie-break)           | XS    | —     |
@@ -694,14 +694,25 @@ getter needed.
 
 ## Track 5 — Tooling (rows 21–22)
 
-### 21 — Vitest coverage thresholds
+### 21 — Vitest coverage thresholds — **shipped**
 
 **Branch:** `chore/vitest-coverage-thresholds`
 
-`vite.config.ts:156-161` sets up the reporter but doesn't enforce
-`thresholds: { lines, functions, branches, statements }`. CI runs
-coverage (`test:coverage`) but a drop wouldn't fail. Measure current
-baseline, set at -2% floor.
+**As shipped:**
+
+- Baseline measured on develop @ `f6e4464`: statements 76.22% /
+  branches 66.61% / functions 85.42% / lines 77.78%.
+- `vite.config.ts` `coverage` block now carries a `thresholds`
+  entry set at floor(measured − 2): `statements: 74`, `branches:
+  64`, `functions: 83`, `lines: 75`. Vitest exits non-zero when
+  coverage dips below any of them, so CI's `test:coverage` job
+  starts catching regressions instead of silently shrugging.
+- A trailing comment cites the baseline date + commit so future
+  bumps know what to compare against.
+- Verified the gate fires: temporarily bumping `statements` to 79
+  produced `ERROR: Coverage for statements (76.22%) does not meet
+  global threshold (79%)` and exit code 1 (reverted before
+  commit).
 
 **Cost:** XS.
 
