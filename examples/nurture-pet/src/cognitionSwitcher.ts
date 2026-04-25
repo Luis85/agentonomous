@@ -769,52 +769,84 @@ function mountBackendPicker(rootEl: HTMLElement, hooks: BackendPickerHooks): Bac
   const backendSelect = rootEl.querySelector<HTMLSelectElement>('#cognition-backend-select');
   if (!backendSelect) return { dispose: (): void => undefined };
 
-  let initialBackend: Backend = getLearningBackend();
+  // Read the persisted choice but do NOT propagate it to
+  // `selectedBackend` until the async probe validates it. A stale
+  // localStorage value (e.g. `'webgl'` from a previous session on a
+  // device that no longer has a GL context) would otherwise be
+  // applied synchronously, and a fast user click on Learning before
+  // the async probe finishes would land in `learningMode.construct()`
+  // with an unsupported backend — `fromJSON` rejects with
+  // `TfjsBackendNotRegisteredError`, the existing `onChange` catch
+  // path disables Learning mode for the rest of the session, and
+  // the user can't pick CPU as a recovery.
+  let persisted: Backend | null = null;
   try {
     const raw = globalThis.localStorage?.getItem(BACKEND_STORAGE_KEY);
-    if (typeof raw === 'string' && isBackend(raw)) {
-      initialBackend = raw;
-      setLearningBackend(initialBackend);
-    }
+    if (typeof raw === 'string' && isBackend(raw)) persisted = raw;
   } catch {
-    // localStorage unavailable — keep the default.
+    // localStorage unavailable — proceed with the cpu default.
   }
-  backendSelect.value = initialBackend;
+
+  // Seed selectedBackend with `cpu` synchronously. CPU is always
+  // registered (the package gates nothing on environment), so any
+  // Learning activation that races the probe succeeds. After the
+  // probe validates `persisted`, we promote it (and force a same-
+  // mode reconstruct when Learning is the active cognition mode so
+  // the running reasoner picks up the upgraded backend).
+  setLearningBackend('cpu');
+  backendSelect.value = persisted ?? 'cpu';
 
   void (async (): Promise<void> => {
     try {
       const { TfjsReasoner } = await import('agentonomous/cognition/adapters/tfjs');
-      await Promise.all(
-        VALID_BACKENDS.map(async (name) => {
-          const ok = await TfjsReasoner.probeBackend(name);
-          if (hooks.isDisposed()) return;
-          const opt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${name}"]`);
-          if (!opt) return;
-          if (ok) {
-            opt.disabled = false;
-            opt.removeAttribute('title');
-          } else {
-            opt.disabled = true;
-            opt.title = `${name.toUpperCase()} unavailable in this browser`;
-            // Persisted selection unreachable — fall back to cpu
-            // (always available) and re-persist the corrected value
-            // so a future load doesn't re-pick the broken one.
-            if (backendSelect.value === name) {
-              backendSelect.value = 'cpu';
-              setLearningBackend('cpu');
-              try {
-                globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, 'cpu');
-              } catch {
-                // localStorage unavailable — selection still applied for this session.
-              }
-            }
-          }
-        }),
+      const probeResults = await Promise.all(
+        VALID_BACKENDS.map(async (name) => ({
+          name,
+          ok: await TfjsReasoner.probeBackend(name),
+        })),
       );
+      if (hooks.isDisposed()) return;
+
+      for (const { name, ok } of probeResults) {
+        const opt = backendSelect.querySelector<HTMLOptionElement>(`option[value="${name}"]`);
+        if (!opt) continue;
+        if (ok) {
+          opt.disabled = false;
+          opt.removeAttribute('title');
+        } else {
+          opt.disabled = true;
+          opt.title = `${name.toUpperCase()} unavailable in this browser`;
+        }
+      }
+
+      // Promote the persisted selection to `selectedBackend` ONLY
+      // if its probe succeeded. Otherwise keep `cpu` and re-persist
+      // `'cpu'` so a future reload doesn't keep choosing the broken
+      // option.
+      const persistedOk =
+        persisted !== null && persisted !== 'cpu'
+          ? (probeResults.find((r) => r.name === persisted)?.ok ?? false)
+          : true;
+      if (persistedOk && persisted !== null && persisted !== 'cpu') {
+        setLearningBackend(persisted);
+        backendSelect.value = persisted;
+        // If Learning was selected during the probe window, force a
+        // same-mode reconstruct so the in-flight reasoner picks up
+        // the upgraded backend.
+        if (hooks.isLearningActive()) hooks.triggerReconstruct();
+      } else if (!persistedOk && persisted !== null) {
+        backendSelect.value = 'cpu';
+        try {
+          globalThis.localStorage?.setItem(BACKEND_STORAGE_KEY, 'cpu');
+        } catch {
+          // localStorage unavailable — selection still applied for this session.
+        }
+      }
     } catch {
       // Adapter import failed (peer dep missing). Leave all options
       // enabled; if the user actually selects Learning mode, the mode's
-      // own probe surfaces the missing dep.
+      // own probe surfaces the missing dep. selectedBackend stays at
+      // 'cpu' so Learning still has a viable activation path.
     }
   })();
 
