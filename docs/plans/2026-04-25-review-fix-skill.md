@@ -514,7 +514,14 @@ verbatim:
 name: review-fix-shipped
 
 on:
-  pull_request:
+  # `pull_request_target` runs in the base-repo context with a write-
+  # capable GITHUB_TOKEN. We need that to PATCH the tracker comment on
+  # merges from fork PRs, where the standard `pull_request` event fires
+  # with a read-only token. This is safe because the workflow does NOT
+  # check out or execute any PR-supplied code — it only reads
+  # `context.payload.pull_request.body` (already present in the event
+  # payload) and calls the GitHub REST API.
+  pull_request_target:
     types: [closed]
 
 permissions:
@@ -556,60 +563,68 @@ jobs:
               const findingId = `${sha7}.${idxStr}`;
               const marker = `<!-- f:${findingId} -->`;
 
-              core.info(`Looking for ${marker} in #${issueNumber} comments...`);
+              // Per-match try/catch: a missing/inaccessible target issue
+              // (or any other transient API error) must not abort sibling
+              // matches in the same PR body. Soft-warn and continue so
+              // the rest of the flips still happen.
+              try {
+                core.info(`Looking for ${marker} in #${issueNumber} comments...`);
 
-              const iterator = github.paginate.iterator(
-                github.rest.issues.listComments,
-                {
+                const iterator = github.paginate.iterator(
+                  github.rest.issues.listComments,
+                  {
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    per_page: 100,
+                  },
+                );
+
+                let hit = null;
+                for await (const { data: page } of iterator) {
+                  hit = page.find((c) => c.body && c.body.includes(marker));
+                  if (hit) break;
+                }
+
+                if (!hit) {
+                  core.warning(`Finding ${findingId} not found in #${issueNumber}. Skipping.`);
+                  continue;
+                }
+
+                // Locate the line containing the marker by string ops (no
+                // regex escaping needed). Markers are unique per finding ID,
+                // so a single substring search is sufficient.
+                const markerIdx = hit.body.indexOf(marker);
+                const lineStart = hit.body.lastIndexOf('\n', markerIdx) + 1;
+                const lineEndRaw = hit.body.indexOf('\n', markerIdx);
+                const lineEnd = lineEndRaw === -1 ? hit.body.length : lineEndRaw;
+                const line = hit.body.slice(lineStart, lineEnd);
+
+                if (line.startsWith('- [x] ')) {
+                  core.warning(`Finding ${findingId} already shipped. Skipping.`);
+                  continue;
+                }
+                if (!line.startsWith('- [ ] ')) {
+                  core.warning(`Marker ${marker} found but checklist line shape unexpected: ${line.slice(0, 40)}... Skipping.`);
+                  continue;
+                }
+
+                const newLine = line
+                  .replace('- [ ] ', '- [x] ')
+                  .replace(` ${marker}`, ` (shipped in #${prNumber}) ${marker}`);
+                const newBody = hit.body.slice(0, lineStart) + newLine + hit.body.slice(lineEnd);
+
+                await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  per_page: 100,
-                },
-              );
+                  comment_id: hit.id,
+                  body: newBody,
+                });
 
-              let hit = null;
-              for await (const { data: page } of iterator) {
-                hit = page.find((c) => c.body && c.body.includes(marker));
-                if (hit) break;
+                core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
+              } catch (err) {
+                core.warning(`Failed to process finding ${findingId} in #${issueNumber}: ${err.message}. Continuing with remaining matches.`);
               }
-
-              if (!hit) {
-                core.warning(`Finding ${findingId} not found in #${issueNumber}. Skipping.`);
-                continue;
-              }
-
-              // Locate the line containing the marker by string ops (no
-              // regex escaping needed). Markers are unique per finding ID,
-              // so a single substring search is sufficient.
-              const markerIdx = hit.body.indexOf(marker);
-              const lineStart = hit.body.lastIndexOf('\n', markerIdx) + 1;
-              const lineEndRaw = hit.body.indexOf('\n', markerIdx);
-              const lineEnd = lineEndRaw === -1 ? hit.body.length : lineEndRaw;
-              const line = hit.body.slice(lineStart, lineEnd);
-
-              if (line.startsWith('- [x] ')) {
-                core.warning(`Finding ${findingId} already shipped. Skipping.`);
-                continue;
-              }
-              if (!line.startsWith('- [ ] ')) {
-                core.warning(`Marker ${marker} found but checklist line shape unexpected: ${line.slice(0, 40)}... Skipping.`);
-                continue;
-              }
-
-              const newLine = line
-                .replace('- [ ] ', '- [x] ')
-                .replace(` ${marker}`, ` (shipped in #${prNumber}) ${marker}`);
-              const newBody = hit.body.slice(0, lineStart) + newLine + hit.body.slice(lineEnd);
-
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: hit.id,
-                body: newBody,
-              });
-
-              core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
             }
 ```
 
