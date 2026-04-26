@@ -15,6 +15,6 @@ import type { Needs } from './Needs.js';
  * Compose them via `ComposedNeedsPolicy` when an agent should both express
  * and self-satisfy.
  */
-export interface NeedsPolicy {
+export type NeedsPolicy = {
   suggest(needs: Needs, persona?: Persona): readonly IntentionCandidate[];
-}
+};

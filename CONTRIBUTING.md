@@ -3,6 +3,13 @@
 Thanks for helping out. This document captures the workflow we've converged on
 for branches, commits, releases, and local development.
 
+> **Working with an AI coding assistant?** See
+> [`.claude/memory/`](./.claude/memory/) — a checked-in, project-wide
+> memory bank covering release posture, review workflow, and the
+> conventions Codex / maintainer reviews assume. Same baseline for every
+> contributor and every agent. Start with
+> [`.claude/memory/MEMORY.md`](./.claude/memory/MEMORY.md).
+
 ## Branch model
 
 We follow a [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/)–flavored
@@ -108,20 +115,25 @@ into `develop` afterwards so the fix propagates.
 
 ## Commit messages
 
-Subject line: `<type>: <summary>` or `<Rxx>: <summary>` for remediation items.
+Subject line: `<type>: <summary>` or `<type>(<scope>): <summary>`
+(Conventional Commits — scope optional).
 
 - `type` is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`.
 - Keep subjects under 72 chars.
 - Body explains **why**, not what. Wrap at 72.
 - One logical change per commit. Squash noise before opening a PR.
 
-Example:
+Examples:
 
 ```
 fix: snapshot mood roundtrip no longer re-emits MoodChanged
 
 The previous restore path set `currentMood` only when a snapshot
 carried one, leaving stale state on partial restores. …
+```
+
+```
+feat(persistence): add LocalStorage adapter
 ```
 
 ## Pull requests

@@ -3,20 +3,20 @@ import type { MoodCategory } from '../mood/Mood.js';
 import type { AnimationState } from './AnimationState.js';
 
 /** A recorded state rotation. Useful for debug overlays + replay tests. */
-export interface AnimationTransition {
+export type AnimationTransition = {
   from: AnimationState;
   to: AnimationState;
   at: number;
   reason?: string;
   fxHint?: string;
-}
+};
 
-export interface ReconcileContext {
+export type ReconcileContext = {
   activeSkillId?: string;
   mood?: MoodCategory;
   modifiers?: Modifiers;
   wallNowMs: number;
-}
+};
 
 /**
  * Options for `AnimationStateMachine`. Consumers tune how the reconciler
@@ -33,13 +33,13 @@ export interface ReconcileContext {
  *   On overflow the oldest entry is evicted. Guards long-running agents
  *   against unbounded history growth.
  */
-export interface AnimationStateMachineOptions {
+export type AnimationStateMachineOptions = {
   skillMap?: Readonly<Record<string, AnimationState>>;
   modifierOverrides?: Readonly<Record<string, AnimationState>>;
   moodMap?: Readonly<Record<string, AnimationState>>;
   idleState?: AnimationState;
   maxHistorySize?: number;
-}
+};
 
 export const DEFAULT_ANIMATION_HISTORY_SIZE = 1000;
 

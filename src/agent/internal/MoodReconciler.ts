@@ -22,7 +22,7 @@ export class MoodReconciler {
       previous,
     });
     agent.currentMood = next;
-    if (previous && previous.category === next.category) return null;
+    if (previous?.category === next.category) return null;
     const event: MoodChangedEvent = {
       type: MOOD_CHANGED,
       at,
@@ -31,7 +31,7 @@ export class MoodReconciler {
       to: next.category,
       valence: next.valence,
     };
-    agent._internalPublish(event);
+    agent.publishEvent(event);
     return { from: previous?.category, to: next.category, valence: next.valence };
   }
 }

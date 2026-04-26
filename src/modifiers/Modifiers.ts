@@ -7,16 +7,22 @@ import { NumericModifierResolver } from './NumericModifierResolver.js';
  * Reason a modifier left the collection — used by `Modifiers.tick(...)` to
  * report expirations upstream.
  */
-export interface ModifierRemoval {
+export type ModifierRemoval = {
   modifier: Modifier;
   reason: 'expired' | 'removed' | 'replaced';
-}
+};
 
 /**
  * Cross-cutting buff/debuff collection. Consulted every tick by Needs,
  * Mood (M5), Skills (M7), and the Reasoner (M7). Stores modifiers by
  * internal key (id + incrementing ordinal) to support `stack` entries
  * that share an id.
+ *
+ * @experimental — the direct constructor is wrapped by a `modifiers`
+ * module in the 1.1 composable kernel. Prefer applying modifiers via
+ * the agent (`facade.applyModifier(...)` / `SkillContext.applyModifier`)
+ * or declaring them on a species descriptor; reach for `new
+ * Modifiers()` only when you need full control over the slot.
  */
 export class Modifiers {
   private readonly entries: { key: string; mod: Modifier }[] = [];
@@ -77,7 +83,7 @@ export class Modifiers {
     const removed: Modifier[] = [];
     for (let i = this.entries.length - 1; i >= 0; i--) {
       const entry = this.entries[i];
-      if (entry && entry.mod.id === id) {
+      if (entry?.mod.id === id) {
         removed.unshift(entry.mod);
         this.entries.splice(i, 1);
       }

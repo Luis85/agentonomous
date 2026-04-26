@@ -6,6 +6,10 @@ import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
 import { InvalidTimeScaleError, MissingDependencyError } from '../../../src/agent/errors.js';
+import { AGENT_TICKED, type AgentTickedEvent } from '../../../src/events/standardEvents.js';
+import { ArrayScriptedController } from '../../../src/agent/ScriptedController.js';
+import { createAgent } from '../../../src/agent/createAgent.js';
+import type { DomainEvent } from '../../../src/events/DomainEvent.js';
 
 function baseDeps(overrides: Partial<AgentDependencies> = {}): AgentDependencies {
   const identity: AgentIdentity = {
@@ -304,5 +308,88 @@ describe('Agent (M2 shell)', () => {
 
       expect(observed).toEqual([3, 0]);
     });
+  });
+});
+
+describe('AgentTicked emission', () => {
+  it('emits exactly one AgentTicked event per completed tick, after trace is assembled', async () => {
+    const bus = new InMemoryEventBus();
+    const events: DomainEvent[] = [];
+    bus.subscribe((e) => events.push(e));
+    const agent = createAgent({
+      id: 'pet',
+      species: 'cat',
+      clock: new ManualClock(1_000),
+      rng: 0,
+      eventBus: bus,
+    });
+
+    const trace1 = await agent.tick(0.1);
+
+    const ticked1 = events.filter((e) => e.type === AGENT_TICKED) as AgentTickedEvent[];
+    expect(ticked1).toHaveLength(1);
+    expect(ticked1[0]!.tickNumber).toBe(1);
+    expect(ticked1[0]!.agentId).toBe('pet');
+    expect(ticked1[0]!.wallDtSeconds).toBeCloseTo(0.1);
+    expect(ticked1[0]!.virtualDtSeconds).toBeCloseTo(0.1);
+    expect(trace1.emitted.some((e) => e.type === AGENT_TICKED)).toBe(false);
+    expect(ticked1[0]!.trace).toBe(trace1);
+
+    const trace2 = await agent.tick(0.1);
+    const ticked2 = events.filter((e) => e.type === AGENT_TICKED) as AgentTickedEvent[];
+    expect(ticked2).toHaveLength(2);
+    expect(ticked2[1]!.tickNumber).toBe(2);
+    expect(trace2.emitted.some((e) => e.type === AGENT_TICKED)).toBe(false);
+    expect(ticked2[1]!.trace).toBe(trace2);
+  });
+
+  it('does not emit AgentTicked on a halted short-circuit tick', async () => {
+    const bus = new InMemoryEventBus();
+    const events: DomainEvent[] = [];
+    bus.subscribe((e) => events.push(e));
+    const agent = createAgent({
+      id: 'pet',
+      species: 'cat',
+      clock: new ManualClock(0),
+      rng: 0,
+      eventBus: bus,
+    });
+
+    agent.kill('test');
+    events.length = 0;
+
+    const trace = await agent.tick(0.1);
+    expect(trace.halted).toBe(true);
+    expect(events.filter((e) => e.type === AGENT_TICKED)).toHaveLength(0);
+  });
+
+  it('populates selectedAction with the first action of the tick, or null', async () => {
+    const bus = new InMemoryEventBus();
+    const events: DomainEvent[] = [];
+    bus.subscribe((e) => events.push(e));
+    const scripted = new ArrayScriptedController([
+      [{ type: 'noop' }],
+      [{ type: 'invoke-skill', skillId: 'meow' }],
+      [],
+    ]);
+    const agent = createAgent({
+      id: 'pet',
+      species: 'cat',
+      clock: new ManualClock(0),
+      rng: 0,
+      eventBus: bus,
+      controlMode: 'scripted',
+      scripted,
+    });
+
+    await agent.tick(0.1);
+    await agent.tick(0.1);
+    await agent.tick(0.1);
+
+    const ticked = events.filter((e) => e.type === AGENT_TICKED) as AgentTickedEvent[];
+    expect(ticked).toHaveLength(3);
+    expect(ticked[0]!.selectedAction).toEqual({ type: 'noop' });
+    expect(ticked[1]!.selectedAction).toEqual({ type: 'invoke-skill', skillId: 'meow' });
+    expect(ticked[2]!.selectedAction).toBeNull();
   });
 });

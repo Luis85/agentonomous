@@ -1,0 +1,13 @@
+# Enforce LF line endings for all text files.
+#
+# Why: .editorconfig and .prettierrc both request LF, but without this
+# file Git's per-user `core.autocrlf` setting can convert to CRLF on
+# checkout on Windows. That conversion is invisible in `git diff` (both
+# sides get normalized before comparison) but trips `prettier --check`
+# and creates phantom "248 files changed" status noise after a
+# `prettier --write .` run.
+#
+# `text=auto eol=lf` tells Git to (a) detect text vs binary, (b) store
+# text with LF, and (c) check text out with LF on every platform —
+# regardless of `core.autocrlf`.
+* text=auto eol=lf

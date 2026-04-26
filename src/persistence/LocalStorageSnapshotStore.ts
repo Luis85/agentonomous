@@ -1,16 +1,28 @@
 import type { AgentSnapshot } from './AgentSnapshot.js';
 import type { SnapshotStorePort } from './SnapshotStorePort.js';
 
-const INDEX_KEY = '__agentonomous/index__';
+/**
+ * Internal sub-namespace for the index metadata. Split from data so a
+ * user-supplied key can never collide with the index itself.
+ */
+const META_INDEX_KEY = '__agentonomous/meta/index';
+
+/**
+ * Internal sub-namespace for snapshot payloads. All user-supplied keys
+ * live under this prefix and are `encodeURIComponent`-encoded so strings
+ * that look like meta paths (e.g. `__agentonomous/meta/index`) can't
+ * escape the data subspace.
+ */
+const DATA_PREFIX = '__agentonomous/data/';
 
 /** Minimal storage contract; browser `Storage` satisfies this. */
-export interface StorageLike {
+export type StorageLike = {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
-}
+};
 
-export interface LocalStorageSnapshotStoreOptions {
+export type LocalStorageSnapshotStoreOptions = {
   /** Prefix for keys. Defaults to `'agentonomous/'`. */
   prefix?: string;
   /**
@@ -18,19 +30,38 @@ export interface LocalStorageSnapshotStoreOptions {
    * consumers can inject `sessionStorage` or a stub in tests.
    */
   storage?: StorageLike;
-}
+};
 
 /**
  * Snapshot store backed by a `Storage`-like object (typically
  * `window.localStorage`). Serializes via `JSON.stringify` / `JSON.parse`.
- * Keeps a `prefix/__agentonomous/index__` list so `list()` is O(1).
+ *
+ * Keyspace layout (internal; consumers should not depend on it):
+ *
+ * - `{prefix}__agentonomous/data/{encodeURIComponent(userKey)}` — payloads.
+ * - `{prefix}__agentonomous/meta/index` — the O(1) key list backing `list()`.
+ *
+ * Splitting data from metadata means a user-supplied key that would
+ * otherwise collide with the index path (e.g. the string
+ * `__agentonomous/meta/index`) is `encodeURIComponent`-encoded into
+ * the disjoint data subspace and can never overwrite the index.
  */
 export class LocalStorageSnapshotStore implements SnapshotStorePort {
   private readonly prefix: string;
   private readonly storage: StorageLike;
 
   constructor(opts: LocalStorageSnapshotStoreOptions = {}) {
-    this.prefix = opts.prefix ?? 'agentonomous/';
+    const prefix = opts.prefix ?? 'agentonomous/';
+    // An empty prefix would make `startsWith(prefix)` true for every
+    // storage key, so a future scan-style feature could rewrite
+    // unrelated application data. Reject it at the boundary rather
+    // than leaving that footgun open.
+    if (prefix === '') {
+      throw new Error(
+        'LocalStorageSnapshotStore: `prefix` must not be empty — an empty namespace would collide with unrelated storage keys.',
+      );
+    }
+    this.prefix = prefix;
     const resolved = opts.storage ?? resolveBrowserStorage();
     if (!resolved) {
       throw new Error(
@@ -41,13 +72,25 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   save(key: string, snapshot: AgentSnapshot): Promise<void> {
-    this.storage.setItem(this.prefix + key, JSON.stringify(snapshot));
+    let encoded: string;
+    try {
+      encoded = this.dataKey(key);
+    } catch (cause) {
+      return Promise.reject(cause as Error);
+    }
+    this.storage.setItem(encoded, JSON.stringify(snapshot));
     this.appendIndex(key);
     return Promise.resolve();
   }
 
   load(key: string): Promise<AgentSnapshot | null> {
-    const raw = this.storage.getItem(this.prefix + key);
+    let encoded: string;
+    try {
+      encoded = this.dataKey(key);
+    } catch (cause) {
+      return Promise.reject(cause as Error);
+    }
+    const raw = this.storage.getItem(encoded);
     if (raw === null) return Promise.resolve(null);
     try {
       return Promise.resolve(JSON.parse(raw) as AgentSnapshot);
@@ -61,9 +104,34 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   delete(key: string): Promise<void> {
-    this.storage.removeItem(this.prefix + key);
+    let encoded: string;
+    try {
+      encoded = this.dataKey(key);
+    } catch (cause) {
+      return Promise.reject(cause as Error);
+    }
+    this.storage.removeItem(encoded);
     this.removeFromIndex(key);
     return Promise.resolve();
+  }
+
+  private dataKey(key: string): string {
+    // `encodeURIComponent` throws `URIError` on lone-surrogate inputs
+    // (malformed UTF-16). Re-raise with a message that points the
+    // consumer at the bad key instead of surfacing a bare runtime
+    // error from save / load / delete.
+    try {
+      return this.prefix + DATA_PREFIX + encodeURIComponent(key);
+    } catch (cause) {
+      throw new Error(
+        `LocalStorageSnapshotStore: snapshot key '${key}' is not a well-formed UTF-16 string (${String(cause)}).`,
+        { cause },
+      );
+    }
+  }
+
+  private indexKey(): string {
+    return this.prefix + META_INDEX_KEY;
   }
 
   private appendIndex(key: string): void {
@@ -78,7 +146,7 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   private readIndex(): readonly string[] {
-    const raw = this.storage.getItem(this.prefix + INDEX_KEY);
+    const raw = this.storage.getItem(this.indexKey());
     if (!raw) return [];
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -89,7 +157,7 @@ export class LocalStorageSnapshotStore implements SnapshotStorePort {
   }
 
   private writeIndex(keys: readonly string[]): void {
-    this.storage.setItem(this.prefix + INDEX_KEY, JSON.stringify(keys));
+    this.storage.setItem(this.indexKey(), JSON.stringify(keys));
   }
 }
 

@@ -13,7 +13,7 @@ import type { IntentionCandidate } from '../IntentionCandidate.js';
  * determinism of the inputs — needs, modifiers, persona all behave
  * predictably under fixed seeds.
  */
-export interface ReasonerContext {
+export type ReasonerContext = {
   perceived: readonly DomainEvent[];
   needs: Needs | undefined;
   modifiers: Modifiers;
@@ -24,9 +24,27 @@ export interface ReasonerContext {
    * with its own judgement to make a final pick.
    */
   candidates: readonly IntentionCandidate[];
-}
+};
 
-export interface Reasoner {
+export type Reasoner = {
   /** Choose an intention this tick, or `null` for idle. */
   selectIntention(ctx: ReasonerContext): Intention | null;
-}
+
+  /**
+   * Clear ephemeral between-tick state so the next tick starts from a
+   * known-clean baseline. The kernel invokes this at exactly two points:
+   *
+   * 1. Immediately after `Agent.setReasoner(next)` — on the **incoming**
+   *    reasoner. The outgoing reasoner is discarded without a reset call.
+   * 2. At the very end of `Agent.restore(...)`, after the catch-up-tick
+   *    loop — on the **live** reasoner. Resetting post-catch-up means the
+   *    first live post-restore tick starts fresh regardless of the chunk
+   *    size used for catch-up.
+   *
+   * Never called mid-tick. Implementors should clear plan/BT state and
+   * per-tick accumulators. Long-lived architecture — trained network
+   * weights, configured policies, persona biases — MUST be preserved.
+   * Stateless reasoners can omit this method entirely.
+   */
+  reset?(): void;
+};

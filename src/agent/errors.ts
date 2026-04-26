@@ -61,6 +61,27 @@ export class SkillInvocationError extends AgentError {
 }
 
 /**
+ * Thrown by `SkillRegistry.register()` when a skill with the same `id` is
+ * already registered. Fail-fast prevents silent overrides — the common
+ * root cause of "my skill works in isolation but not when I add module X"
+ * bugs. Consumers who intend to override should call
+ * `registry.replace(skill)` instead.
+ */
+export class DuplicateSkillError extends AgentError {
+  readonly skillId: string;
+
+  constructor(skillId: string, options?: { cause?: unknown }) {
+    super(
+      'E_DUPLICATE_SKILL',
+      `Skill '${skillId}' is already registered. Use registry.replace(skill) if overwrite is intentional.`,
+      options,
+    );
+    this.name = 'DuplicateSkillError';
+    this.skillId = skillId;
+  }
+}
+
+/**
  * An LLM or tool call would exceed its configured budget. Reserved for
  * LLM-tool integrations; unused by the core tick pipeline.
  */

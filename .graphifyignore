@@ -1,0 +1,32 @@
+node_modules
+graphify-out
+.claude
+.github
+.husky
+dist
+coverage
+.changeset
+.vite
+
+tests
+examples
+scripts
+
+# generated TypeDoc HTML — regenerated each build, no graph value
+docs/api
+
+CLAUDE.md
+AGENTS.md
+
+# root configs — noise, no useful edges
+eslint.config.js
+vite.config.ts
+vitest.config.ts
+tsconfig*.json
+package.json
+package-lock.json
+.nvmrc
+.prettierrc*
+.prettierignore
+.editorconfig
+

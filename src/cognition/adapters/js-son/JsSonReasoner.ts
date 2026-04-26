@@ -14,7 +14,7 @@ import type { Reasoner, ReasonerContext } from '../../reasoning/Reasoner.js';
  * Used to derive belief updates from the structured `ReasonerContext`
  * without each plan having to rewrite scoring logic.
  */
-export interface JsSonBeliefHelpers {
+export type JsSonBeliefHelpers = {
   /**
    * Highest-scoring candidate matching `filter` (or any candidate when
    * `filter` is omitted). Mirrors the mistreevous adapter's helper for
@@ -24,7 +24,7 @@ export interface JsSonBeliefHelpers {
   topCandidate: (filter?: (c: IntentionCandidate) => boolean) => IntentionCandidate | null;
   /** Flat `{id: level}` snapshot of the agent's needs, or `{}` if unset. */
   needsLevels: () => Record<string, number>;
-}
+};
 
 /**
  * Maps the per-tick `ReasonerContext` to a js-son belief update object.
@@ -40,7 +40,7 @@ export type JsSonBeliefMapper = (ctx: ReasonerContext, helpers: JsSonBeliefHelpe
  * straight through to the underlying js-son `Agent`. The adapter only
  * layers the per-tick context mapping and intention extraction on top.
  */
-export interface JsSonReasonerOptions {
+export type JsSonReasonerOptions = {
   /**
    * Initial beliefs — the object that `new Agent({ beliefs })` is seeded
    * with. Typically assembled via the `Belief()` helper from
@@ -88,7 +88,7 @@ export interface JsSonReasonerOptions {
    * not use.
    */
   id?: string;
-}
+};
 
 const INTENTION_KEY = 'intention' as const;
 
@@ -175,9 +175,11 @@ export class JsSonReasoner implements Reasoner {
   }
 
   /**
-   * Rebuild the underlying js-son `Agent` from the original options.
-   * Use after major state shifts — js-son agents are stateful (beliefs
-   * accumulate across `next()` calls) so there's no built-in "rewind".
+   * Rebuilds the wrapped js-son agent from the constructor's initial
+   * options: beliefs revert to the initial map; desires and plans are
+   * reinstalled from the saved descriptors. Implements the
+   * `Reasoner.reset` port contract (see
+   * `src/cognition/reasoning/Reasoner.ts`).
    */
   reset(): void {
     this.agent = this.buildAgent();

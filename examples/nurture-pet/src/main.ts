@@ -1,14 +1,20 @@
 import {
+  AGENT_TICKED,
   createAgent,
   defaultPetInteractionModule,
   defineRandomEvent,
+  DirectBehaviorRunner,
   ExpressMeowSkill,
   ExpressSadSkill,
   ExpressSleepySkill,
   InMemoryMemoryAdapter,
   RandomEventTicker,
   SkillRegistry,
+  type AgentTickedEvent,
 } from 'agentonomous';
+import { ApproachTreatSkill } from './skills/ApproachTreatSkill.js';
+import { setLearningAgent } from './cognition/learning.js';
+import { mountCognitionSwitcher } from './cognitionSwitcher.js';
 import { catSpecies } from './species.js';
 import {
   mountExportImport,
@@ -76,12 +82,17 @@ const randomEvents = new RandomEventTicker([
   }),
 ]);
 
-// --- Skill registry populated with active + expressive defaults ---------------
+// --- Skill registry populated with expressive + approach defaults -------------
+// `createAgent({ modules: [defaultPetInteractionModule] })` auto-installs
+// that module's active-care skills (feed/clean/play/rest/pet/scold/
+// medicate), so we don't pre-register them here. The expressive + approach
+// skills below are not bundled in any module, so they still need manual
+// registration.
 const skills = new SkillRegistry();
-skills.registerAll(defaultPetInteractionModule.skills ?? []);
 skills.register(ExpressMeowSkill);
 skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
+skills.register(ApproachTreatSkill);
 
 // --- Species (base + optional user JSON override) -----------------------------
 const speciesOverride = loadConfigOverride(catSpecies);
@@ -98,8 +109,23 @@ const pet = createAgent({
   memory: new InMemoryMemoryAdapter(),
   modules: [defaultPetInteractionModule],
   skills,
+  // Behavior runner — only consulted for reasoner-committed intentions.
+  // Player button interactions invoke skills directly via `pet.invokeSkill`
+  // and bypass this table. The single mapping routes the BT cognition
+  // mode's `approach-treat` interrupt intention to its namesake skill.
+  behavior: new DirectBehaviorRunner({
+    skillByIntentionType: {
+      'approach-treat': 'approach-treat',
+    },
+  }),
   randomEvents,
 });
+
+// Wire the learning mode to the agent: scopes the persisted-network
+// localStorage key per-pet AND subscribes to the standard event bus to
+// feed the mood / modifier-count / event-count dims of
+// `featuresFromNeeds`.
+setLearningAgent(pet);
 
 // --- Mount UI + reactive binding ----------------------------------------------
 const hud = mountHud(pet);
@@ -111,6 +137,11 @@ mountResetButton(pet);
 mountConfigPanel(catSpecies, currentEditableConfig(effectiveSpecies), () =>
   resetSimulation(pet.identity.id),
 );
+const cognitionSwitcherRoot = document.querySelector<HTMLElement>('#cognition-switcher');
+if (!cognitionSwitcherRoot) {
+  throw new Error('main: #cognition-switcher slot not found in index.html');
+}
+const cognitionSwitcher = mountCognitionSwitcher(pet, cognitionSwitcherRoot);
 
 // HUD updates run from the per-frame RAF loop below — a prior
 // `bindAgentToStore` hook also called `hud.update` on every agent event,
@@ -170,22 +201,40 @@ const unsubscribeModifierDecorator = pet.subscribe((event) => {
   }
 });
 
+// Drive HUD + trace panel off the AgentTicked bus event. The event
+// fires once per non-halted tick, synchronously during `pet.tick(dt)`,
+// and carries the full `DecisionTrace` on its payload — no closure
+// cache needed. See `InMemoryEventBus.publish` for the sync-publish
+// semantics that guarantee `event.trace` matches the tick that just
+// completed. The rAF loop below is a pure tick driver.
+const unsubscribeUiRefresh = pet.subscribe((event) => {
+  if (event.type !== AGENT_TICKED) return;
+  const ticked = event as AgentTickedEvent;
+  const state = pet.getState();
+  hud.update(state);
+  traceView.render(ticked.trace, state, ticked.tickNumber);
+});
+
 // --- Game loop ----------------------------------------------------------------
-// Needs decay, age advances, and modifier timers count down silently
-// between agent events — without this per-frame repaint the HUD would
-// appear frozen until the next critical-threshold crossing or skill
-// result.
+// rAF drives `pet.tick(dt)` at display refresh rate. UI refresh
+// happens in the AgentTicked subscriber above — no per-frame DOM
+// work here, except a one-shot HUD render on the halt transition
+// (AgentTicked doesn't fire on halted ticks by library spec, so
+// without this fallback the HUD would stay frozen at the
+// pre-death state after the agent dies).
 let last = performance.now();
 let rafHandle = 0;
 let stopped = false;
+let haltRendered = false;
 async function loop(now: number): Promise<void> {
   const dt = Math.min((now - last) / 1000, 0.25);
   last = now;
   const trace = await pet.tick(dt);
   if (stopped) return;
-  const state = pet.getState();
-  hud.update(state);
-  traceView.render(trace, state);
+  if (trace.halted && !haltRendered) {
+    haltRendered = true;
+    hud.update(pet.getState());
+  }
   rafHandle = requestAnimationFrame((t) => {
     void loop(t);
   });
@@ -207,6 +256,8 @@ function disposeDemo(): void {
   stopped = true;
   if (rafHandle !== 0) cancelAnimationFrame(rafHandle);
   unsubscribeModifierDecorator();
+  unsubscribeUiRefresh();
+  cognitionSwitcher.dispose();
   hud.dispose();
 }
 

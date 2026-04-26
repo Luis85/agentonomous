@@ -12,12 +12,12 @@ import type { NeedsPolicy } from './NeedsPolicy.js';
  * need ids to intention type strings (e.g., `hunger → 'express:meow-hungry'`).
  * Omitted mappings fall back to `express:about-<needId>`.
  */
-export interface ExpressiveNeedsPolicyOptions {
+export type ExpressiveNeedsPolicyOptions = {
   /** Urgency floor below which no expression fires. Default: 0.4. */
   minUrgency?: number;
   /** Optional per-need intention type override. */
   expressionByNeed?: Readonly<Record<string, string>>;
-}
+};
 
 /** Emits `kind: 'express'` intentions so the pet reacts emotionally. */
 export class ExpressiveNeedsPolicy implements NeedsPolicy {

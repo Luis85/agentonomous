@@ -5,21 +5,21 @@ import type { SnapshotStorePort } from './SnapshotStorePort.js';
  * Minimal fs surface the store needs. Consumers pass `node:fs/promises` or
  * a stub in tests.
  */
-export interface FsAdapter {
+export type FsAdapter = {
   readFile(path: string, encoding: 'utf8'): Promise<string>;
   writeFile(path: string, data: string, encoding: 'utf8'): Promise<void>;
   mkdir(path: string, opts: { recursive: true }): Promise<void | string | undefined>;
   readdir(path: string): Promise<string[]>;
   unlink(path: string): Promise<void>;
   access(path: string): Promise<void>;
-}
+};
 
-export interface FsSnapshotStoreOptions {
+export type FsSnapshotStoreOptions = {
   directory: string;
   fs: FsAdapter;
   /** Path separator. Defaults to `'/'`. */
   sep?: string;
-}
+};
 
 /**
  * Filesystem-backed snapshot store for Node consumers. Each key becomes a
@@ -56,7 +56,26 @@ export class FsSnapshotStore implements SnapshotStorePort {
   async list(): Promise<readonly string[]> {
     await this.ensureDir();
     const entries = await this.fs.readdir(this.directory);
-    return entries.filter((e) => e.endsWith('.json')).map((e) => e.slice(0, -5));
+    const out: string[] = [];
+    for (const e of entries) {
+      if (!e.endsWith('.json')) continue;
+      try {
+        out.push(decodeKey(e.slice(0, -5)));
+      } catch {
+        // Malformed `%XX` sequence — a file the encoder wouldn't have
+        // produced (foreign tooling, manual drop-in). Skip it; the store
+        // can't round-trip it through key-based `load()` anyway, so
+        // surfacing it would just hand callers an unusable key.
+      }
+    }
+    // Sort before returning so callers see deterministic output across
+    // platforms — ext4, NTFS, tmpfs, and various CI runners all return
+    // readdir entries in different orders. Use a locale-independent
+    // code-point comparison so the order stays stable regardless of the
+    // host process's `LANG` / ICU locale; `localeCompare` would re-
+    // introduce cross-host divergence for non-ASCII keys.
+    out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    return out;
   }
 
   async delete(key: string): Promise<void> {
@@ -74,10 +93,47 @@ export class FsSnapshotStore implements SnapshotStorePort {
   }
 
   private pathFor(key: string): string {
-    return `${this.directory}${this.sep}${sanitizeKey(key)}.json`;
+    return `${this.directory}${this.sep}${encodeKey(key)}.json`;
   }
 }
 
-function sanitizeKey(key: string): string {
-  return key.replace(/[^a-zA-Z0-9._-]/g, '_');
+/**
+ * Encode a logical snapshot key into a filesystem-safe filename component.
+ *
+ * Reversible percent-encoding: every character outside `[A-Za-z0-9._-]`,
+ * plus `%` itself, becomes `%XX` — uppercase hex of the UTF-8 byte(s).
+ * Keeps the output alphabet strictly `/[A-Za-z0-9._\-%]+/` so `decodeKey`
+ * is a clean inverse.
+ *
+ * Worst case is 3× expansion (every char → `%XX` for one-byte code
+ * points, up to 9× for four-byte UTF-8). Callers needing strict path-
+ * length safety should bound logical keys at the call site.
+ */
+export function encodeKey(key: string): string {
+  let out = '';
+  for (const char of key) {
+    if (/^[A-Za-z0-9._-]$/.test(char)) {
+      out += char;
+    } else {
+      // encodeURIComponent emits multi-byte UTF-8 as chained %XX — exactly
+      // the byte-wise escaping we want. It leaves `! ' ( ) * ~` unreserved
+      // though, so sweep those into %XX too to keep the output alphabet
+      // narrow enough for decodeKey to treat every %XX uniformly.
+      let escaped = encodeURIComponent(char);
+      escaped = escaped.replace(
+        /[!'()*~]/g,
+        (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`,
+      );
+      out += escaped;
+    }
+  }
+  return out;
+}
+
+/**
+ * Decode a filename (sans `.json` suffix) back into its logical snapshot
+ * key. Inverse of `encodeKey`.
+ */
+export function decodeKey(encoded: string): string {
+  return decodeURIComponent(encoded);
 }

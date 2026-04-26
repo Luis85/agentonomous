@@ -15,7 +15,7 @@ import type { ControlMode } from './ControlMode.js';
  *     remote / scripted modes). Ordering is stable under a fixed seed.
  *   - M8 adds `animationTransitions`.
  */
-export interface DecisionTrace {
+export type DecisionTrace = {
   agentId: string;
 
   /** Wall-clock ms when this tick started. */
@@ -44,4 +44,4 @@ export interface DecisionTrace {
 
   /** Reserved for subsystem-specific deltas (needs, modifiers, mood, ...). */
   deltas?: Record<string, unknown>;
-}
+};

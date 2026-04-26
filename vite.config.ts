@@ -1,6 +1,7 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import dts from 'vite-plugin-dts';
 
 // Library mode build. Entries:
@@ -10,8 +11,8 @@ import dts from 'vite-plugin-dts';
 //                                                    → dist/cognition/adapters/mistreevous/index.js
 // - js-son:      src/cognition/adapters/js-son/index.ts
 //                                                    → dist/cognition/adapters/js-son/index.js
-// - brain.js:    src/cognition/adapters/brainjs/index.ts
-//                                                    → dist/cognition/adapters/brainjs/index.js
+// - tfjs:        src/cognition/adapters/tfjs/index.ts
+//                                                    → dist/cognition/adapters/tfjs/index.js
 //
 // All peer dependencies are marked external so consumers provide them.
 
@@ -42,14 +43,6 @@ const ambientDtsEntries: AmbientDtsEntry[] = [
       'dist/cognition/adapters/js-son/JsSonReasoner.d.ts',
     ],
   },
-  {
-    from: 'src/cognition/adapters/brainjs/brain.d.ts',
-    to: 'dist/cognition/adapters/brainjs/brain.d.ts',
-    referencedBy: [
-      'dist/cognition/adapters/brainjs/index.d.ts',
-      'dist/cognition/adapters/brainjs/BrainJsReasoner.d.ts',
-    ],
-  },
 ];
 
 function copyAmbientDts(): Plugin {
@@ -78,13 +71,23 @@ function copyAmbientDts(): Plugin {
 
 const externalPackages = [
   '@anthropic-ai/sdk',
-  'brain.js',
+  // tfjs backends are dynamic-imported by `TfjsReasoner.detectBestBackend` /
+  // `probeBackend` and `learningMode.construct()` (literal-string `import()`
+  // per backend so Vite can code-split). Each is an optional peer dep —
+  // consumers install only the backend(s) they actually use. Without these
+  // entries Rollup pulls the full backend kernel sets into the published
+  // `dist/` (300–700 KB per backend), inflating the package and undermining
+  // the optional-peer contract.
+  '@tensorflow/tfjs-backend-cpu',
+  '@tensorflow/tfjs-backend-wasm',
+  '@tensorflow/tfjs-backend-webgl',
+  '@tensorflow/tfjs-core',
+  '@tensorflow/tfjs-layers',
   'excalibur',
   'js-son-agent',
   'mistreevous',
   'openai',
   'sim-ecs',
-  'gray-matter',
 ];
 
 export default defineConfig({
@@ -105,10 +108,7 @@ export default defineConfig({
           __dirname,
           'src/cognition/adapters/js-son/index.ts',
         ),
-        'cognition/adapters/brainjs/index': resolve(
-          __dirname,
-          'src/cognition/adapters/brainjs/index.ts',
-        ),
+        'cognition/adapters/tfjs/index': resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
       formats: ['es'],
     },
@@ -136,11 +136,54 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Activates the matrix-selected tfjs backend (see
+    // `tests/setup/tfjsBackend.ts`) BEFORE any test file's static
+    // imports run. No-op for non-tfjs tests — the import is cheap and
+    // the side effect (registering a backend factory) is harmless when
+    // no `TfjsReasoner` is constructed.
+    setupFiles: ['./tests/setup/tfjsBackendSetup.ts'],
+    // Resolve `agentonomous` + its adapter subpaths against `src/` at test
+    // time. Without this, vitest hits the root `package.json` exports
+    // map (→ `./dist/*`), which requires a prior `npm run build` — but
+    // CI runs tests *before* build (and `npm run verify` runs them in
+    // that order locally too). The demo files in `examples/nurture-pet/`
+    // intentionally import from `agentonomous` + its subpaths so they
+    // stay consumer-realistic; the alias keeps the tests that exercise
+    // those demo files working without a build artifact dependency.
+    alias: [
+      {
+        find: /^agentonomous\/cognition\/adapters\/mistreevous$/,
+        replacement: resolve(__dirname, 'src/cognition/adapters/mistreevous/index.ts'),
+      },
+      {
+        find: /^agentonomous\/cognition\/adapters\/js-son$/,
+        replacement: resolve(__dirname, 'src/cognition/adapters/js-son/index.ts'),
+      },
+      {
+        find: /^agentonomous\/cognition\/adapters\/tfjs$/,
+        replacement: resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
+      },
+      {
+        find: /^agentonomous$/,
+        replacement: resolve(__dirname, 'src/index.ts'),
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/index.ts', 'src/**/*.d.ts'],
+      // Baseline 2026-04-25 (commit f6e4464): statements 76.22 / branches
+      // 66.61 / functions 85.42 / lines 77.78. Thresholds set at
+      // floor(measured - 2) so routine PRs don't trip the gate but a
+      // coverage regression beyond ~2pp fails the build. Bump these in
+      // step with measured improvements (cite the new baseline + commit).
+      thresholds: {
+        statements: 74,
+        branches: 64,
+        functions: 83,
+        lines: 75,
+      },
     },
   },
 });

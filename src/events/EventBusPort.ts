@@ -8,7 +8,7 @@ import type { DomainEvent } from './DomainEvent.js';
  * Event ordering rule (see plan §Time & tick contract): events emitted
  * during tick N land in tick N+1's perception queue.
  */
-export interface EventBusPort {
+export type EventBusPort = {
   /** Queue an event for both perception (next tick) and subscribers (immediately). */
   publish(event: DomainEvent): void;
 
@@ -17,4 +17,4 @@ export interface EventBusPort {
 
   /** Subscribe to all events. Returns an unsubscribe function. */
   subscribe(listener: (event: DomainEvent) => void): () => void;
-}
+};

@@ -1,0 +1,313 @@
+# 0.9.2 Cognition Switcher — Design
+
+> Brainstormed 2026-04-19. Feeds directly into
+> `docs/plans/2026-04-19-set-reasoner-and-switcher.md` (implementation plan,
+> to be produced via `superpowers:writing-plans`).
+
+## Context
+
+The v1 roadmap (`docs/plans/2026-04-19-v1-comprehensive-plan.md` row 2) framed
+0.9.2 as two PRs — a library PR adding `Agent.setReasoner()` and a demo PR
+adding a cognition-switcher dropdown. A pre-brainstorm survey found that
+the **library PR already shipped** in commit `c58d5f7`
+("feat(agent): live-swap cognition reasoner via setReasoner (P4)"),
+bundled into the P4 polish pass. The evidence:
+
+- `src/agent/Agent.ts:577-605` — `setReasoner` + `getReasoner` with full
+  JSDoc.
+- `tests/unit/agent/Agent-setReasoner.test.ts` — four unit tests covering
+  default construction, swap-on-next-tick, argument validation, and
+  state-preservation across a swap.
+- `.changeset/agent-set-reasoner.md` — minor-bump changeset already
+  written.
+
+The roadmap row 2 status (`Not drafted`) is therefore stale and will be
+corrected in a roadmap-bookkeeping commit alongside this plan.
+
+**0.9.2 as remaining work is demo-only.** This design covers the
+single-PR demo effort.
+
+## Goal
+
+Close Chapter C of the MVP demo spec
+(`docs/specs/mvp-demo.md` — "Cognition switch: dropdown for heuristic / BT
+/ BDI / learning"). A reader running the nurture-pet demo can pick among
+four cognition reasoners at runtime; the switch is observable in the
+trace panel within one tick. The BT mode visibly differentiates from the
+heuristic by reactively interrupting on a random event; BDI and learning
+modes are functionally equivalent stubs that establish the live-swap
+mechanism for follow-up plans to fill with differentiated content.
+
+## Scope decisions
+
+Captured from the brainstorm dialogue. Each entry pins a decision that
+shapes the design and is out of bounds to revisit in the implementation
+plan without re-opening brainstorm.
+
+| #   | Decision                                                                                                                                                                                                                                  | Rationale                                                                                                                                                                                                                                                         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Demo-only PR.** No library changes.                                                                                                                                                                                                     | `Agent.setReasoner` already shipped in `c58d5f7`; existing unit tests cover the determinism contract at the unit level.                                                                                                                                           |
+| 2   | **Async `import()` probe at mount time.** Each mode's availability is probed via a try/catch dynamic import; result cached for the lifetime of the switcher.                                                                              | No runtime peer-detection pattern exists in the repo; this plan establishes it. Static-import wrappers would make a missing peer into a build error, losing the teaching moment for local clones.                                                                 |
+| 3   | **Differentiated BT + stub BDI + stub brain.js.** One mode is genuinely differentiated; the other two are functional-but-equivalent to heuristic.                                                                                         | Full-differentiation across all four is effectively four authoring projects (BT / BDI / brain.js training); each wants its own plan. BT is chosen as the showcase because it has the richest helper API and the most distinctive "stateful commitment" behaviour. |
+| 4   | **BT differentiator: reactive interrupt on `surpriseTreat`.** Normal ticks mirror the heuristic's top-candidate pick; on a `surpriseTreat` random event, the BT locks in a 3-tick `approach-treat` action regardless of urgency pressure. | Reactive + stateful = hardest behaviour to express as a weighted scorer, so the BT mode is genuinely "doing something the heuristic cannot." The `surpriseTreat` event already exists in the demo's `RandomEventTicker`.                                          |
+| 5   | **New examples-local `ApproachTreatSkill`.** ~30 LoC. Lives in `examples/nurture-pet/src/skills/ApproachTreatSkill.ts` — not a library skill.                                                                                             | Gives the trace panel a legible string (`approach-treat`) during the interrupt. Reusing an existing skill would confuse the demo ("why is the pet eating because a treat appeared?").                                                                             |
+| 6   | **Unavailable-peer UX: disabled `<option>` + tooltip.** Options appear but are greyed; hovering reveals `Install <peerName> to enable`.                                                                                                   | Pedagogical (the reader can see modes they'd unlock by installing peers). Native `<select>` semantics prevent accidental selection.                                                                                                                               |
+| 7   | **Default on load: heuristic.** Selection not persisted across reload or demo Reset.                                                                                                                                                      | Matches prior demo behaviour (no switcher meant no selection state). Fresh start on reload is aligned with the exploratory demo ethos.                                                                                                                            |
+| 8   | **No switcher unit test for each stub/BT mode's behaviour.** One module test covers probe + on-select wiring; browser smoke covers behavioural verification.                                                                              | The stubs are functionally trivial; the BT's differentiation is easier to verify visually. Over-testing stub content adds maintenance without increasing confidence.                                                                                              |
+
+## Module structure
+
+```
+examples/nurture-pet/src/
+├── cognitionSwitcher.ts              # dropdown + capability probe + mount API
+├── cognition/
+│   ├── index.ts                      # mode registry: { id, label, peerName, probe, construct }
+│   ├── heuristic.ts                  # returns new UrgencyReasoner() — always available
+│   ├── bt.ts                         # differentiated BT with ApproachTreat interrupt
+│   ├── bdi.ts                        # stub BDI: single desire → top candidate
+│   ├── learning.ts                   # stub brain.js: loads learning.network.json
+│   └── learning.network.json         # pre-built 1-layer toy net (checked in)
+└── skills/
+    └── ApproachTreatSkill.ts         # ~30 LoC no-op skill, BT interrupt target
+```
+
+Each `cognition/<mode>.ts` exports:
+
+```ts
+export const mode: CognitionModeSpec = {
+  id: 'heuristic' | 'bt' | 'bdi' | 'learning',
+  label: string,               // dropdown display label
+  peerName: string | null,     // null for always-available (heuristic)
+  probe(): Promise<boolean>,   // try/catch dynamic import
+  construct(): Reasoner,       // builds a fresh reasoner instance
+};
+```
+
+`cognitionSwitcher.ts` imports all four specs, probes them in parallel on
+mount, and renders the `<select>` accordingly.
+
+## Public API (switcher module)
+
+Mirrors the existing `mountHud` / `mountTraceView` / `mountSeedPanel`
+shape:
+
+```ts
+export interface CognitionSwitcherHandle {
+  dispose(): void;
+}
+
+export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): CognitionSwitcherHandle;
+```
+
+Called from `examples/nurture-pet/src/main.ts` alongside the other
+panel-mount calls. `dispose()` is invoked from the existing demo
+teardown path (the same one that calls `unsubscribeUiRefresh()` and
+`unsubscribeModifierDecorator()`).
+
+## BT design (the differentiated mode)
+
+Mistreevous MDSL definition (string, passed to the adapter's
+`definition` field):
+
+```
+root {
+  selector {
+    sequence {
+      condition [IsReactingToTreat]
+      action    [RunApproachTreat]
+    }
+    action [PickTopCandidate]
+  }
+}
+```
+
+Handler registrations (per-adapter `handlers` map):
+
+- **`IsReactingToTreat`** — guarded closure over a `remainingTreatTicks`
+  counter.
+  - If `ctx.perceived.some(e => e.type === 'RandomEvent' && e.subtype
+=== 'surpriseTreat')`, set `remainingTreatTicks = 3`.
+  - Return `remainingTreatTicks > 0`, then decrement.
+  - The counter lives in the closure returned by `construct()`; mode
+    swaps build a fresh reasoner, wiping it. Matches the "nothing is
+    transferred from the outgoing reasoner" contract on `setReasoner`.
+- **`RunApproachTreat`** — `helpers.commit({ type: 'invoke-skill',
+skillId: 'approach-treat' })`; returns `State.RUNNING`.
+- **`PickTopCandidate`** — `const top = helpers.topCandidate(); if
+(top) helpers.commit(top.intention); return State.SUCCEEDED`. Pure
+  pass-through to the heuristic scoring.
+
+**Observable differentiator:** when `surpriseTreat` fires, the trace
+panel shows `approach-treat` as the selected action for 3 consecutive
+ticks regardless of hunger / cleanliness urgency. Under the heuristic
+reasoner the same random event arrives (via `ctx.perceived`) but has no
+effect on action selection — the pet keeps servicing whichever need is
+most urgent.
+
+## Stub BDI
+
+`construct()` returns a `JsSonReasoner` with:
+
+- Single belief: `topCandidate` (the current highest-scoring candidate
+  or `null`).
+- Single desire: `pursue-top` — fires iff `topCandidate !== null`.
+- Single plan: `function*() { yield this.beliefs.topCandidate.intention; }`.
+- `toBeliefs` mapper reads `helpers.topCandidate()` from the
+  `ReasonerContext`.
+
+Behaviourally equivalent to `UrgencyReasoner`; the trace panel shows the
+same per-tick selections but routed through the BDI machinery. The value
+is having the mode exist in the switcher for live-swap demonstration;
+differentiated BDI authorship is a follow-up plan.
+
+## Stub learning
+
+`construct()` loads `learning.network.json` (checked in) into a
+`brain.js` `NeuralNetwork` and returns a `BrainJsReasoner` with:
+
+- `featuresOf(ctx, helpers) → helpers.needsLevels()` (object of
+  `{ needId: level }`).
+- `outputsOf(output, ctx, helpers)` maps the highest-valued output
+  feature to a skill id via a hand-authored lookup table, then returns
+  `{ type: 'invoke-skill', skillId }`.
+
+The pre-built net has hand-chosen weights that produce urgency-like
+scoring — again behaviourally close to heuristic. Real training lives
+in 0.9.3 (`docs/plans/2026-04-19-v1-comprehensive-plan.md` row 3).
+
+## Capability-probe flow
+
+On `mountCognitionSwitcher`:
+
+1. Render the `<select>` immediately with all four options present but
+   `disabled`. Default label reads `(detecting…)` or similar — this
+   state may never render in practice because local `import()` for an
+   already-installed package resolves synchronously-ish; treat the
+   label as a fallback for slow disks rather than a user-visible delay.
+2. `await Promise.all([heuristic, bt, bdi, learning].map(m =>
+m.probe()))`.
+3. For each resolved-true, remove `disabled`, clear `title`.
+4. For each resolved-false, keep `disabled`, set `title="Install
+<peerName> to enable"`.
+5. Default select value: `heuristic` (always resolves true).
+6. Wire the `change` event: on select, call `mode.construct()` →
+   `agent.setReasoner(reasoner)`.
+
+Probe implementation per mode:
+
+```ts
+export async function probe(): Promise<boolean> {
+  try {
+    await import('mistreevous');
+    return true;
+  } catch {
+    return false;
+  }
+}
+```
+
+Vite's dev-time `import()` resolution handles missing packages by
+rejecting the promise — no global error surfaces.
+
+## Lifecycle
+
+- **Mount:** rendered above the HUD in a new HTML slot
+  (`<div id="cognition-switcher">`) declared in
+  `examples/nurture-pet/index.html`.
+- **Demo Reset / New pet:** the existing reset flow recreates the agent.
+  The switcher's `dispose()` is called during teardown, and
+  `mountCognitionSwitcher` is re-invoked after agent construction,
+  producing a fresh mode registry and default `heuristic` selection.
+- **Page reload:** no persistence; fresh start.
+- **Mode swap mid-tick:** impossible — selections originate from a
+  `<select>` `change` event which runs on the main thread outside any
+  `pet.tick(dt)` call. `Agent.setReasoner` takes effect on the next
+  `selectIntention` per the library's existing contract.
+
+## Testing
+
+**Unit tests.** One file:
+`examples/nurture-pet/tests/cognitionSwitcher.test.ts` (vitest-jsdom).
+
+| Assertion                                                                                  | Setup                                                                                                     |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Probe succeeds → option enabled, `title` absent.                                           | Mock a mode spec with `probe: async () => true`.                                                          |
+| Probe fails → option disabled, `title === 'Install <peerName> to enable'`.                 | Mock with `probe: async () => false`.                                                                     |
+| `change` event → `agent.setReasoner` called with the selected mode's `construct()` result. | Spy on `agent.setReasoner`.                                                                               |
+| `dispose()` → subsequent `change` events are no-ops.                                       | Fire `change` after `dispose()`, assert spy call count unchanged.                                         |
+| `dispose()` before probes resolve → no DOM mutation once they resolve.                     | Mount with slow-resolving probe stubs; call `dispose()` synchronously; assert no `<option>` attr changes. |
+
+**No unit tests for individual mode content** (BT handlers, BDI
+plan, brain.js featuresOf) — those are verified via browser smoke and
+are shallow enough that isolation tests don't add confidence.
+
+**Browser smoke** (manual steps, enumerated in the implementation
+plan's verification section):
+
+1. All four modes selectable; `heuristic` default; behaviour matches
+   prior demo.
+2. Switch to `bt` → normal ticks mirror heuristic; on `surpriseTreat`
+   the trace panel locks on `approach-treat` for 3 ticks, then resumes.
+3. Switch to `bdi` / `learning` → ticks cleanly, trace panel shows
+   reasoner-routed selections, no console errors.
+4. Demo Reset → switcher returns to `heuristic`.
+5. Peer-missing simulation: temporarily rename a peer's directory in
+   `node_modules`, reload; that mode's option renders disabled with
+   tooltip; restore.
+6. `npm run verify` green locally.
+
+## Roadmap bookkeeping (separate from this plan's PR)
+
+Two `docs(plans)` edits land in one commit on `develop` directly, per
+the `feedback_plan_crafting_on_develop` memory:
+
+- `docs/plans/2026-04-19-v1-comprehensive-plan.md` row 2 Status → `Library
+shipped (c58d5f7 in P4); demo plan drafted (0.9.2-...); demo PR
+pending`.
+- Optional short note in the 0.9.2 prose section acknowledging the
+  library work already shipped, to head off future confusion.
+
+Not part of the implementation plan's PR; pushed to `develop` before
+the topic branch is cut.
+
+## Out of scope
+
+- Differentiated BDI content (follow-up plan if needed).
+- Differentiated brain.js content / live training (0.9.3 territory).
+- Persisting switcher selection across page reload or demo Reset.
+- `Reasoner.reset()` harmonization (0.9.4 — separate library port work).
+- A library-side integration test for determinism under reasoner swap
+  (explicitly chose option A during brainstorm — unit tests suffice).
+- Adding more cognition modes beyond the four enumerated.
+- Keyboard-accessible mode cycling, a11y polish beyond native `<select>`.
+
+## Acceptance criteria
+
+1. Switcher renders above the HUD with four options.
+2. Each mode probes its peer dep at mount; unavailable modes render
+   disabled with tooltips reading `Install <peerName> to enable`.
+3. Selecting a mode calls `agent.setReasoner(...)` and the new reasoner
+   is active on the next `AgentTicked` event.
+4. BT mode visibly interrupts on `surpriseTreat` — trace panel shows
+   `approach-treat` for 3 consecutive ticks — then resumes normal
+   top-candidate pick.
+5. BDI and learning modes produce working reasoners that tick without
+   throwing **and** yield a non-null intention for at least one tick
+   under normal demo load (prevents a silently-no-op stub from passing
+   the gate); behaviour may otherwise approximate heuristic.
+6. Demo Reset returns the switcher to the default `heuristic` mode.
+7. `npm run verify` green.
+
+## Risks + mitigations
+
+| Risk                                                                                                           | Mitigation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dynamic `import()` probe misbehaves in Vite's build-time resolution (e.g., bundles the peer even when missing) | Test the probe in both `npm run demo:dev` (esbuild) and `npm run build` (rollup) before declaring the plan complete. Static imports with try/catch do NOT catch missing-module errors at runtime — they error at module-parse time — so that is not a viable fallback. The realistic fallback if dynamic probe fails is a Vite plugin that resolves peer availability at build time and injects a `__PEER_<NAME>_AVAILABLE__` define (or `import.meta.glob` equivalent), then the switcher reads the define synchronously instead of probing. |
+| Mistreevous MDSL parser rejects the interrupt selector shape                                                   | The adapter has existing tests exercising selectors and sequences; the shape here is within documented mistreevous syntax. If it breaks, the fallback is a programmatic BT definition (mistreevous accepts JS objects as well as MDSL strings).                                                                                                                                                                                                                                                                                               |
+| `surpriseTreat` perception doesn't reach the reasoner because of the `AGENT_TICKED` filter at Stage 1          | The filter only excludes `AGENT_TICKED`-type events; `RandomEvent` events pass through. Verified in the 0.9.1 demo plan's event-flow analysis.                                                                                                                                                                                                                                                                                                                                                                                                |
+| `approach-treat` skill not registered on the agent, so the commit resolves to a no-op action                   | The implementation plan must register `ApproachTreatSkill` in the demo's module list (alongside `defaultPetInteractionModule`) before the BT can invoke it. Verification step 2 would fail otherwise.                                                                                                                                                                                                                                                                                                                                         |
+
+---
+
+Next step: invoke `superpowers:writing-plans` to produce
+`docs/plans/2026-04-19-set-reasoner-and-switcher.md` from this design.

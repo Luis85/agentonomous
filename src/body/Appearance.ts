@@ -9,7 +9,7 @@ export type AgentShape = 'rectangle' | 'circle' | 'sprite' | (string & {});
  * Visual description of an agent. Just enough to drive a 2D sprite or a
  * placeholder primitive — no textures, materials, or animation state.
  */
-export interface Appearance {
+export type Appearance = {
   shape: AgentShape;
   /** Width in renderer units (pixels for 2D, world-units for 3D). */
   width: number;
@@ -23,7 +23,7 @@ export interface Appearance {
   spriteId?: string;
   /** Z-order hint; larger values render on top. */
   layer?: number;
-}
+};
 
 /** Sensible defaults: a visible 32x32 white rectangle. Always a fresh object. */
 export function defaultAppearance(): Appearance {

@@ -1,4 +1,3 @@
-import { InMemoryEventBus } from '../events/InMemoryEventBus.js';
 import type { EventBusPort } from '../events/EventBusPort.js';
 import type {
   AnimationStateMachine,
@@ -8,51 +7,48 @@ import type { Embodiment } from '../body/Embodiment.js';
 import type { BehaviorRunner } from '../cognition/behavior/BehaviorRunner.js';
 import type { Learner } from '../cognition/learning/Learner.js';
 import type { Reasoner } from '../cognition/reasoning/Reasoner.js';
-import { AgeModel } from '../lifecycle/AgeModel.js';
 import type { LifecycleDescriptor } from '../lifecycle/defineLifecycle.js';
 import type { LifeStage } from '../lifecycle/LifeStage.js';
 import type { LifeStageSchedule } from '../lifecycle/LifeStageSchedule.js';
-import { InMemoryMemoryAdapter } from '../memory/InMemoryMemoryAdapter.js';
 import type { MemoryRepository } from '../memory/MemoryRepository.js';
 import type { Modifiers } from '../modifiers/Modifiers.js';
 import type { MoodModel } from '../mood/MoodModel.js';
-import { DefaultMoodModel } from '../mood/DefaultMoodModel.js';
 import type { Need } from '../needs/Need.js';
-import { Needs } from '../needs/Needs.js';
+import type { Needs } from '../needs/Needs.js';
 import type { NeedsPolicy } from '../needs/NeedsPolicy.js';
-import { ExpressiveNeedsPolicy } from '../needs/ExpressiveNeedsPolicy.js';
 import type { Skill } from '../skills/Skill.js';
-import { SkillRegistry } from '../skills/SkillRegistry.js';
+import type { SkillRegistry } from '../skills/SkillRegistry.js';
 import type { AutoSavePolicy } from '../persistence/AutoSavePolicy.js';
-import { pickDefaultSnapshotStore } from '../persistence/pickDefaultSnapshotStore.js';
 import type { SnapshotStorePort } from '../persistence/SnapshotStorePort.js';
-import { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
+import type { RandomEventTicker } from '../randomEvents/RandomEventTicker.js';
 import type { RandomEventDef } from '../randomEvents/defineRandomEvent.js';
 import type { RemoteController } from './RemoteController.js';
 import type { ScriptedController } from './ScriptedController.js';
 import type { WallClock } from '../ports/WallClock.js';
-import { SystemClock } from '../ports/SystemClock.js';
 import type { Rng } from '../ports/Rng.js';
-import { SeededRng } from '../ports/SeededRng.js';
 import type { Logger } from '../ports/Logger.js';
 import type { Validator } from '../ports/Validator.js';
 import type { SpeciesDescriptor } from '../species/SpeciesDescriptor.js';
 import type { SpeciesRegistry } from '../species/SpeciesRegistry.js';
-import { InvalidSpeciesError } from './errors.js';
 import type { Species } from './Species.js';
 import type { AgentRole } from './AgentRole.js';
 import type { Persona } from './Persona.js';
-import type { AgentIdentity } from './AgentIdentity.js';
 import type { AgentModule } from './AgentModule.js';
 import type { ControlMode } from './ControlMode.js';
 import { Agent } from './Agent.js';
+import {
+  buildAgentDeps,
+  installModuleSkills,
+  toAgentDependencies,
+  type ResolvedDeps,
+} from './internal/buildAgentDeps.js';
 
 /**
  * Ergonomic builder config for `createAgent`. Only `id` + `species` are
  * required; every other slot has a sensible Phase A default so a consumer
  * can get a running agent in a one-liner.
  */
-export interface CreateAgentConfig {
+export type CreateAgentConfig = {
   /** Stable unique identifier. */
   id: string;
   /**
@@ -148,7 +144,7 @@ export interface CreateAgentConfig {
         autoSave?: AutoSavePolicy;
         autoSaveKey?: string;
       };
-}
+};
 
 /**
  * Default ingress. Returns a running `Agent` with Phase A defaults wired in.
@@ -159,213 +155,16 @@ export interface CreateAgentConfig {
  * ```
  */
 export function createAgent(config: CreateAgentConfig): Agent {
-  const speciesDescriptor = resolveSpecies(config.species, config.speciesRegistry);
-  const speciesId =
-    speciesDescriptor?.id ?? (typeof config.species === 'string' ? config.species : '');
-
-  const identity: AgentIdentity = {
-    id: config.id,
-    name: config.name ?? config.id,
-    version: config.version ?? '0.0.0',
-    role: config.role ?? 'npc',
-    species: speciesId,
-    ...(config.persona !== undefined
-      ? { persona: config.persona }
-      : speciesDescriptor?.persona !== undefined
-        ? { persona: speciesDescriptor.persona }
-        : {}),
-  };
-
-  const eventBus = config.eventBus ?? new InMemoryEventBus();
-  const clock = config.clock ?? new SystemClock();
-  const rng = resolveRng(config.rng, config.id);
-  const needs = resolveNeeds(config.needs ?? speciesDescriptor?.needs);
-
-  const lifecycle = resolveLifecycle(config.lifecycle ?? speciesDescriptor?.lifecycle);
-  const ageModel =
-    lifecycle !== undefined
-      ? new AgeModel({
-          bornAt: config.bornAt ?? clock.now(),
-          schedule: lifecycle.schedule,
-          ...(config.initialAgeSeconds !== undefined
-            ? { initialAgeSeconds: config.initialAgeSeconds }
-            : {}),
-          ...(config.initialStage !== undefined ? { initialStage: config.initialStage } : {}),
-        })
-      : undefined;
-
-  const moodModel = resolveMoodModel(config.moodModel, Boolean(needs ?? ageModel));
-  const needsPolicy = resolveNeedsPolicy(config.needsPolicy, needs);
-  const randomEvents = resolveRandomEvents(config.randomEvents);
-  const memory = config.memory ?? new InMemoryMemoryAdapter();
-  const { snapshotStore, autoSave, autoSaveKey } = resolvePersistence(config.persistence);
-  const skills = resolveSkills(config.skills);
-
-  // Auto-install any skills contributed by config-time modules so the
-  // SkillRegistry is fully populated by the time the agent starts ticking.
-  for (const mod of config.modules ?? []) {
-    for (const skill of mod.skills ?? []) {
-      skills.register(skill);
-    }
-  }
-
-  // Build an embodiment from species defaults if the consumer didn't
-  // supply one. Locomotion + appearance flow through.
-  let embodiment = config.embodiment;
-  if (embodiment === undefined && speciesDescriptor) {
-    const appearance = speciesDescriptor.appearance;
-    const locomotion = speciesDescriptor.locomotion;
-    if (appearance !== undefined || locomotion !== undefined) {
-      embodiment = {
-        transform: {
-          position: { x: 0, y: 0, z: 0 },
-          rotation: { x: 0, y: 0, z: 0 },
-          scale: { x: 1, y: 1, z: 1 },
-        },
-        appearance: appearance ?? {
-          shape: 'rectangle',
-          width: 32,
-          height: 32,
-          color: '#ffffff',
-          visible: true,
-        },
-        locomotion: locomotion ?? 'static',
-      };
-    }
-  }
-
-  const agent = new Agent({
-    identity,
-    eventBus,
-    clock,
-    rng,
-    ...(config.logger !== undefined ? { logger: config.logger } : {}),
-    ...(config.validator !== undefined ? { validator: config.validator } : {}),
-    ...(config.timeScale !== undefined ? { timeScale: config.timeScale } : {}),
-    ...(config.controlMode !== undefined ? { controlMode: config.controlMode } : {}),
-    ...(config.modules !== undefined ? { modules: config.modules } : {}),
-    ...(needs ? { needs } : {}),
-    ...(config.modifiers !== undefined ? { modifiers: config.modifiers } : {}),
-    ...(ageModel !== undefined ? { ageModel } : {}),
-    ...(lifecycle?.capabilities !== undefined ? { stageCapabilities: lifecycle.capabilities } : {}),
-    ...(moodModel !== undefined ? { moodModel } : {}),
-    ...(embodiment !== undefined ? { embodiment } : {}),
-    ...(randomEvents !== undefined ? { randomEvents } : {}),
-    memory,
-    ...(config.remote !== undefined ? { remote: config.remote } : {}),
-    ...(config.scripted !== undefined ? { scripted: config.scripted } : {}),
-    ...(snapshotStore !== undefined ? { snapshotStore } : {}),
-    ...(autoSave !== undefined ? { autoSave } : {}),
-    ...(autoSaveKey !== undefined ? { autoSaveKey } : {}),
-    ...(config.reasoner !== undefined ? { reasoner: config.reasoner } : {}),
-    ...(config.behavior !== undefined ? { behavior: config.behavior } : {}),
-    ...(config.learner !== undefined ? { learner: config.learner } : {}),
-    ...(needsPolicy !== undefined ? { needsPolicy } : {}),
-    ...(config.animation !== undefined ? { animation: config.animation } : {}),
-    skills,
-  });
-
-  // Apply species-declared passive modifiers after construction so the
-  // standard ModifierApplied events fire on the bus.
-  if (speciesDescriptor?.passiveModifiers) {
-    for (const mod of speciesDescriptor.passiveModifiers) {
-      agent.applyModifier(mod);
-    }
-  }
-
+  const deps: ResolvedDeps = buildAgentDeps(config);
+  installModuleSkills(deps.skills, config.modules);
+  const agent = new Agent(toAgentDependencies(deps, config));
+  applyPassiveModifiers(agent, deps.speciesDescriptor);
   return agent;
 }
 
-function resolveSkills(input: SkillRegistry | readonly Skill[] | undefined): SkillRegistry {
-  if (input === undefined) return new SkillRegistry();
-  if (input instanceof SkillRegistry) return input;
-  const reg = new SkillRegistry();
-  reg.registerAll(input);
-  return reg;
-}
-
-function resolveSpecies(
-  species: Species | SpeciesDescriptor,
-  registry: SpeciesRegistry | undefined,
-): SpeciesDescriptor | undefined {
-  if (typeof species === 'string') {
-    if (registry?.has(species)) return registry.get(species);
-    return undefined;
+function applyPassiveModifiers(agent: Agent, sd: SpeciesDescriptor | undefined): void {
+  if (!sd?.passiveModifiers) return;
+  for (const mod of sd.passiveModifiers) {
+    agent.applyModifier(mod);
   }
-  if (species && typeof species === 'object' && 'id' in species) {
-    return species;
-  }
-  throw new InvalidSpeciesError(
-    'Invalid `species` config — expected string id or SpeciesDescriptor.',
-  );
-}
-
-function resolveRandomEvents(
-  input: RandomEventTicker | readonly RandomEventDef[] | undefined,
-): RandomEventTicker | undefined {
-  if (input === undefined) return undefined;
-  if (input instanceof RandomEventTicker) return input;
-  return new RandomEventTicker(input);
-}
-
-function resolvePersistence(input: CreateAgentConfig['persistence']): {
-  snapshotStore: SnapshotStorePort | undefined;
-  autoSave: AutoSavePolicy | undefined;
-  autoSaveKey: string | undefined;
-} {
-  if (input === false) {
-    return { snapshotStore: undefined, autoSave: undefined, autoSaveKey: undefined };
-  }
-  const store = input?.store ?? pickDefaultSnapshotStore();
-  return {
-    snapshotStore: store,
-    autoSave: input?.autoSave,
-    autoSaveKey: input?.autoSaveKey,
-  };
-}
-
-function resolveLifecycle(
-  lifecycle: LifecycleDescriptor | LifeStageSchedule | undefined,
-): LifecycleDescriptor | undefined {
-  if (lifecycle === undefined) return undefined;
-  if (Array.isArray(lifecycle)) {
-    return { schedule: lifecycle };
-  }
-  return lifecycle as LifecycleDescriptor;
-}
-
-function resolveMoodModel(
-  override: MoodModel | false | undefined,
-  autoEnable: boolean,
-): MoodModel | undefined {
-  if (override === false) return undefined;
-  if (override !== undefined) return override;
-  return autoEnable ? new DefaultMoodModel() : undefined;
-}
-
-function resolveNeeds(needs: Needs | readonly Need[] | undefined): Needs | undefined {
-  if (needs === undefined) return undefined;
-  if (needs instanceof Needs) return needs;
-  return new Needs(needs);
-}
-
-/**
- * Auto-wires an `ExpressiveNeedsPolicy` when the consumer configured
- * `needs` but no explicit `needsPolicy`. Without this, the autonomous
- * cognition pipeline silently produces zero candidates and the pet
- * appears inert.
- */
-function resolveNeedsPolicy(
-  explicit: NeedsPolicy | undefined,
-  needs: Needs | undefined,
-): NeedsPolicy | undefined {
-  if (explicit !== undefined) return explicit;
-  if (needs === undefined) return undefined;
-  return new ExpressiveNeedsPolicy();
-}
-
-function resolveRng(rng: Rng | number | string | undefined, fallbackSeed: string): Rng {
-  if (rng === undefined) return new SeededRng(fallbackSeed);
-  if (typeof rng === 'number' || typeof rng === 'string') return new SeededRng(rng);
-  return rng;
 }

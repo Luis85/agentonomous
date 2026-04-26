@@ -14,7 +14,7 @@
  *   - M5 populates `mood` + real `stage`.
  *   - M8 populates `animation`.
  */
-export interface AgentState {
+export type AgentState = {
   id: string;
   stage: string;
   halted: boolean;
@@ -23,4 +23,4 @@ export interface AgentState {
   modifiers: readonly { id: string; expiresAt?: number }[];
   mood?: { category: string; updatedAt: number };
   animation: string;
-}
+};

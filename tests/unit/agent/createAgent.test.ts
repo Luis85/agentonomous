@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { AgentModule } from '../../../src/agent/AgentModule.js';
 import { createAgent } from '../../../src/agent/createAgent.js';
+import { DuplicateSkillError } from '../../../src/agent/errors.js';
+import { ok } from '../../../src/agent/result.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
 import { Needs } from '../../../src/needs/Needs.js';
 import { DEFAULT_URGENCY_CURVE } from '../../../src/needs/Need.js';
 import type { IntentionCandidate } from '../../../src/cognition/IntentionCandidate.js';
+import type { Skill } from '../../../src/skills/Skill.js';
+import { SkillRegistry } from '../../../src/skills/SkillRegistry.js';
 
 describe('createAgent (M2 builder)', () => {
   it('builds a running agent with only id + species', async () => {
@@ -101,5 +106,67 @@ describe('createAgent (M2 builder)', () => {
     expect(agent.identity.name).toBe('Alice');
     expect(agent.identity.version).toBe('1.2.3');
     expect(agent.identity.persona?.traits.sociability).toBe(0.9);
+  });
+});
+
+describe('createAgent — module skill precedence', () => {
+  function stubSkill(id: string): Skill {
+    return {
+      id,
+      execute() {
+        return Promise.resolve(ok({ effectiveness: 1 }));
+      },
+    };
+  }
+
+  it('consumer-pre-registered skill wins over a module skill with the same id', () => {
+    const consumerFeed = stubSkill('feed');
+    const moduleFeed = stubSkill('feed');
+    const skills = new SkillRegistry();
+    skills.register(consumerFeed);
+    const mod: AgentModule = { id: 'feed-mod', skills: [moduleFeed] };
+
+    const agent = createAgent({
+      id: 'pet',
+      species: 'cat',
+      rng: 0,
+      persistence: false,
+      skills,
+      modules: [mod],
+    });
+
+    // Consumer's stub must still be the one registered — not silently replaced.
+    expect(skills.get('feed')).toBe(consumerFeed);
+    expect(agent.identity.id).toBe('pet');
+  });
+
+  it('throws DuplicateSkillError when two modules contribute the same skill id', () => {
+    const modA: AgentModule = { id: 'a', skills: [stubSkill('feed')] };
+    const modB: AgentModule = { id: 'b', skills: [stubSkill('feed')] };
+
+    expect(() =>
+      createAgent({
+        id: 'pet',
+        species: 'cat',
+        rng: 0,
+        persistence: false,
+        modules: [modA, modB],
+      }),
+    ).toThrowError(DuplicateSkillError);
+  });
+
+  it('throws DuplicateSkillError when a single module lists the same skill twice', () => {
+    const duplicate = stubSkill('feed');
+    const mod: AgentModule = { id: 'mod', skills: [duplicate, duplicate] };
+
+    expect(() =>
+      createAgent({
+        id: 'pet',
+        species: 'cat',
+        rng: 0,
+        persistence: false,
+        modules: [mod],
+      }),
+    ).toThrowError(DuplicateSkillError);
   });
 });

@@ -152,6 +152,93 @@
           background: #1b2140;
         }
       }
+      .cognition-switcher {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      @media (prefers-color-scheme: dark) {
+        .cognition-switcher {
+          background: #1b2140;
+        }
+      }
+      .cognition-label {
+        font-size: 12px;
+        opacity: 0.7;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      #cognition-mode-select,
+      #cognition-backend-select {
+        padding: 4px 8px;
+        font-size: 13px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        background: inherit;
+        color: inherit;
+      }
+      #cognition-mode-select:disabled,
+      #cognition-backend-select:disabled {
+        opacity: 0.5;
+      }
+      .cognition-status {
+        font-size: 12px;
+        opacity: 0.6;
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+      }
+      .learner-buffer {
+        font-size: 12px;
+        opacity: 0.7;
+        font-variant-numeric: tabular-nums;
+        margin-left: 4px;
+      }
+      .loss-sparkline {
+        display: block;
+        margin-top: 4px;
+        opacity: 0.85;
+      }
+      .loss-sparkline .axis {
+        stroke: currentColor;
+        stroke-opacity: 0.2;
+        stroke-width: 1;
+      }
+      .loss-sparkline .curve {
+        fill: none;
+        stroke: #4f8cff;
+        stroke-width: 1.5;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+      }
+      .prediction-strip {
+        display: block;
+        margin-top: 4px;
+        opacity: 0.95;
+      }
+      .prediction-strip .threshold {
+        stroke: currentColor;
+        stroke-opacity: 0.45;
+        stroke-width: 1;
+        stroke-dasharray: 3 3;
+      }
+      .prediction-strip .prediction-bar {
+        fill: #38bdf8;
+        opacity: 0.75;
+      }
+      .prediction-strip .prediction-bar.selected {
+        fill: #16a34a;
+        opacity: 1;
+      }
+      .prediction-strip .prediction-label {
+        fill: currentColor;
+        font-size: 9px;
+        font-family: ui-monospace, SFMono-Regular, monospace;
+        opacity: 0.7;
+      }
       .speed-label {
         font-size: 12px;
         opacity: 0.7;
@@ -443,6 +530,45 @@
     </section>
 
     <section class="hud">
+      <div class="cognition-switcher" id="cognition-switcher">
+        <span class="cognition-label">Cognition</span>
+        <select id="cognition-mode-select" aria-label="Cognition mode">
+          <option value="heuristic">Heuristic (urgency)</option>
+        </select>
+        <select
+          id="cognition-backend-select"
+          aria-label="TensorFlow.js backend"
+          title="Backend used by the Learning (tfjs) reasoner. CPU is determinism-preserving; WebGL/WASM trade replay parity for speed."
+        >
+          <option value="cpu">CPU</option>
+          <option value="wasm">WASM</option>
+          <option value="webgl">WebGL</option>
+        </select>
+        <span class="cognition-status" id="cognition-status" data-mode="heuristic">active</span>
+        <button id="train-network" type="button" hidden>Train</button>
+        <button id="untrain-network" type="button" hidden>Untrain</button>
+        <span id="learner-buffer" class="learner-buffer" aria-live="polite" hidden></span>
+        <svg
+          id="loss-sparkline"
+          class="loss-sparkline"
+          width="120"
+          height="32"
+          viewBox="0 0 120 32"
+          aria-label="Training loss curve"
+          role="img"
+          hidden
+        ></svg>
+        <svg
+          id="prediction-strip"
+          class="prediction-strip"
+          width="200"
+          height="60"
+          viewBox="0 0 200 60"
+          aria-label="Softmax prediction strip"
+          role="img"
+          hidden
+        ></svg>
+      </div>
       <div class="speed">
         <span class="speed-label">Speed</span>
         <div class="speed-buttons" id="speed-picker"></div>

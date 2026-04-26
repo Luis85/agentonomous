@@ -12,10 +12,10 @@ import type { BehaviorRunner } from './BehaviorRunner.js';
  * `fallback` handles intentions without a mapping. The default emits
  * `{ type: 'noop' }`.
  */
-export interface DirectBehaviorRunnerOptions {
+export type DirectBehaviorRunnerOptions = {
   skillByIntentionType?: Readonly<Record<string, string>>;
   fallback?: (intention: Intention) => readonly AgentAction[];
-}
+};
 
 /**
  * Phase A default behavior runner. Lookup-table translation from intention

@@ -31,10 +31,10 @@ describe('fxHint helpers', () => {
   });
 
   it('preserves the narrow event subtype on the return value', () => {
-    interface SpecificEvent extends DomainEvent {
+    type SpecificEvent = DomainEvent & {
       type: 'Specific';
       payload: { foo: string };
-    }
+    };
     const event: SpecificEvent = { type: 'Specific', at: 0, payload: { foo: 'bar' } };
     const decorated = withFxHint(event, 'pop');
     // TypeScript-level: decorated is still SpecificEvent. Runtime checks:

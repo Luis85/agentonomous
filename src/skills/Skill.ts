@@ -10,7 +10,7 @@ import type { Result } from '../agent/result.js';
  * expected failures (no target, missing resource, cooldown still active)
  * surface explicitly; infrastructure failures throw as usual.
  */
-export interface Skill<Params = Record<string, unknown>> {
+export type Skill<Params = Record<string, unknown>> = {
   /** Unique identifier (e.g., `'feed-self'`, `'cry'`, `'express:meow'`). */
   readonly id: string;
   /**
@@ -25,14 +25,14 @@ export interface Skill<Params = Record<string, unknown>> {
   readonly baseEffectiveness?: number;
 
   execute(params: Params | undefined, ctx: SkillContext): Promise<Result<SkillOutcome, SkillError>>;
-}
+};
 
 /**
  * Payload returned by a successful skill execution. Carries an `fxHint` so
  * renderers can trigger sounds/particles without the skill knowing about
  * the renderer.
  */
-export interface SkillOutcome {
+export type SkillOutcome = {
   /** Optional rendering hint. */
   fxHint?: string;
   /**
@@ -42,14 +42,14 @@ export interface SkillOutcome {
   effectiveness?: number;
   /** Free-form detail for tests + DecisionTrace. */
   details?: Record<string, unknown>;
-}
+};
 
 /**
  * Typed failure shape. Skills use `code` strings like
  * `'missing-param'`, `'precondition-failed'`, `'no-target'`.
  */
-export interface SkillError {
+export type SkillError = {
   code: string;
   message: string;
   details?: Record<string, unknown>;
-}
+};

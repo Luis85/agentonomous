@@ -8,8 +8,17 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "agentonomous": ["../../src/index.ts"],
+      "agentonomous/cognition/adapters/mistreevous": [
+        "../../src/cognition/adapters/mistreevous/index.ts"
+      ],
+      "agentonomous/cognition/adapters/js-son": ["../../src/cognition/adapters/js-son/index.ts"],
+      "agentonomous/cognition/adapters/tfjs": ["../../src/cognition/adapters/tfjs/index.ts"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "../../src/cognition/adapters/js-son/js-son-agent.d.ts"]
 }

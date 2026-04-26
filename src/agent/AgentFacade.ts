@@ -6,18 +6,23 @@ import type { AgentIdentity } from './AgentIdentity.js';
 
 /**
  * Read-only + safe-mutation surface passed to skills, reactive handlers,
- * and modules. Keeps consumers from mutating agent internals in ways that
- * break invariants (e.g., setting need levels directly without going
- * through the `satisfy` verb).
+ * and modules. Prevents consumers from mutating agent internals in ways
+ * that would break invariants (e.g., setting need levels directly
+ * without going through the `satisfy` verb, or emitting events outside
+ * the tick pipeline where they would miss the current `DecisionTrace`).
  *
- * More verbs land in later milestones:
- *   - M3: `satisfyNeed(id, amount)`
- *   - M4: `applyModifier(mod)` / `removeModifier(id)`
- *   - M10: `addMemory(record)`
+ * Reached from three places:
+ *  - a `Skill.execute(params, ctx)` body (via `ctx` — a superset that
+ *    adds `satisfyNeed` / `applyModifier` / `removeModifier` /
+ *    `hasModifier` / `ageSeconds`);
+ *  - a `ReactiveHandler.handle(event, agent)` callback;
+ *  - a module's optional `onInstall(agent)` hook.
  *
- * For M2 it exposes only the immutable read surface + `publishEvent`.
+ * Skill-context verbs beyond this interface are declared on
+ * `SkillContext` so that reactive handlers (which should not
+ * arbitrarily mutate need levels) have a deliberately smaller surface.
  */
-export interface AgentFacade {
+export type AgentFacade = {
   readonly identity: AgentIdentity;
   readonly clock: WallClock;
   readonly rng: Rng;
@@ -42,4 +47,4 @@ export interface AgentFacade {
    * facade boundary.
    */
   getTimeScale(): number;
-}
+};

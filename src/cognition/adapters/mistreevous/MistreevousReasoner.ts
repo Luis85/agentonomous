@@ -9,7 +9,7 @@ import type { Reasoner, ReasonerContext } from '../../reasoning/Reasoner.js';
  * `ReasonerContext` and commit to an `Intention` without owning a
  * reference to the agent itself.
  */
-export interface MistreevousHelpers {
+export type MistreevousHelpers = {
   /**
    * Commit to an intention. The most recent commit wins per
    * `selectIntention` call; uncommitted ticks return `null`.
@@ -20,7 +20,7 @@ export interface MistreevousHelpers {
    * `filter` is omitted). Returns `null` when no candidate matches.
    */
   topCandidate(filter?: (c: IntentionCandidate) => boolean): IntentionCandidate | null;
-}
+};
 
 /**
  * Handler signature for action / condition nodes in the behaviour tree.
@@ -51,7 +51,7 @@ export type MistreevousHandler = (
  * BT action / condition node names to functions the adapter will route
  * mistreevous calls to.
  */
-export interface MistreevousReasonerOptions {
+export type MistreevousReasonerOptions = {
   /**
    * Behaviour-tree definition, in mistreevous' MDSL string form or its
    * structured `RootNodeDefinition` form. Passed straight to
@@ -75,7 +75,7 @@ export interface MistreevousReasonerOptions {
    * Forwarded to mistreevous as `options.getDeltaTime`.
    */
   getDeltaTime?: () => number;
-}
+};
 
 /**
  * Reasoner adapter that delegates intention selection to a
@@ -144,7 +144,11 @@ export class MistreevousReasoner implements Reasoner {
     return this.selected;
   }
 
-  /** Reset the underlying tree to READY. Use after major state shifts. */
+  /**
+   * Returns the BT to `READY`. Any `RUNNING` node state — including
+   * mid-sequence continuations — is cleared. Implements the `Reasoner.reset`
+   * port contract (see `src/cognition/reasoning/Reasoner.ts`).
+   */
   reset(): void {
     this.tree.reset();
   }

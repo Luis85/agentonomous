@@ -15,7 +15,7 @@ export type MoodCategory =
   | 'sleepy'
   | (string & {});
 
-export interface Mood {
+export type Mood = {
   category: MoodCategory;
   /** Wall-clock ms when the mood entered the current category. */
   updatedAt: number;
@@ -25,4 +25,4 @@ export interface Mood {
    * it, categorical renderers ignore it.
    */
   valence?: number;
-}
+};
