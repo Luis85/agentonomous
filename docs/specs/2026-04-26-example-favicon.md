@@ -63,8 +63,14 @@ function brandFaviconPlugin() {
 - **Build (`vite build`):** `closeBundle` copies the asset into the
   example's `dist/` so deployed bundles include it.
 - **HTML wiring:** `<link rel="icon" type="image/svg+xml" href="favicon.svg" />`
-  inside `<head>`. The relative `href` (no leading `/`) lets Vite's
-  `base` prefix work for GitHub Pages deploys (`PAGES_BASE=/agentonomous/`).
+  inside `<head>`. The bare-relative `href` (no leading `/`) is left
+  untouched by Vite's HTML transform (Vite only rewrites root-relative
+  URLs that resolve to files in `publicDir`, which this plugin
+  intentionally does not use). Runtime behavior is correct anyway:
+  browsers resolve a relative `href` against the document URL, so a
+  page served from `https://user.github.io/agentonomous/` fetches
+  `https://user.github.io/agentonomous/favicon.svg` — exactly where
+  `closeBundle` wrote the asset.
 
 ### Why a Vite plugin and not `predev` / `prebuild` scripts
 
@@ -73,6 +79,16 @@ which then gets either committed (stale duplicate) or `.gitignore`-d
 (invisible drift). The plugin keeps `branding/favicon.svg` as the single
 on-disk artifact and keeps each example's source tree free of generated
 files.
+
+### GH Pages
+
+`closeBundle` writes the asset to `dist/favicon.svg`, which the GH
+Pages workflow deploys at `/agentonomous/favicon.svg`. The HTML
+`<link href="favicon.svg">` is bare-relative and is left as-is in
+`dist/index.html` (Vite does not rewrite it — see "HTML wiring"
+above). Browsers resolve the relative href against the page URL, so
+the deployed favicon loads correctly. No `PAGES_BASE`-specific build
+logic is required.
 
 ## Files changed
 
@@ -94,9 +110,9 @@ No `.gitignore` change. No file inside any `examples/*/public/` directory.
   renders in the browser tab strip in both light and dark themes.
 - Manual: `cd examples/nurture-pet && npm run build`, confirm
   `examples/nurture-pet/dist/favicon.svg` exists post-build.
-- GitHub Pages: deploys via the existing workflow without changes; only
-  the `<link>` href + `closeBundle` copy are new, both already respect
-  `PAGES_BASE`.
+- GitHub Pages: deploys via the existing workflow without changes. See
+  the "GH Pages" subsection above for why the bare-relative `href`
+  resolves correctly without any `PAGES_BASE` rewrite.
 
 ## Branch / PR / changeset
 

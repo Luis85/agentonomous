@@ -4,7 +4,7 @@
 
 **Goal:** Ship a library-branded SVG favicon (`agentonomous`) wired into every browser example via a small Vite plugin, with `branding/favicon.svg` as the single source of truth.
 
-**Architecture:** Canonical SVG at `branding/favicon.svg`. Each browser example's `vite.config.ts` registers a small `brandFaviconPlugin()` that (a) serves the asset at `/favicon.svg` in dev via a middleware and (b) copies it into the example's `dist/` on `closeBundle` for production builds. The example's HTML references it with a relative `href` so Vite's `base` rewrite works for the GitHub Pages deploy (`PAGES_BASE=/agentonomous/`). Today only `examples/nurture-pet/` is wired; `examples/llm-mock/` is a Node CLI with no HTML and is out of scope.
+**Architecture:** Canonical SVG at `branding/favicon.svg`. Each browser example's `vite.config.ts` registers a small `brandFaviconPlugin()` that (a) serves the asset at `/favicon.svg` in dev via a middleware and (b) copies it into the example's `dist/` on `closeBundle` for production builds. The example's HTML references it with a bare-relative `href` (`favicon.svg`); browsers resolve it against the document URL at runtime, so both `localhost:5173/` and the GitHub Pages deploy at `https://user.github.io/agentonomous/` fetch the asset correctly without any Vite-side rewrite (Vite only rewrites root-relative URLs resolving to files in `publicDir`, which this plugin doesn't use). Today only `examples/nurture-pet/` is wired; `examples/llm-mock/` is a Node CLI with no HTML and is out of scope.
 
 **Tech Stack:** SVG, Vite 8 plugin API, Node 22 ESM, `node:fs`/`node:path`.
 
@@ -216,24 +216,34 @@ Insert after the existing `<meta name="viewport" …>` line and before the `<tit
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 ```
 
-The `href` is intentionally relative (no leading `/`). Vite rewrites it against `base` during the HTML transform so a `PAGES_BASE=/agentonomous/` build resolves to `/agentonomous/favicon.svg`, not `/favicon.svg` (which would 404 on GitHub Pages).
+Note: bare-relative `href` (no leading `/`). Vite leaves bare-relative
+URLs untouched in the HTML transform (it only rewrites root-relative
+URLs that resolve to files in `publicDir`, which this plugin doesn't
+use). Runtime behavior is correct anyway: a page served at
+`https://user.github.io/agentonomous/index.html` resolves the relative
+href to `https://user.github.io/agentonomous/favicon.svg`, which is
+where `closeBundle` wrote the asset. No Vite rewrite involved.
 
-- [ ] **Step 2: Verify the build rewrites the href under `PAGES_BASE`**
+- [ ] **Step 2: Verify the build leaves the href bare-relative**
 
 Run from `examples/nurture-pet/`:
 
 ```bash
-PAGES_BASE=/agentonomous/ npm run build
+npm run build
 grep favicon dist/index.html
 ```
 
 Expected output line:
 
 ```
-<link rel="icon" type="image/svg+xml" href="/agentonomous/favicon.svg" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
 ```
 
-If the output keeps a leading `/agentonomous/agentonomous/` (double-prefix) or omits the prefix entirely, the `<link>` `href` is wrong — recheck Step 1.
+The href is unchanged from `index.html` source — Vite does not rewrite
+bare-relative URLs. Browsers resolve it against the document URL at
+runtime, which is what makes both `localhost:5173/` and
+`user.github.io/agentonomous/` work without per-deployment build
+arguments.
 
 - [ ] **Step 3: Commit**
 
@@ -277,7 +287,7 @@ gh pr create --base develop --title "feat(demo): add agentonomous favicon for br
 ## Summary
 - Adds canonical `branding/favicon.svg` (indigo rounded square + white lowercase `a`, hand-built path).
 - Wires it through `examples/nurture-pet` via a small Vite plugin: dev middleware + build-time copy into `dist/`.
-- References it from `examples/nurture-pet/index.html` with a relative `href` so `PAGES_BASE` resolves correctly on GitHub Pages.
+- References it from `examples/nurture-pet/index.html` with a bare-relative `href`; browsers resolve it against the document URL at runtime so both `localhost:5173/` and the GitHub Pages deploy fetch it correctly without a build-time rewrite.
 - No `public/favicon.svg` committed in the example — `branding/` is the single source of truth.
 
 Spec: `docs/specs/2026-04-26-example-favicon.md`.
@@ -288,7 +298,7 @@ No changeset: pure example wiring + new branding asset; no library behavior chan
 ## Test plan
 - [ ] `npm run verify` is green.
 - [ ] `npm run demo:dev` shows the favicon in the browser tab in light + dark mode.
-- [ ] `cd examples/nurture-pet && PAGES_BASE=/agentonomous/ npm run build && grep favicon dist/index.html` prints `/agentonomous/favicon.svg`.
+- [ ] `cd examples/nurture-pet && npm run build && grep favicon dist/index.html` prints `favicon.svg` (bare-relative is intentional — see plan Task 4).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
