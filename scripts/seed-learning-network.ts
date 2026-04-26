@@ -276,7 +276,7 @@ async function main(): Promise<void> {
     '..',
     '..',
     'examples',
-    'nurture-pet',
+    'product-demo',
     'src',
     'cognition',
     'learning.network.json',
