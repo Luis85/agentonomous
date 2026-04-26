@@ -98,6 +98,23 @@ describe('useAgentSession', () => {
     expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 2);
   });
 
+  it('setSpeed rejects non-finite or non-positive multipliers and leaves state untouched', () => {
+    const session = useAgentSession();
+    session.init({ seed: 'reject-seed' });
+    session.setSpeed(2);
+    expect(session.speedMultiplier).toBe(2);
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 2);
+
+    const invalid = [0, -1, -0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+    for (const bad of invalid) {
+      expect(() => session.setSpeed(bad)).toThrow(RangeError);
+    }
+
+    // State must survive every rejected call.
+    expect(session.speedMultiplier).toBe(2);
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 2);
+  });
+
   it('replayFromSnapshot(null) rebuilds a fresh agent reusing the persisted seed', () => {
     const session = useAgentSession();
     session.init({ seed: 'replay-seed' });

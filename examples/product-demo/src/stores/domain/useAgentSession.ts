@@ -115,6 +115,15 @@ export const useAgentSession = defineStore('agentSession', () => {
   }
 
   function setSpeed(multiplier: number): void {
+    // Up-front validation: non-finite or non-positive values would either
+    // reach `agent.setTimeScale` (which throws after `speedMultiplier`
+    // has already been mutated) or — for `0` — silently shadow `pause()`.
+    // Reject early so the store's invariants stay consistent.
+    if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      throw new RangeError(
+        `useAgentSession.setSpeed: expected a finite positive multiplier, got ${String(multiplier)}`,
+      );
+    }
     speedMultiplier.value = multiplier;
     if (agent.value !== null && running.value) {
       agent.value.setTimeScale(BASE_TIME_SCALE * multiplier);
