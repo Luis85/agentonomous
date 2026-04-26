@@ -76,7 +76,10 @@ users see — not infer — what changed between modes.
 - Spec criteria P2-AC-1 through P2-AC-4 all met.
 - Tuning constants chosen and recorded in the Done log.
 - Planning-doc tracker table row for "Cognition diff panel" set to ✅
-  with every merged PR linked.
+  shipped with every PR linked **in the same PR that ships each
+  row** (use the GH-assigned PR number; never chase with a `docs:
+  flip row` follow-up — see CLAUDE.md "Plan + doc updates ride with
+  the PR that lands the work").
 
 ## Done log
 

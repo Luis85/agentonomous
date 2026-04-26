@@ -27,7 +27,7 @@ The doc set originally landed via [PR #129](https://github.com/Luis85/agentonomo
 Every downstream PR cut from this plan must:
 
 - include the body line `Tracks: #132`,
-- tick its row in the [Tracker table](#tracker-table) in the same diff (per the project rule that plan + doc updates ride with their PR),
+- flip its row in the [Tracker table](#tracker-table) to `✅ shipped` with `[#NNN](url)` **in the same PR** (use the GH-assigned PR number — it is known the moment the PR is opened, before merge). Do NOT land at "in review" and chase with a `docs: flip row` follow-up — those pollute history. The row briefly reads "shipped" while the PR is still open; CI gates prevent a broken merge from leaving the row stale,
 - get added as a row to the GitHub tasklist on issue #132's body so completion auto-flips on merge.
 
 ---

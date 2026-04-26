@@ -82,8 +82,11 @@ backed by a normalized run fingerprint.
 
 - Spec criteria P3-AC-1 through P3-AC-5 all met.
 - `minSampleFraction` final value chosen and recorded in Done log.
-- Planning-doc tracker table row for "Determinism fingerprint" set to ✅
-  with every merged PR linked.
+- Planning-doc tracker table row for "Determinism fingerprint" set to
+  ✅ shipped with every PR linked **in the same PR that ships each
+  row** (use the GH-assigned PR number; never chase with a `docs:
+  flip row` follow-up — see CLAUDE.md "Plan + doc updates ride with
+  the PR that lands the work").
 
 ## Done log
 
