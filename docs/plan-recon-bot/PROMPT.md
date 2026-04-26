@@ -77,14 +77,20 @@ For each candidate to archive:
    Open-and-unlabelled tracker → leave alone.
 4. **Successor link.** Search the plan body for
    `Superseded by` / `Replaces` / `Successor:` markers. If a
-   successor plan exists and lives in `docs/plans/`, archive the
-   predecessor regardless of tracker state. **Precedence:** an
-   explicit successor link is the **only** path that overrides the
-   "[Never archive a plan with open roadmap rows](#hard-rules)" hard
-   rule below. Predecessors that name their successor in-body are
-   intentionally left with stale unfinished rows when the work moves;
-   archiving them is correct. Every other "open rows" plan stays
-   exactly as the hard rule says: leave alone, full stop.
+   successor plan exists and lives in `docs/plans/` AND
+   [Cross-check 3](#cross-checks-run-before-deciding-b) (tracker
+   issue closed or carrying a `closed` / `complete` / `archived`
+   label) also passes, archive the predecessor — predecessors that
+   name their successor in-body are intentionally left with stale
+   unfinished rows when the work moves, and the closed tracker
+   confirms the supersede is finalised. **Precedence:** the
+   successor link is the **only** path that overrides the
+   "[Never archive a plan with open roadmap rows](#hard-rules)"
+   hard rule. It does **not** override the tracker-closure check
+   (Cross-check 3) — an open umbrella issue means the umbrella
+   intent is still active, regardless of whether one constituent
+   plan was superseded. Every other "open rows" plan stays exactly
+   as the hard rule says: leave alone, full stop.
 
 # Process
 
@@ -139,9 +145,11 @@ After every move is staged:
    via git history are fine; broken in-repo links to the moved
    files (e.g. an active doc that still points at
    `docs/plans/<file>` instead of `docs/archive/plans/<file>`) are
-   not. If verify fails on a broken link, leave the moves staged,
-   write a [failure issue](#failure-handling), and exit 1 — do not
-   silently rewrite links to make verify pass.
+   not. If verify fails on a broken link, route through
+   [Failure handling](#failure-handling) (unstage the moves, open
+   the failure issue, exit 1) — do not silently rewrite links to
+   make verify pass, and do not leave a dirty index for the next
+   monthly run to inherit.
 
    ```bash
    npm run verify
