@@ -52,9 +52,10 @@ There is no per-PR or per-bump state to carry across runs (this
 routine opens at most one PR per run, against a fresh dated
 branch). The dep-triage bot uses per-PR comment markers because it
 triages multiple Dependabot PRs per run; this bot does not.
-Idempotency is bounded by an ISO-week PR search filtered by
-`ROUTINE_GH_LOGIN` — see the prompt's
-[Idempotency](./PROMPT.md#idempotency) section.
+Idempotency is bounded by a search for **any** still-open
+`chore/actions-bump-*` PR authored by `ROUTINE_GH_LOGIN` — older
+unmerged bump PRs also block a new run, not just this week's. See
+the prompt's [Idempotency](./PROMPT.md#idempotency) section.
 
 If a run finds no `PENDING` rows (`scripts/bump-actions.mjs` exits
 0), the routine does NOT open a PR or an issue. Quiet runs leave
@@ -103,12 +104,14 @@ weekly `dep-triage-bot`.
 
       The prompt's
       [Idempotency check](./PROMPT.md#idempotency) uses this login
-      as the trust boundary for "is there already a bump PR open
-      this week from us?". The check deliberately does NOT
-      constrain `user.type` — that would silently disable the
-      ISO-week dedupe on PAT-based runs. It exits non-zero if the
-      env var is unset, so a misconfigured run cannot accidentally
-      open duplicate bump PRs against an unfiltered author list.
+      as the trust boundary for "is there already an unmerged bump
+      PR open from us?" — the search blocks on **any** still-open
+      `chore/actions-bump-*` PR from this login, regardless of when
+      it was opened. The check deliberately does NOT constrain
+      `user.type` — that would silently disable the dedupe on
+      PAT-based runs. It exits non-zero if the env var is unset, so
+      a misconfigured run cannot accidentally open duplicate bump
+      PRs against an unfiltered author list.
 - [ ] Confirm `gh` and `node` are on the routine's PATH and
       authenticated. `scripts/bump-actions.mjs` shells out to
       `gh api` for every action lookup; without auth the script
@@ -246,11 +249,12 @@ rules, or output-format pain. To change it:
   `actions-bump-bot` label view automatically.
 - **No idempotency markers on the bump PR itself.** The routine
   opens at most one PR per run against a fresh dated branch
-  (`chore/actions-bump-YYYY-MM-DD`); if a re-run within the same
-  ISO-week finds an existing PR from `ROUTINE_GH_LOGIN`, it exits
-  silently. This intentionally diverges from `dep-triage-bot`'s
-  per-PR-comment markers — there's nothing per-PR to track here
-  because the artifact IS the PR.
+  (`chore/actions-bump-YYYY-MM-DD`); if a re-run finds **any**
+  still-open `chore/actions-bump-*` PR from `ROUTINE_GH_LOGIN`
+  (regardless of when that PR was opened), it exits silently. This
+  intentionally diverges from `dep-triage-bot`'s per-PR-comment
+  markers — there's nothing per-PR to track here because the
+  artifact IS the PR.
 
 ## Bot label convention
 

@@ -359,9 +359,14 @@ comma-separated.
 artifact — applied bumps in the body table, verify status in the
 footer. There is no per-run issue when verify passes.
 
-**Secondary sink: failure issue, only when verify fails after applying
-bumps.** See [Failure handling](#failure-handling) below for the issue
-spec.
+**Secondary sink: failure issue under the `actions-bump-bot` label.**
+The routine opens a fresh issue per [Failure handling](#failure-handling)
+on every failure path the run can hit — `ERROR` rows from
+`scripts/bump-actions.mjs` (auth / network / rate-limit / missing CLI),
+`DIVERGENT` rows (filed alongside any bump PR, not in place of one),
+`actionlint` failures after applying bumps, and `npm run verify`
+failures after applying bumps. Each path uses its own issue title
+prefix; see [Failure handling](#failure-handling) for the exact specs.
 
 **No-op runs leave no trace.** If `scripts/bump-actions.mjs` exits 0,
 exit cleanly without opening a PR or issue. An empty
@@ -599,8 +604,9 @@ issue per failed run:
 - Edit any file outside `.github/workflows/*.{yml,yaml}` in the bump PR.
 - Land the bump PR yourself. The bot opens the PR; the owner merges.
 - Comment on existing `chore/actions-bump-*` PRs. Each run owns its
-  own dated branch; if the previous week's PR is still open, the
-  ISO-week idempotency check above exits 0 silently.
+  own dated branch; if a prior `chore/actions-bump-*` PR is still
+  open, the [Idempotency](#idempotency) check above exits 0 silently
+  regardless of when that PR was opened.
 - Touch `.changeset/*.md`. Action bumps are infrastructure-only.
 - Bypass any of the Hard rules above to drain the queue faster.
   Slow + safe is the contract.
