@@ -73,25 +73,53 @@ The script prints, to stdout, in order:
      Skip the run entirely if any action errors — see
      [Failure handling](#failure-handling).
 
-4. **Exit code.** `0` if every pin is `up-to-date`. `1` if any
-   `PENDING` / `DIVERGENT` / `ERROR` row exists. The exit code is the
-   no-op signal: exit 0 from the script means there is nothing to do
-   this run.
+   `no-releases` and `unresolved` rows do **NOT** get a dedicated
+   per-status section — the script lists them only in the column-6
+   `status` field of the table at step 2. The routine must scan that
+   column directly to surface them. See [Failure handling](#failure-handling)
+   for the triage-issue spec.
+
+4. **Exit code.** `0` when no `PENDING` / `DIVERGENT` / `ERROR` rows
+   exist. `1` if any do. **Note:** rows with status `no-releases` or
+   `unresolved` are not gated on; the script exits `0` even when they
+   are present. Treat these as actionable triage state, not no-op —
+   see [No-op detection](#no-op-detection) below.
 
 ## No-op detection
 
-The cleanest no-op check is the script's own exit code:
+Exit code `0` is necessary but **not sufficient** for a no-op. The
+script also exits `0` when every row is `up-to-date` *or* every
+non-up-to-date row is `no-releases` / `unresolved` (neither status
+gates the exit code, so silent drift can hide behind exit 0). Parse
+the status-table column 6 from the script's stdout to distinguish:
 
 ```bash
-if node scripts/bump-actions.mjs > /tmp/bump-actions.out 2>&1; then
+node scripts/bump-actions.mjs > /tmp/bump-actions.out 2>&1
+SCRIPT_EXIT=$?
+
+# Strip the table to its 6th column (status) — skip the header line
+# (`action  pinned  sha  latest  sha  status`) and the dashed
+# separator. `awk` works because the script left-pads every column
+# with spaces so the last whitespace-delimited token on each row is
+# always the status.
+STATUSES="$(awk 'NR>2 && NF>0 && $0 !~ /^-+$/ {print $NF}' /tmp/bump-actions.out)"
+UNRESOLVED="$(printf '%s\n' "$STATUSES" | grep -E '^(no-releases|unresolved)$' || true)"
+
+if [ "$SCRIPT_EXIT" -eq 0 ] && [ -z "$UNRESOLVED" ]; then
   echo "No-op run — every pin matches its latest release."
   exit 0
 fi
 ```
 
-If the script exits 0, **do NOT open a PR, do NOT open an issue,
-exit cleanly**. Quiet runs leave no trace — same convention as the
-weekly `dep-triage-bot` and the daily `review-bot`.
+If `SCRIPT_EXIT` is `0` and `UNRESOLVED` is empty, **do NOT open a PR,
+do NOT open an issue, exit cleanly**. Quiet runs leave no trace —
+same convention as the weekly `dep-triage-bot` and the daily
+`review-bot`.
+
+If `SCRIPT_EXIT` is `0` but `UNRESOLVED` is non-empty, open a triage
+issue per [Failure handling](#failure-handling) and exit `0` — the
+run is otherwise no-op (no `PENDING` rows to bump), but the
+unresolved drift must surface.
 
 # Process
 
@@ -523,6 +551,21 @@ filesystem side effects. Exit 0 after dumping.
   pre-flight, only `ERROR` aborts; `DIVERGENT` files its own issue
   alongside the bump PR). The divergent issue is filed regardless of
   whether the run also opens a bump PR.
+
+- **`scripts/bump-actions.mjs` reports `no-releases` or `unresolved`
+  rows** → open a fresh issue under the `actions-bump-bot` label
+  titled `Unresolved action pins YYYY-MM-DD` with the affected rows
+  grouped by status in the body — `no-releases` rows mean the action
+  has no GitHub releases (legitimate when an action publishes only
+  tags, broken when its repo was deleted/renamed); `unresolved` rows
+  mean the latest tag couldn't be peeled to a SHA (transient network
+  / rate-limit blip, or a bug in the peel logic). Do **NOT** abort
+  the run — continue processing whatever `PENDING` rows the same
+  scan returned. The triage issue is filed regardless of whether the
+  run also opens a bump PR. The script does not exit non-zero on
+  these statuses (see [Output shape](#output-shape--what-to-parse)
+  step 4), so the routine must scan column 6 of the script's
+  status table to detect them.
 
 - **`actionlint` fails after applying bumps** → revert the bump
   edits (`git restore .github/workflows/`), close the bump branch
