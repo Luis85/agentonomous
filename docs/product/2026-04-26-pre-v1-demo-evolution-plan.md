@@ -10,6 +10,28 @@ It records existing capabilities, in-scope outcomes, implementation constraints,
 
 ---
 
+## Document set
+
+This planning doc is the **what + why**. The shape lives in three companion documents:
+
+| Doc | Path | Role |
+|---|---|---|
+| Design doc | [`docs/specs/2026-04-26-pre-v1-demo-evolution-design.md`](../specs/2026-04-26-pre-v1-demo-evolution-design.md) | Cross-cutting *how* — Vue/Pinia/Router architecture, DDD layering, cross-pillar contracts (`Scenario`, `WalkthroughStep`, `DiffMetric`, `RunFingerprint`, `ConfigDraft`), determinism fingerprint design, persistence contract. |
+| Spec | [`docs/specs/2026-04-26-pre-v1-demo-evolution-spec.md`](../specs/2026-04-26-pre-v1-demo-evolution-spec.md) | Per-pillar *requirements* — FRs, data shapes, acceptance criteria, NFRs. |
+| Plans | `docs/plans/2026-04-26-pre-v1-demo-*.md` (six files; see [Tracker table](#tracker-table)) | Per-pillar **roadmaps** — chunked PR slices, file targets, verification gates. |
+
+### PR #129 — umbrella tracker
+
+[PR #129](https://github.com/Luis85/agentonomous/pull/129) holds this planning doc, the design doc, the spec, and all six plans. It stays **docs-only** for the duration of the increment — implementation lives in downstream PRs cut from `develop`.
+
+Every downstream PR cut from this plan must:
+
+- include the body line `Tracks: #129`,
+- tick its row in the [Tracker table](#tracker-table) in the same diff (per the project rule that plan + doc updates ride with their PR),
+- get added as a row to the GitHub tasklist on PR #129's body so completion auto-flips on merge.
+
+---
+
 ## Baseline snapshot (already present)
 
 1. **Narrative-capable pet loop** with lifecycle, mood, random events, default + expressive skills.
@@ -319,19 +341,36 @@ Weekly checkpoint questions:
 
 ---
 
+## Tracker table
+
+Canonical status. Update the **Status** and **PR** cells in the same diff that ships each downstream PR.
+
+| Wave | Pillar | Plan | Status | PR |
+|---|---|---|---|---|
+| 0 | Demo rename preflight | [`rename-preflight`](../plans/2026-04-26-pre-v1-demo-rename-preflight.md) | not started | — |
+| A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | not started | — |
+| A | Cognition diff panel | [`cognition-diff-panel`](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md) | not started | — |
+| A | Determinism fingerprint | [`determinism-fingerprint`](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md) | not started | — |
+| B | JSON preview / commit | [`json-preview-commit`](../plans/2026-04-26-pre-v1-demo-json-preview-commit.md) | not started | — |
+| B-C | Second scenario | [`second-scenario`](../plans/2026-04-26-pre-v1-demo-second-scenario.md) | not started | — |
+
+Status values: `not started` · `in progress` · `in review` · ✅ shipped.
+
+---
+
 ## Milestone checklist
 
 ### M1 (end Week 2)
-- [ ] Guided walkthrough skeleton merged.
-- [ ] Behavior-diff baseline merged.
-- [ ] Fingerprint/verdict core merged.
+- [ ] Guided walkthrough skeleton merged ([plan](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md)).
+- [ ] Behavior-diff baseline merged ([plan](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md)).
+- [ ] Fingerprint/verdict core merged ([plan](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md)).
 
 ### M2 (end Week 4)
-- [ ] JSON preview/commit split merged.
-- [ ] Second scenario MVP merged.
-- [ ] Diff panel confidence/quality improvements merged.
+- [ ] JSON preview/commit split merged ([plan](../plans/2026-04-26-pre-v1-demo-json-preview-commit.md)).
+- [ ] Second scenario MVP merged ([plan](../plans/2026-04-26-pre-v1-demo-second-scenario.md)).
+- [ ] Diff panel confidence/quality improvements merged ([plan](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md)).
 
 ### M3 (end Week 6)
-- [ ] Replay report polish merged.
+- [ ] Replay report polish merged ([plan](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md)).
 - [ ] Final scripted demo rehearsal + soak signoff completed.
 - [ ] Excalibur multi-agent follow-up brief drafted (separate track).
