@@ -199,6 +199,30 @@ export const useTourProgress = defineStore('tourProgress', () => {
     persist();
   }
 
+  /**
+   * Skip the entire remainder of the tour in one shot. Walks the chain
+   * from `lastStep` to the `'end'` sentinel, recording every visited
+   * step in `skipped`, then sets `completedAt` so `<TourOverlay>`
+   * disappears. Used by the intro view's "Skip to free play" CTA so
+   * users who opt out don't see the overlay pop on every chapter.
+   * Bounded by the graph's step count to short-circuit any future
+   * cyclic-graph mistake.
+   */
+  function complete(): void {
+    if (completedAt.value !== null) return;
+    const limit = graph.stepsById.size;
+    let cursor: WalkthroughStepId | 'end' = lastStep.value;
+    for (let i = 0; i < limit; i += 1) {
+      if (cursor === 'end') break;
+      if (!skipped.value.includes(cursor)) skipped.value.push(cursor);
+      const step = graph.stepsById.get(cursor);
+      if (step === undefined) break;
+      cursor = step.nextOnComplete;
+    }
+    completedAt.value = Date.now();
+    persist();
+  }
+
   function restart(): void {
     completedAt.value = null;
     skipped.value = [];
@@ -288,6 +312,7 @@ export const useTourProgress = defineStore('tourProgress', () => {
     next,
     skip,
     restart,
+    complete,
     markComplete,
     syncRoute,
     resumeFromRoute,

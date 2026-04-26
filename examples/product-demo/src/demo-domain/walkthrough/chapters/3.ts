@@ -17,7 +17,13 @@
  *      mode, not the cold-start fallback.
  */
 
-import { eventEmittedSinceStep, not, cognitionModeIs } from '../predicates.js';
+import {
+  combineAll,
+  eventEmittedSinceStep,
+  not,
+  cognitionModeIs,
+  ticksSinceStepAtLeast,
+} from '../predicates.js';
 import type { WalkthroughStep } from '../types.js';
 import {
   STEP_ID_COGNITION_OBSERVE,
@@ -54,7 +60,14 @@ const cognitionObserveStep: WalkthroughStep = {
   title: observeCopy.title,
   hint: observeCopy.hint,
   highlight: COGNITION_INDICATOR_HANDLE,
-  completionPredicate: eventEmittedSinceStep('AgentTicked'),
+  // Both: an `AgentTicked` event AND virtual time has actually
+  // advanced since the cursor entered this step. `useAgentSession`
+  // still emits `AgentTicked` at `timeScale === 0` (so the trace
+  // panel keeps observing paused frames), but `tickIndex` does not
+  // increment. Without the dwell-tick gate, the chapter could
+  // auto-complete while the simulation is paused — the user would
+  // never see a real post-switch decision tick.
+  completionPredicate: combineAll(eventEmittedSinceStep('AgentTicked'), ticksSinceStepAtLeast(1)),
   nextOnComplete: STEP_ID_JSON_PREVIEW,
 };
 

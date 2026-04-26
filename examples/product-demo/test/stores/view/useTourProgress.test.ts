@@ -313,6 +313,41 @@ describe('useTourProgress', () => {
     expect(tour.lastStep).toBe(STEP_ID_AUTONOMY);
   });
 
+  it('complete() walks every remaining step into `skipped` and sets `completedAt`', async () => {
+    const wrapper = await mountWithStores();
+    const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
+    expect(tour.lastStep).toBe(STEP_ID_AUTONOMY);
+    expect(tour.completedAt).toBeNull();
+
+    tour.complete();
+
+    // Every authored step (chapter-1 autonomy through chapter-5 import)
+    // must end up in the skipped set; the last cursor stays at whatever
+    // step pointed to `'end'` last.
+    expect(tour.skipped).toContain(STEP_ID_AUTONOMY);
+    expect(tour.skipped).toContain(STEP_ID_TRACE_OPEN);
+    expect(tour.skipped).toContain(STEP_ID_REPLAY_IMPORT);
+    expect(tour.completedAt).not.toBeNull();
+    // Persisted in the same shot — a reload must see the completed tour.
+    const raw = globalThis.localStorage.getItem(PROGRESS_KEY);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!) as { completedAt: number | null; skipped: string[] };
+    expect(parsed.completedAt).not.toBeNull();
+    expect(parsed.skipped).toContain(STEP_ID_REPLAY_IMPORT);
+  });
+
+  it('complete() is a no-op once the tour is already complete', async () => {
+    const wrapper = await mountWithStores();
+    const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
+    tour.complete();
+    const firstCompletedAt = tour.completedAt;
+    expect(firstCompletedAt).not.toBeNull();
+    const skippedAfterFirst = [...tour.skipped];
+    tour.complete();
+    expect(tour.completedAt).toBe(firstCompletedAt);
+    expect([...tour.skipped]).toEqual(skippedAfterFirst);
+  });
+
   it('Reset (replayFromSnapshot(null)) does NOT mutate tour cursor / completedAt / skipped (P1-FR-7)', async () => {
     const wrapper = await mountWithStores();
     const session = (wrapper.vm as unknown as { session: ReturnType<typeof useAgentSession> })
