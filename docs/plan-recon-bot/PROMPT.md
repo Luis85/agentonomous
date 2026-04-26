@@ -182,9 +182,16 @@ After every move is staged:
 - **Never edit a plan body beyond prepending the archived banner.**
   No prose fixes, no roadmap-row tweaks, no link rewrites — those
   belong to `docs-review-bot` (drift audit), not this routine.
-- **Never touch files outside `docs/plans/` and `docs/archive/plans/`
-  in the recon branch.** Link rewrites elsewhere belong to a separate
-  PR.
+- **Never commit or stage files outside `docs/plans/` and
+  `docs/archive/plans/` on the recon branch.** Link rewrites elsewhere
+  belong to a separate PR. The gitignored `.plan-recon-cache/` is the
+  only out-of-scope path the routine writes to — it holds the
+  re-submit-by-hand `pr-body-*.md` / `FAILED-issue-body-*.md`
+  artifacts (see [PR open command](#pr-open-command) and
+  [Failure handling](#failure-handling)) and is excluded from
+  `git add` because it lives in the repo's `.gitignore` (one-time
+  setup, see README). It never enters a commit or the PR diff, so
+  this rule's commit-scope guarantee still holds.
 
 # Output — one PR per run with archive moves
 
