@@ -6,6 +6,7 @@ import {
   buildAgent,
   type BuildAgentOptions,
 } from '../../demo-domain/scenarios/petCare/buildAgent.js';
+import { setLearningAgent } from '../../demo-domain/scenarios/petCare/cognition/learning.js';
 
 const DEFAULT_SCENARIO_ID = 'petCare';
 const SEED_STORAGE_KEY_PREFIX = 'demo.v2.session.lastSeed.';
@@ -73,7 +74,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     scenarioId.value = resolvedScenario;
     seed.value = resolvedSeed;
     speedMultiplier.value = 1;
-    agent.value = markRaw(
+    const fresh = markRaw(
       buildAgent({
         seed: resolvedSeed,
         ...(options.speciesOverride !== undefined
@@ -81,6 +82,13 @@ export const useAgentSession = defineStore('agentSession', () => {
           : {}),
       }),
     );
+    agent.value = fresh;
+    // Wire the learning-mode singleton's `agentIdForHydration` + bus
+    // subscription. The legacy `src/main.ts` does this immediately after
+    // `buildAgent`; without the call, switching to Learning mode reads
+    // a null hydration scope and stale feature inputs (mood / recent
+    // events).
+    setLearningAgent(fresh);
     running.value = true;
     writePersistedSeed(resolvedScenario, resolvedSeed);
   }
@@ -110,8 +118,14 @@ export const useAgentSession = defineStore('agentSession', () => {
     if (agent.value === null) return;
     const wasRunning = running.value;
     if (!wasRunning) agent.value.setTimeScale(BASE_TIME_SCALE * speedMultiplier.value);
-    await agent.value.tick(dtSeconds);
-    if (!wasRunning) agent.value.setTimeScale(0);
+    try {
+      await agent.value.tick(dtSeconds);
+    } finally {
+      // `finally` keeps the paused-scale invariant even when `tick`
+      // throws (reasoner/runtime errors). Without it the agent stays
+      // unpaused while `running` is false — control state inconsistent.
+      if (!wasRunning && agent.value !== null) agent.value.setTimeScale(0);
+    }
   }
 
   function setSpeed(multiplier: number): void {
@@ -142,7 +156,9 @@ export const useAgentSession = defineStore('agentSession', () => {
         'useAgentSession.replayFromSnapshot: snapshot deserialisation lands in slice 1.2b',
       );
     }
-    agent.value = markRaw(buildAgent({ seed: seed.value }));
+    const fresh = markRaw(buildAgent({ seed: seed.value }));
+    agent.value = fresh;
+    setLearningAgent(fresh);
     speedMultiplier.value = 1;
     running.value = true;
   }

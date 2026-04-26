@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setActivePinia } from 'pinia';
 import { createTestingPinia } from '@pinia/testing';
 import type { AgentTickedEvent, DomainEvent } from 'agentonomous';
@@ -68,6 +68,26 @@ describe('useAgentSession', () => {
     session.resume();
     expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE);
     expect(session.running).toBe(true);
+  });
+
+  it('step() restores the paused timeScale even when agent.tick throws', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'step-throw-seed' });
+    session.pause();
+    expect(session.agent?.getTimeScale()).toBe(0);
+
+    const tickSpy = vi
+      .spyOn(session.agent!, 'tick')
+      .mockRejectedValueOnce(new Error('synthetic tick failure'));
+
+    await expect(session.step(1)).rejects.toThrow('synthetic tick failure');
+
+    // The `finally` branch must restore the paused scale even though
+    // `tick` rejected — leaving the agent at `BASE_TIME_SCALE` would
+    // contradict `running === false`.
+    expect(session.agent?.getTimeScale()).toBe(0);
+    expect(session.running).toBe(false);
+    tickSpy.mockRestore();
   });
 
   it('step(dt) advances exactly one tick while paused without resuming', async () => {
