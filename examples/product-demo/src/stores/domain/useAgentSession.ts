@@ -365,6 +365,12 @@ export const useAgentSession = defineStore('agentSession', () => {
    * the rebuild; callers don't need to scrub them up-front.
    */
   async function replayFromSnapshot(snapshot: AgentSnapshot | null = null): Promise<void> {
+    // Capture the user's currently-selected cognition mode BEFORE the
+    // rebuild. The reset path (`snapshot === null`) discards it; the
+    // import path (`snapshot !== null`) re-applies it to the fresh
+    // agent so chapter-5's deterministic-replay flow uses the same
+    // decision policy as the exported run.
+    const previousMode = cognitionModeId.value;
     const fresh = markRaw(
       buildAgent({
         seed: seed.value,
@@ -404,12 +410,28 @@ export const useAgentSession = defineStore('agentSession', () => {
     lastTrace.value = null;
     lastTickNumber.value = 0;
     // The fresh agent boots on the default heuristic reasoner; sync
-    // the readout (and chapter-3 predicate) so a previously-selected
-    // mode doesn't ghost across a reset / import.
+    // the readout to match. The import path below re-applies the
+    // user's previous mode (so deterministic replay matches the
+    // exported run's policy); the reset path leaves it at heuristic.
     cognitionModeId.value = 'heuristic';
     // Drop any in-flight `setCognitionMode` request — its `setReasoner`
     // call would land on the new agent under the old user's intent.
     cognitionToken += 1;
+
+    if (snapshot !== null && previousMode !== 'heuristic') {
+      // Re-apply the user's active cognition mode to the fresh agent
+      // so chapter-5 replay reproduces the exported run's behaviour.
+      // If the peer dep is no longer available (uninstalled between
+      // export and import), `setCognitionMode` throws — swallow here
+      // so the import itself succeeds; cognitionModeId already
+      // reflects 'heuristic' (the agent's actual reasoner) and the
+      // user can retry the swap manually via the HUD picker.
+      try {
+        await setCognitionMode(previousMode as CognitionModeSpec['id']);
+      } catch {
+        // intentional swallow — see comment above.
+      }
+    }
   }
 
   /**
