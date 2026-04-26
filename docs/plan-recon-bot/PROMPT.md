@@ -208,11 +208,26 @@ After every move is staged:
   setup, see README). It never enters a commit or the PR diff, so
   this rule's commit-scope guarantee still holds.
 
-# Output — one PR per run with archive moves
+# Output — PR or triage issue, depending on what the run found
 
 The PRIMARY sink is the archive PR itself. **One PR per run, only when
-there is at least one archive move.** No moves needed → no PR, no
-issue, exit cleanly. Same "quiet runs leave no trace" convention as
+there is at least one archive move.** When the run finds at least one
+movable plan, the PR carries the full artifact — `Archived this run`
+sections plus an optional `Ambiguous — owner decides` appendix.
+
+The SECONDARY sink is a triage issue under the `plan-recon-bot`
+label. **One issue per run, only when there are zero archive moves
+but at least one ambiguous flag.** The PR sink does not fire (no
+diff to review) but the ambiguous candidates still need to surface
+to the owner — see [Ambiguous-only triage issue](#ambiguous-only-triage-issue)
+below for the spec. This is distinct from the failure issue specced
+under [Failure handling](#failure-handling): a triage issue means the
+run completed cleanly but produced no archive moves, only flags;
+a failure issue means the run aborted on `git mv` / `verify` /
+`push` / `pr-open`.
+
+Zero archive moves AND zero ambiguous flags → no PR, no issue, exit
+cleanly. Same "quiet runs leave no trace" convention as
 `docs/review-bot/`, `docs/docs-review-bot/`, and `docs/dep-triage-bot/`.
 
 ## PR spec
@@ -277,13 +292,82 @@ file write. Dry-run keeps the body in `${BODY}` and never touches
 disk — the prompt's own "[Dry-run mode](#dry-run-mode)" rule requires
 zero filesystem side effects.
 
+## Ambiguous-only triage issue
+
+When the run produces zero archive moves but at least one ambiguous
+flag, open one issue per run instead of a PR — the recon branch is
+not pushed (there is no diff), and the ambiguous list rides on the
+issue body so the owner can triage from the `plan-recon-bot` label
+view.
+
+- **Title:** `Ambiguous plan candidates YYYY-MM-DD — <head-sha7>`
+- **Label:** `plan-recon-bot` (already exists in repo —
+  see [Setup checklist](./README.md#setup-checklist-one-time)).
+- **Body:** the same `Ambiguous — owner decides` block specced in
+  [PR spec](#pr-spec) above, with a one-line preamble:
+
+  ```markdown
+  ## Ambiguous plan candidates at <head-sha7>
+
+  Run id: plan-recon-<UTC-iso8601>
+  No archive moves staged this run; the candidates below need owner
+  decisions before the next run.
+
+  ## Ambiguous — owner decides
+
+  - `docs/plans/<file>.md` — <one-line reason>.
+
+  <!-- plan-recon:<head-sha7>:ambiguous-only -->
+  ```
+
+- **Assignee:** none. Owner reads the body, decides per candidate
+  (archive / supersede / leave open), and closes the issue manually
+  once each candidate is resolved or accepted as not-yet-ready.
+
+The marker comment trailer follows the same `<bot>:<head-sha7>:<action>`
+pattern as the archive PR's per-entry markers, scoped to the
+`ambiguous-only` action so the [Skip check](#skip-check-run-at-the-start-of-every-run)
+can detect prior triage issues opened from the same `head-sha7` and
+avoid duplicating them on a same-day re-run.
+
+The triage issue does NOT replace the failure-issue path: failures
+mid-run (mv / verify / push / pr-open) still abort the run and open
+a [Failure issue](#issue-spec) per [Failure handling](#failure-handling).
+Triage issues open only when the run completes cleanly.
+
+### Open command
+
+```bash
+TITLE="Ambiguous plan candidates $(date -u +%F) — ${HEAD_SHA7}"
+# BODY is the ambiguous-only triage body assembled in memory — same
+# in-memory pattern as the archive PR body and the failure-issue
+# body. Do NOT write a cache file in dry-run mode.
+if [ -n "${DRY_RUN:-}" ]; then
+  printf '[DRY_RUN] would call: gh issue create --title %q --label plan-recon-bot --body-file <inline>\n' \
+    "${TITLE}"
+  printf '[DRY_RUN] body:\n%s\n' "${BODY}"
+else
+  BODY_FILE=".plan-recon-cache/ambiguous-issue-body-$(date -u +%F)-${HEAD_SHA7}.md"
+  mkdir -p "$(dirname "${BODY_FILE}")"
+  printf '%s\n' "${BODY}" > "${BODY_FILE}"
+  gh issue create \
+    --title "${TITLE}" \
+    --label plan-recon-bot \
+    --body-file "${BODY_FILE}"
+fi
+```
+
+The cache file is written **only** in non-dry-run mode so the
+routine leaves a re-submit-by-hand artifact if `gh issue create`
+fails after the file write. Dry-run keeps the body in `${BODY}` and
+never touches disk.
+
 ## No-op handling
 
-If the run finds zero plans that pass the
-[Cross-checks](#cross-checks-run-before-deciding-b), do NOT open a PR
-and do NOT open an issue. Log the no-op to stdout and exit 0. Same
-convention as the daily code-review bot, weekly docs-review bot, and
-weekly dep-triage bot.
+If the run finds zero archive moves AND zero ambiguous flags, do NOT
+open a PR and do NOT open an issue. Log the no-op to stdout and exit
+0. Same convention as the daily code-review bot, weekly docs-review
+bot, and weekly dep-triage bot.
 
 An empty `plan-recon-bot` label view = nothing happened recently.
 
@@ -356,6 +440,35 @@ EXISTING_ISSUE="$(gh issue list \
   | head -n1)"
 ```
 
+### 3. Ambiguous-only triage-issue idempotency
+
+If an ambiguous-only triage issue already exists for the current
+`<head-sha7>` and run-date with title
+`Ambiguous plan candidates YYYY-MM-DD — <head-sha7>` authored by
+`$ROUTINE_GH_LOGIN`, do NOT open a duplicate. The prior run already
+surfaced the same flag set; same-day re-runs on an unchanged
+`origin/develop` head exit 0 silently. The body's
+`<!-- plan-recon:<head-sha7>:ambiguous-only -->` marker provides a
+secondary idempotency anchor in case the title format ever changes.
+
+```bash
+EXISTING_TRIAGE="$(gh issue list \
+  --label plan-recon-bot \
+  --state open \
+  --search "Ambiguous plan candidates $(date -u +%F) — ${HEAD_SHA7} in:title" \
+  --json number,title,body,author \
+  | jq -r --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_GH_LOGIN}" \
+    '.[]
+     | select(.author.login == $login)
+     | select(.body | contains("plan-recon:" + $sha + ":ambiguous-only"))
+     | .number' \
+  | head -n1)"
+if [ -n "${EXISTING_TRIAGE}" ]; then
+  echo "Skip — same-day ambiguous-only triage issue already open for ${HEAD_SHA7}: #${EXISTING_TRIAGE}"
+  exit 0
+fi
+```
+
 ## First-ever run
 
 There is no first-run setup for idempotency. With zero prior PRs or
@@ -383,7 +496,8 @@ Wraps:
 - `git push` (would-be push of the recon branch).
 - `gh pr create` (the run's archive PR).
 - `gh issue create` (failure issue, see
-  [Failure handling](#failure-handling)).
+  [Failure handling](#failure-handling); ambiguous-only triage
+  issue, see [Ambiguous-only triage issue](#ambiguous-only-triage-issue)).
 - `gh issue comment` (delta-append on a same-day failure-issue
   re-run).
 - `gh label create` (first-run label setup, if it ever runs — the
