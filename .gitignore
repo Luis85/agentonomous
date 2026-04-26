@@ -15,6 +15,7 @@ examples/**/playwright-report
 examples/**/test-results
 .worktrees
 .review-fix-cache
+.plan-recon-cache/
 .claude/settings.local.json
 .claude/.last-run
 

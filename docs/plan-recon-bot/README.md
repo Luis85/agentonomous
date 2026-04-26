@@ -216,11 +216,19 @@ Each per-run issue carries exactly its routine's label — no
 cross-labelling, no shared `automation` umbrella label. Filter the
 issue list by label to see one routine's full history.
 
-For `plan-recon-bot` specifically, the label-tagged surface is the
-**failure issue**, not the archive PR (the PR is filterable by
-title pattern + base branch). An empty `plan-recon-bot` label view
-is the desired state — every issue in there is a real failure
-needing investigation.
+For `plan-recon-bot` specifically, the label-tagged surface covers
+**two distinct issue types** (the archive PR is filterable separately
+by title pattern + base branch):
+
+| Issue type | Title prefix | Marker | Meaning |
+| ---------- | ------------ | ------ | ------- |
+| Failure issue | `Plan reconciliation YYYY-MM-DD — <head-sha7>` | `<!-- plan-recon:<head-sha7>:failed -->` | Run aborted on `git mv` / `verify` / `push` / `pr-open`. Investigate. |
+| Ambiguous-only triage issue | `Ambiguous plan candidates YYYY-MM-DD — <head-sha7>` | `<!-- plan-recon:<head-sha7>:ambiguous-only -->` | Run completed cleanly, zero archive moves but ≥1 ambiguous flag. Owner triage. |
+
+An empty `plan-recon-bot` label view means the routine has not
+surfaced anything for owner attention recently — neither failure
+nor ambiguous candidates. Triage the label by reading the title /
+marker before assuming "issue here = failure".
 
 ## Related
 

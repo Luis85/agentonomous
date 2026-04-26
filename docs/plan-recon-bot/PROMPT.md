@@ -50,8 +50,11 @@ For each plan file, decide:
   table is `- [x] shipped` (or a synonym: `shipped via #NNN`,
   `complete`), AND the plan's last commit on `origin/develop` is
   ≥ 14 days old, AND no live work in the repo points at it.
-  Successor-supersession also counts: if the plan body or its tracker
-  issue links forward to a successor plan, archive the predecessor.
+  Successor-supersession is the only path that overrides the
+  "every row shipped" requirement, and it requires BOTH a successor
+  link in the plan body AND a closed tracker issue — see
+  [Cross-check 4](#cross-checks-run-before-deciding-b) for the full
+  precedence (a successor link alone is NOT enough).
 - **(c) Flag for owner** if the evidence is genuinely ambiguous — e.g.
   the tracker table looks complete but the umbrella issue has unclosed
   child issues, or two plans cover overlapping scope and it isn't
@@ -102,8 +105,22 @@ and opens one PR per run.
 git fetch origin
 RUN_DATE="$(date -u +%F)"
 BRANCH="docs/plan-recon-${RUN_DATE}"
-git worktree add ".worktrees/${BRANCH//\//-}" -b "${BRANCH}" origin/develop
-cd ".worktrees/${BRANCH//\//-}"
+WORKTREE_DIR=".worktrees/${BRANCH//\//-}"
+
+# Prune any stale branch / worktree from a same-day rerun BEFORE the
+# worktree-add below. A failed earlier run on the same UTC date leaves
+# `${BRANCH}` and/or `${WORKTREE_DIR}` behind; without this guard,
+# `git worktree add ... -b "${BRANCH}"` aborts with `fatal: a branch
+# named '${BRANCH}' already exists` and the routine never gets past
+# startup. Same prune body as [Recon-branch abandonment](#recon-branch-abandonment)
+# below — kept inline here so it runs first.
+if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
+  git worktree remove --force "${WORKTREE_DIR}" 2>/dev/null || true
+  git branch -D "${BRANCH}" 2>/dev/null || true
+fi
+
+git worktree add "${WORKTREE_DIR}" -b "${BRANCH}" origin/develop
+cd "${WORKTREE_DIR}"
 npm ci
 ```
 
@@ -133,12 +150,25 @@ For each plan that passed the [Cross-checks](#cross-checks-run-before-deciding-b
    fi
    ```
 
-3. **Stage the archive banner edit + the `git mv`** as one logical
-   change per plan. One commit per plan keeps the PR diff readable
-   and lets the owner revert a single move without losing the
-   others.
+3. **Stage and commit the archive banner edit + the `git mv`** as one
+   logical change per plan. One commit per plan keeps the PR diff
+   readable and lets the owner revert a single move without losing the
+   others. The `git mv` itself already updates the index, but the
+   banner edit needs an explicit `git add` of the archived path before
+   the commit. Skip the commit in dry-run mode.
 
-After every move is staged:
+   ```bash
+   if [ -n "${DRY_RUN:-}" ]; then
+     printf '[DRY_RUN] would call: git add %q && git commit -m %q\n' \
+       "docs/archive/plans/${PLAN}" \
+       "docs(archive): ${PLAN%.md}"
+   else
+     git add "docs/archive/plans/${PLAN}"
+     git commit -m "docs(archive): ${PLAN%.md}"
+   fi
+   ```
+
+After every move is committed:
 
 4. **Run the verify gate.** `npm run verify` must stay green even
    after the moves — links inside the archived plans that resolve
@@ -146,10 +176,10 @@ After every move is staged:
    files (e.g. an active doc that still points at
    `docs/plans/<file>` instead of `docs/archive/plans/<file>`) are
    not. If verify fails on a broken link, route through
-   [Failure handling](#failure-handling) (unstage the moves, open
-   the failure issue, exit 1) — do not silently rewrite links to
-   make verify pass, and do not leave a dirty index for the next
-   monthly run to inherit.
+   [Failure handling](#failure-handling) (reset the recon branch back
+   to `origin/develop`, open the failure issue, exit 1) — do not
+   silently rewrite links to make verify pass, and do not leave local
+   commits on the recon branch for the next monthly run to inherit.
 
    ```bash
    npm run verify
@@ -388,7 +418,7 @@ accidentally trust signals from arbitrary users.
 
 ## Skip check (run at the start of every run)
 
-Two duplicate-detection checks run before any move is staged:
+Two duplicate-detection checks run before any move is committed:
 
 ### 1. Same-day re-run on the same `origin/develop` head SHA
 
@@ -513,16 +543,19 @@ in-progress staged moves so the run produces realistic verify-pass /
 verify-fail signals. Under no circumstances trigger `git push`,
 `gh pr create`, or `gh issue create` from that path.
 
-In dry-run mode, do NOT write any cache files. Dry runs leave zero
-filesystem side effects beyond the staged-but-uncommitted working tree.
+In dry-run mode, do NOT write any cache files and do NOT commit. Dry
+runs leave zero filesystem side effects beyond the staged-but-
+uncommitted working tree.
 Exit 0 after dumping.
 
 # Failure handling
 
 If anything in the run fails — `git mv` errors, `npm run verify` fails,
 the archive parse breaks, `git push` fails, etc. — abort the run,
-unstage the moves on the recon branch, open a failure issue, and exit
-1.
+reset the recon branch back to `origin/develop` (`git reset --hard
+origin/develop`) so the local commits vanish, open a failure issue,
+and exit 1. The recon branch is never pushed before verify, so this
+reset is local-only.
 
 ## Issue spec
 
@@ -536,7 +569,7 @@ unstage the moves on the recon branch, open a failure issue, and exit
 
   Run id: plan-recon-<UTC-iso8601>
   Stage: git mv / verify / parse / push / pr-open
-  Plans staged before failure: <list>
+  Plans committed before failure: <list>
 
   <details><summary>Verbatim failure tail (last 40 lines)</summary>
 
