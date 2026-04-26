@@ -208,9 +208,24 @@ For each remaining `PENDING` row in scope:
    # bumps land in the commit. The bump scanner accepts both
    # extensions; staging only *.yml would leave .yaml edits in the
    # worktree and produce a partial bump PR + dirty tree.
-   git add .github/workflows/
-   git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
+   if [ -n "${DRY_RUN:-}" ]; then
+     printf '[DRY_RUN] would call: git add .github/workflows/\n'
+     printf '[DRY_RUN] would call: git commit -m %q\n' \
+       "chore: bump pinned action SHAs ($(date -u +%F))"
+   else
+     git add .github/workflows/
+     git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
+   fi
    ```
+
+   The DRY_RUN gate matters because [step 2](#process) skipped the
+   actual `git switch -c` in dry-run mode — so HEAD is still on
+   `develop` here. An unconditional `git commit` would commit the
+   bump edits directly onto the local `develop` clone, contaminating
+   subsequent runs. Skipping the commit (and step 8's push) keeps
+   the dry-run contract: zero filesystem side effects beyond the
+   workflow-file edits in [step 3](#process), which are reverted by
+   [Failure handling](#failure-handling) on any failure path.
 
 7. **Write the PR body to the cache file (skipped in `DRY_RUN`).**
    The routine assembled `${BODY}` in memory while applying bumps
@@ -311,13 +326,15 @@ comma-separated.
 - **Never** bypass `--no-verify` to land a green-CI claim. If
   `npm run verify` fails locally, the PR is blocked
   (see [Failure handling](#failure-handling)).
-- **Never** weaken `.github/workflows/*.yml` to make a bump pass. If a
-  bump fails CI because the new action version requires inputs the
-  workflow doesn't supply, that's an owner-review escalation, not a
-  workflow rewrite by the bot.
-- **Never** edit anything outside `.github/workflows/*.yml` in the
-  bump PR. No README updates, no plan flips, no version bumps. Just
-  the SHA + label edits.
+- **Never** weaken `.github/workflows/` files (both `*.yml` and
+  `*.yaml`) to make a bump pass. If a bump fails CI because the new
+  action version requires inputs the workflow doesn't supply, that's
+  an owner-review escalation, not a workflow rewrite by the bot.
+- **Never** edit anything outside `.github/workflows/` (which covers
+  both `*.yml` and `*.yaml` — the bump scanner accepts both
+  extensions, so the hard rule must too) in the bump PR. No README
+  updates, no plan flips, no version bumps. Just the SHA + label
+  edits.
 - **Never** bundle a `DIVERGENT` row (same action, multiple SHA/label
   tuples across workflows) into the bump PR. Divergent pins are a
   consistency-fixup, not a routine bump — open a separate issue under
@@ -480,8 +497,11 @@ filesystem side effects. Exit 0 after dumping.
 - **`scripts/bump-actions.mjs` reports `DIVERGENT` rows** → open a
   fresh issue under the `actions-bump-bot` label titled
   `Divergent action pins: <owner>/<repo>` with the variant list in
-  the body, and exit 0 (or proceed with the non-divergent `PENDING`
-  rows in the same run — the divergent issue is filed regardless).
+  the body. Do **NOT** abort the run — continue processing whatever
+  `PENDING` rows the same scan returned (per [Process](#process)
+  pre-flight, only `ERROR` aborts; `DIVERGENT` files its own issue
+  alongside the bump PR). The divergent issue is filed regardless of
+  whether the run also opens a bump PR.
 
 - **`actionlint` fails after applying bumps** → revert the bump
   edits (`git restore .github/workflows/`), close the bump branch
