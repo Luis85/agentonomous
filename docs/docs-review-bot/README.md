@@ -49,8 +49,13 @@ it appends a one-line "clean run" note to the most recent open
       (clone + git ops). No write scope on `contents:` — the routine
       never pushes a branch.
 - [ ] Dry-run once with `DRY_RUN=1` set in the routine's env. The
-      prompt should print the would-be issue body to stdout instead of
-      calling `gh issue create`.
+      prompt's Persistence section (see `PROMPT.md` → "Dry-run mode")
+      guards every `gh issue create`, `gh issue comment`, and
+      `gh label create` call behind a `DRY_RUN` check; in dry-run
+      mode each is replaced by a stdout dump of the would-be call +
+      body, and no `.docs-review-cache/FAILED-*.md` file is written.
+      Read-only `gh issue list` / `gh api .../comments` calls still
+      run.
 
 ## Routine wrapper prompt (paste into the routine)
 
