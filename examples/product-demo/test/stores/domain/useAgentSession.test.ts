@@ -147,6 +147,71 @@ describe('useAgentSession', () => {
     expect(session.speedMultiplier).toBe(1);
   });
 
+  it('replayFromSnapshot(null) preserves the user-chosen speedMultiplier across rebuild', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'replay-preserve-speed-seed' });
+    session.setSpeed(4);
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 4);
+
+    await session.replayFromSnapshot(null);
+
+    expect(session.speedMultiplier).toBe(4);
+    expect(session.running).toBe(true);
+    // The fresh agent must mirror the preserved control state — buildAgent
+    // returns BASE_TIME_SCALE × 1 by default, so without the explicit
+    // setTimeScale at the end of replay, a 4× user would silently end up
+    // back at 1× until the next manual SpeedPicker click.
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 4);
+  });
+
+  it('replayFromSnapshot(null) preserves the paused running state across rebuild', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'replay-preserve-pause-seed' });
+    session.pause();
+    expect(session.running).toBe(false);
+    expect(session.agent?.getTimeScale()).toBe(0);
+
+    await session.replayFromSnapshot(null);
+
+    expect(session.running).toBe(false);
+    expect(session.agent?.getTimeScale()).toBe(0);
+  });
+
+  it("replayFromSnapshot(null) clears the previous agent's tfjs-network localStorage key", async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'tfjs-clear-seed' });
+    const agentId = session.agent!.identity.id;
+    const tfjsKey = `agentonomous/${agentId}/tfjs-network`;
+    globalThis.localStorage.setItem(tfjsKey, '{"weights":"trained-on-previous-pet"}');
+
+    await session.replayFromSnapshot(null);
+
+    expect(globalThis.localStorage.getItem(tfjsKey)).toBeNull();
+  });
+
+  it('replayFromSnapshot(snapshot) leaves the live agent untouched when restore rejects', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'replay-failure-seed' });
+    const previousAgent = session.agent;
+
+    // Spy on the prototype so the SPY catches the FRESH agent's restore
+    // call (the fresh instance hasn't been built yet — we can't spy on it
+    // directly). Reject once to simulate a semantically broken import.
+    const proto = Object.getPrototypeOf(previousAgent);
+    const restoreSpy = vi
+      .spyOn(proto, 'restore')
+      .mockRejectedValueOnce(new Error('synthetic restore failure'));
+
+    await expect(
+      session.replayFromSnapshot({} as unknown as Parameters<typeof session.replayFromSnapshot>[0]),
+    ).rejects.toThrow('synthetic restore failure');
+
+    // The previous agent must still be the live one — failed import is
+    // not allowed to be destructive.
+    expect(session.agent).toBe(previousAgent);
+    restoreSpy.mockRestore();
+  });
+
   it('replayFromSnapshot(null) reapplies the species override that init received', async () => {
     const session = useAgentSession();
     session.init({ seed: 'override-seed', speciesOverride: catSpecies });

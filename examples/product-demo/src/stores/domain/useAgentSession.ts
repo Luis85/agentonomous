@@ -252,10 +252,24 @@ export const useAgentSession = defineStore('agentSession', () => {
 
   /**
    * Reset (`snapshot === null`) rebuilds the agent from the current seed
-   * + species override. Restore (`snapshot !== null`) rebuilds the agent
-   * fresh and then hands the parsed snapshot to `agent.restore` with
+   * + species override and clears any per-agent learning artifacts so
+   * the next Learning-mode hydration cannot re-load weights trained on
+   * the previous pet. Restore (`snapshot !== null`) rebuilds the agent
+   * fresh and hands the parsed snapshot to `agent.restore` with
    * `catchUp: false` — the imported state's virtual-time cursor stays
    * stable, matching the legacy `mountExportImport` semantics.
+   *
+   * Restore is attempted on the FRESH agent BEFORE we publish it as the
+   * live one: a syntactically-valid-but-semantically-broken snapshot
+   * makes `restore` reject, and we want that rejection to leave the
+   * current pet untouched (a failed import must not be destructive).
+   * On rejection the fresh agent is dropped and the error propagates
+   * to the caller (typically `<ExportImportPanel>`'s alert path).
+   *
+   * Speed + control state (`speedMultiplier`, `running`) are preserved
+   * across replay — they reflect the user's UI choice, not the
+   * snapshot's contents, so Reset / New-pet / import must not silently
+   * unpause or rescale the simulation.
    *
    * Stale modifiers from the previous agent are dropped by virtue of
    * the rebuild; callers don't need to scrub them up-front.
@@ -269,19 +283,36 @@ export const useAgentSession = defineStore('agentSession', () => {
           : {}),
       }),
     );
+    if (snapshot !== null) {
+      // Throws here propagate to caller WITHOUT swapping the live agent.
+      await fresh.restore(snapshot, { catchUp: false });
+    } else {
+      // Reset path: discard the previous agent's persisted learning
+      // network so a freshly trained model isn't silently rehydrated
+      // onto the new pet. Same key the cognition switcher's "Untrain"
+      // and Train code paths use.
+      const prev = agent.value;
+      if (prev !== null) {
+        try {
+          globalThis.localStorage?.removeItem(`agentonomous/${prev.identity.id}/tfjs-network`);
+        } catch {
+          // localStorage unavailable — fresh learning-mode construct
+          // falls back to the bundled baseline anyway.
+        }
+      }
+    }
     agent.value = fresh;
     setLearningAgent(fresh);
     attachInternalListener(fresh);
     rebindSubscribers(fresh);
-    speedMultiplier.value = 1;
-    running.value = true;
+    // Replay the user's current control state onto the fresh agent.
+    // `buildAgent` returns a running agent at BASE_TIME_SCALE; if the
+    // user had paused or scaled before reset/import, mirror that here.
+    fresh.setTimeScale(running.value ? BASE_TIME_SCALE * speedMultiplier.value : 0);
     tickIndex.value = 0;
     recentEvents.value = [];
     lastTrace.value = null;
     lastTickNumber.value = 0;
-    if (snapshot !== null) {
-      await fresh.restore(snapshot, { catchUp: false });
-    }
   }
 
   /**

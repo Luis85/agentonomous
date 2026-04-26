@@ -20,6 +20,13 @@ const CHOICES: ReadonlyArray<SpeedChoice> = [
 ];
 
 const session = useAgentSession();
+// `active` mirrors the user's most recent picker click and stays in
+// sync with the store because the store no longer drifts during a
+// session — `useAgentSession.replayFromSnapshot` preserves
+// `running` + `speedMultiplier` across Reset / New-pet / import. If a
+// future code path introduces another mutation source, this should
+// switch to a Pinia-store-driven sync (storeToRefs + watch) so the
+// picker can't lag.
 const active = ref<number | 'pause'>(1);
 
 function readSaved(): number | 'pause' | null {

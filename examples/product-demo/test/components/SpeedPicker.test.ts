@@ -67,4 +67,28 @@ describe('<SpeedPicker>', () => {
     expect(globalThis.localStorage.getItem(SPEED_KEY)).toBeNull();
     wrapper.unmount();
   });
+
+  it('survives a session reset without drifting from the store (preserve-speed contract)', async () => {
+    // Codex P2 #3 — picker's `active` must not desync from the store
+    // when `replayFromSnapshot(null)` runs (Reset button). The fix
+    // lives store-side: `useAgentSession.replayFromSnapshot` now
+    // preserves `speedMultiplier` + `running`, so a mount-time-
+    // initialized local ref stays correct across reset. The full
+    // store-contract regression coverage is in
+    // `useAgentSession.test.ts > replayFromSnapshot(null) preserves
+    // the user-chosen speedMultiplier across rebuild`.
+    const session = useAgentSession();
+    session.init({ seed: 'speed-survives-reset-seed' });
+    const wrapper = mount(SpeedPicker);
+    await nextTick();
+    const buttons = wrapper.findAll('button');
+    await buttons[4]?.trigger('click'); // pick 4×
+    expect(session.speedMultiplier).toBe(4);
+
+    await session.replayFromSnapshot(null);
+
+    expect(session.speedMultiplier).toBe(4);
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 4);
+    wrapper.unmount();
+  });
 });
