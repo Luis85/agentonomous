@@ -8,7 +8,7 @@ import pkgJson from '../../package.json' with { type: 'json' };
  * change lands on `develop`.
  *
  * The expected list is the 1.0 contract per
- * `docs/plans/2026-04-19-v1-comprehensive-plan.md#103--narrow-the-public-surface`.
+ * `docs/archive/plans/2026-04-19-v1-comprehensive-plan.md#103--narrow-the-public-surface`.
  */
 const EXPECTED_SUBPATH_KEYS = [
   '.',

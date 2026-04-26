@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Realised in #97 (skill + workflow + prompt updates).
+
 ---
 date: 2026-04-25
 slug: review-fix-skill

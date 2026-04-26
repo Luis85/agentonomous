@@ -350,7 +350,7 @@ export class Agent {
     // progress but also the three wall-clock-driven reconciliation stages
     // (modifier expiry, mood, animation), so consumers see a consistently
     // frozen agent while paused. Deferred expiries fire on the first
-    // post-resume tick — see `docs/plans/2026-04-19-pause-semantics.md` (Option A).
+    // post-resume tick — see `docs/archive/plans/2026-04-19-pause-semantics.md` (Option A).
     // Read from the tick-entry snapshot so a reactive handler that called
     // `setTimeScale(0)` during Stage 1 doesn't flip the gate mid-tick.
     const paused = tickTimeScale === 0;

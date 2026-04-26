@@ -340,9 +340,12 @@ consumers who don't use Excalibur don't pay for it. Run
 `npm run analyze` after meaningful changes; a significant regression is a
 signal to check for accidentally-bundled adapters or heavy deps.
 
-Phase A milestones (M0–M15) are all green. Phase B (sim-ecs adapter, LLM
-tool, Markdown memory, social/dialogue, possession/jobs, Mistreevous BTs,
-JS-son BDI, tfjs learning) lands post-V1.
+Phase A (the virtual-pet nurture MVP) is feature-complete and in the
+pre-1.0 polish + harden pass — see
+`docs/plans/2026-04-25-comprehensive-polish-and-harden.md`. Phase B
+(sim-ecs adapter, LLM tool-use, Markdown memory, social / dialogue,
+possession / jobs, Mistreevous BTs, JS-son BDI, expanded tfjs learning)
+lands post-1.0.
 
 ## Contributing
 

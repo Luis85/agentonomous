@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed (0.9.4 row of the v1 plan).
+
 # 0.9.4 `Reasoner.reset()` Harmonization — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if

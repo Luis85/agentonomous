@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #46 → #50.
+
 # 0.9.2 Cognition Switcher — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if

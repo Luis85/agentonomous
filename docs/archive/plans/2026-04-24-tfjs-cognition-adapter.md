@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #60 plus the post-tfjs hardening PRs (#116 / #117 / #118).
+
 # TensorFlow.js Cognition Adapter — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.

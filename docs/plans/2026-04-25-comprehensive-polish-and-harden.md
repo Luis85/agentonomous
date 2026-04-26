@@ -2,8 +2,8 @@
 
 > Supersedes:
 >
-> - `docs/plans/2026-04-24-codebase-review-findings.md` (review output)
-> - `docs/plans/2026-04-24-polish-and-harden.md` (incremental roadmap)
+> - `docs/archive/plans/2026-04-24-codebase-review-findings.md` (review output)
+> - `docs/archive/plans/2026-04-24-polish-and-harden.md` (incremental roadmap)
 >
 > Both inputs are kept in git history; this doc consolidates them and
 > reflects the current shipped state (Track A1 + Track A2 merged).
@@ -33,11 +33,12 @@ the existing tree passes clean as error-level:
   warn/error); `@typescript-eslint/no-explicit-any` error;
   `switch-exhaustiveness-check` error.
 - `Agent.ts` extractions into `internal/RestoreCoordinator.ts`,
-  `DeathCoordinator.ts`, `SnapshotAssembler.ts`. ~110 LOC dropped.
+  `DeathCoordinator.ts`, `SnapshotAssembler.ts`.
 - Three express skills (meow / sad / sleepy) collapsed onto
   `createExpressionSkill()` factory.
-- Stale-prone counts (`~300 tests`, `10 default skills`,
-  `~80 KB unminified`) replaced with descriptive phrasing.
+- Stale-prone counts in prose docs replaced with descriptive phrasing
+  (source of truth for sizes is `package.json#size-limit`; for test
+  counts, CI logs).
 - Typedoc wired into CI; adapter entry points added.
 
 ### A2 — Remediation (PRs #71 / #72 / #73 / #74, all merged 2026-04-24/25)
@@ -77,34 +78,49 @@ end-to-end, with each PR Codex-reviewed and resolved before the next.
 | 13  | #83 | `feat/demo-loss-curve`                       | SVG sparkline of `history.loss` under Train button.                                    |
 | 14  | #84 | `feat/demo-train-epoch-progress`             | `TfjsReasoner.train` `onEpochEnd` callback (minor bump); demo HUD goes live mid-fit.   |
 | 15  | #85 | `feat/llm-port-example-and-readme`           | README LLM section, `examples/llm-mock/` deterministic playback example, vision spec status update. |
-| 16  | TBD | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner` with `Buffered: N/50` HUD. |
+| 16  | #91 | `feat/tfjs-learner-in-demo`                  | `Agent.setLearner` + Stage-8 score on every SkillFailed branch (minor bump); demo Learning mode wires `TfjsLearner`. |
 | 17  | #94 | `feat/tfjs-multi-output-softmax`             | 7-way softmax over active-care skills; bundled baseline rebuilt; `TfjsReasoner` JSDoc example (minor bump). |
 | 23–25 | #93 | `docs/worktrees-and-jsdoc`                 | CLAUDE.md `.worktrees/` rule + JSDoc on `result.ts` / `IntentionCandidate.ts` / `SkillRegistry.ts`. |
-| 18  | #96 | `feat/demo-richer-feature-vector`            | 13-dim feature vector (5 needs + 4 mood one-hot + 1 modifier-count + 3 recent-event counts); bundled baseline rebuilt at `[13, 16, 7]`; small library addition (`details.preModifierCount` snapshot). |
-| 19  | TBD | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
-| 20  | TBD | `feat/tfjs-detect-backend-and-picker`        | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps; tfjs adapter size budget 7 → 9 KB gzip. |
-| 3   | TBD | `chore/ci-actions-sha-pinning`               | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
-| 4   | TBD | `chore/ci-backend-and-os-matrix`             | `test` job split into `test-core` (OS matrix only — ubuntu/macos/windows) and `test-tfjs` (OS × backend matrix — `cpu` × `wasm`). `tests/setup/tfjsBackend{,Setup}.ts` reads `TFJS_BACKEND` env, side-effect-imports the matching tfjs-backend package before any test imports run, and exposes `TEST_BACKEND` so adapter test files inject the matching `backend:` opt into every `new TfjsReasoner` / `TfjsReasoner.fromJSON` call. `fail-fast: false`; webgl dropped (needs headless-runner setup). |
-| 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` 13 → 4 via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change; 19 tests untouched. |
+| 18  | #96 | `feat/demo-richer-feature-vector`            | Wider feature vector (needs + mood one-hot + modifier-count + recent-event counts); bundled baseline rebuilt; small library addition (`details.preModifierCount` snapshot). |
+| 19  | #98 | `feat/demo-prediction-strip`                 | SVG strip rendering per-tick softmax distribution + idle-threshold line, selected column highlighted; cognitionSwitcher subscribes to `AgentTicked` while in Learning mode. Demo-only. |
+| 20  | #104 | `feat/tfjs-detect-backend-and-picker`       | `TfjsReasoner.detectBestBackend` + `probeBackend` statics (minor bump); demo backend dropdown (`CPU` / `WASM` / `WebGL`) with localStorage persist + per-option availability probe; backend packages move to optional peer deps. |
+| 3   | #110 | `chore/ci-actions-sha-pinning`              | Every `uses:` reference in `.github/workflows/*.yml` pinned to a 40-char commit SHA with the version label as a trailing comment; `scripts/bump-actions.mjs` printer added so future drift is visible on demand. |
+| 4   | #113 | `chore/ci-backend-and-os-matrix`            | `test` job split into `test-core` (OS matrix only — ubuntu/macos/windows) and `test-tfjs` (OS × backend matrix — `cpu` × `wasm`). `tests/setup/tfjsBackend{,Setup}.ts` reads `TFJS_BACKEND` env. `fail-fast: false`; webgl dropped (needs headless-runner setup). |
+| 10  | #108 | `refactor/mock-llm-completeSync-split`      | `MockLlmProvider.completeSync` split via `pickFromQueue` / `pickFromMatchOrError` / `runScript` / `abortStub` module-level helpers; no public API change. |
 | 11  | #109 | `refactor/persona-bias-extract-helper`      | `defaultPersonaBias` arrow's per-rule weight calc lifted into `weightForRule(rule, intentionType, traits)`; main arrow becomes a flat `TRAIT_RULES.reduce(...)`. No public surface change, no changeset. |
-| 12  | —   | `refactor/non-null-assertion-cleanups`       | Closed as obsolete. All 4 target sites (`TfjsReasoner.ts:34`, `TfjsSnapshot.ts:45`, `MockLlmProvider.ts:166,173`) already non-null-assertion-free post-PR #108 (`MockLlmProvider` split) and earlier tfjs cleanups. `npm run lint` reports 0 non-null-assertion warnings repo-wide. No code change needed. |
-| 22  | TBD | `chore/peer-deps-pin-minimums`               | Replaced `"*"` peer ranges for `@anthropic-ai/sdk` / `openai` / `sim-ecs` / `excalibur` with real semver minimums. `excalibur` pinned to `^0.32.0` (matches devDeps). The other three are aspirational forward-compat hooks (no actual `import` from `src/` / `tests/` / `examples/`); pinned to latest stable major (`@anthropic-ai/sdk ^0.91.0`, `openai ^6.0.0`, `sim-ecs ^0.6.0`) so consumers don't accept arbitrary majors. No changeset (pre-1.0 metadata-only). |
+| 12  | —   | `refactor/non-null-assertion-cleanups`       | Closed as obsolete. All 4 target sites (`TfjsReasoner.ts:34`, `TfjsSnapshot.ts:45`, `MockLlmProvider.ts:166,173`) already non-null-assertion-free post-PR #108 and earlier tfjs cleanups. No code change needed. |
+| 22  | #111 | `chore/peer-deps-pin-minimums`              | Replaced `"*"` peer ranges for `@anthropic-ai/sdk` / `openai` / `sim-ecs` / `excalibur` with real semver minimums; `excalibur` pinned to match devDeps. No changeset (pre-1.0 metadata-only). |
+
+### C — Post-roadmap follow-ups (PRs #92 → #125)
+
+Beyond the rows above, develop has absorbed a wave of correctness +
+hardening work that did not exist as roadmap rows when this plan was
+written:
+
+- **Review-bot infra:** `feat/review-fix-skill` (#97), sweep-mode
+  polish (#100), tracker parse polish (#123).
+- **Tracker findings shipped:** pickScript silent-accept (#101),
+  `LlmProviderPort` interface→type sweep (#103), persistence
+  input-validation (#106), `stage-blocked` failure-branch test (#122),
+  `LearningOutcome.preModifierCount` JSDoc (#121), tfjs `detectBestBackend`
+  mutex (#118), coverage sticky-comment automation (#124).
+- **Demo + tfjs hotfixes:** `TfjsReasoner.toInputTensor` batch shape
+  (#116), `fromJSON` backend module load order (#117).
+- **Tooling / repo upkeep:** in-repo memory (#95), CI pipeline
+  improvements (#92), graph refresh (#99 / #107), CI scripts in
+  path-filter (#119), favicon (#120), rolldown plugin-timings silence
+  (#125).
 
 ---
 
 ## Verify gate (baseline)
 
-As of develop @ 8dc4823:
-
-- `format:check` — clean
-- `lint` — 0 errors; residual warnings are the Track 3 ratchet menu
-- `typecheck` — clean (strict + `exactOptionalPropertyTypes` +
-  `noUncheckedIndexedAccess`)
-- `test` — all green
-- `build` — clean; every entry point under its `size-limit` budget
-  (main 50 KB gzip, integrations 2 KB, tfjs 7 KB)
-- `docs` — typedoc generates `docs/api/` from all five public entry
-  points, 0 errors
+`npm run verify` is required green before opening any PR off this
+plan. Stages: `format:check` → `lint` (0 errors expected; residual
+warnings are the Track 3 ratchet menu) → `typecheck` (strict +
+`exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`) → `test`
+→ `build` (every entry point under its `size-limit` budget; budgets
+live in `package.json#size-limit`) → `docs` (typedoc, 0 errors).
 
 > Counts (`N tests`, `M files`, `X KB gzip`) drift every PR. Source of
 > truth is the CI logs and `package.json#size-limit` config — don't
@@ -737,6 +753,9 @@ getter needed.
   produced `ERROR: Coverage for statements (76.22%) does not meet
   global threshold (79%)` and exit code 1 (reverted before
   commit).
+- Drift detection follow-up shipped in PR #124: a sticky PR comment
+  now reports the actual-vs-threshold delta on every CI run, so a
+  growing gap is visible without re-baselining.
 
 **Cost:** XS.
 

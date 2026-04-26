@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #44.
+
 # 0.9.1 `AgentTicked` Bus Event — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if

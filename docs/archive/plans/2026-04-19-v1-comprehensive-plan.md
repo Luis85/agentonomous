@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Superseded by docs/plans/2026-04-25-comprehensive-polish-and-harden.md.
+
 # agentonomous — v1 Plan (tightened)
 
 > Cross-references: `docs/specs/vision.md`, `docs/specs/mvp-demo.md`,

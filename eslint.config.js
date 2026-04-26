@@ -96,7 +96,7 @@ export default tseslint.config(
       //
       // Limits are intentionally generous so current code passes
       // clean. Ratcheting targets live in
-      // docs/plans/2026-04-24-codebase-review-findings.md.
+      // docs/archive/plans/2026-04-24-codebase-review-findings.md.
       // ────────────────────────────────────────────────────────────
       'max-lines': ['error', { max: 350, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': [
@@ -244,7 +244,7 @@ export default tseslint.config(
   // `snapshot()` into `src/agent/internal/` helpers (saved ~110 LOC).
   // The remaining hotspot is `tick()` (~150 LOC of stage
   // orchestration) — splitting it cleanly is its own focused PR
-  // (Track C2 of docs/plans/2026-04-24-codebase-review-findings.md).
+  // (Track C2 of docs/archive/plans/2026-04-24-codebase-review-findings.md).
   //
   // Cap at 500 here so the file cannot grow further while the split
   // is pending. Drop this override once tick() has been broken out.

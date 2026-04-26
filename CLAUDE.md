@@ -123,6 +123,11 @@ Full rules in [`STYLE_GUIDE.md`](./STYLE_GUIDE.md). High-frequency ones:
   default of `docs/superpowers/plans/`.
 - **Specs** live in `docs/specs/YYYY-MM-DD-<slug>.md` (design docs,
   brainstorm outputs).
+- **Archive.** When every roadmap row in a plan has shipped (or the plan
+  is superseded by a successor), `git mv` it under
+  `docs/archive/plans/`. Same for fully-realised specs →
+  `docs/archive/specs/`. Keep the original filename so links resolve via
+  git history; see `docs/archive/README.md`.
 - Date prefix = first-commit date. Never drop the date; rename via
   `git mv` if the slug changes.
 - **Plan + doc updates ride with the PR that lands the work.** When a
@@ -165,7 +170,7 @@ the same PR.
   keep the pause observably frozen. `Modifier.expiresAt` is still an
   absolute wall-clock ms — deferred expiry fires on the first
   post-resume tick. Phase B may re-base expiry on virtual time;
-  see `docs/plans/2026-04-19-pause-semantics.md`.
+  see `docs/archive/plans/2026-04-19-pause-semantics.md`.
 
 ## graphify
 
