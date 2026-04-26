@@ -8,10 +8,28 @@
 ## Vision statement
 
 **Give TypeScript developers a deterministic, engine-agnostic agent core
-that turns simulations into living worlds — from a single pet you
-nurture in a browser tab to a headless village of thousands — without
-asking them to pick a rendering engine, an AI library, or a state
-manager first.**
+that turns simulations into living worlds *and* drives real
+software-development workflows — from a single pet you nurture in a
+browser tab, to a headless village of thousands, to an agent that picks
+up a ticket and runs it through review — without asking them to pick a
+rendering engine, an AI library, or a state manager first.**
+
+The arc is two versions long:
+
+- **v1 — the basic agent (Phase A).** Deterministic tick pipeline,
+  needs / mood / lifecycle / animation / skills / persistence. The
+  virtual-pet demo proves the core. `LlmProviderPort` +
+  `MockLlmProvider` ship for forward compatibility, but cognition stays
+  classical.
+- **v2 — the workflow-capable agent (Phase B, LLM-integrated).** The
+  same agent, now wired to concrete LLM providers, becomes a first-class
+  citizen of structured agentic workflows. It can be *aware of* a
+  workflow, *orchestrate* it end-to-end, or *execute a single task* in a
+  named role. The reference workflow is the
+  [`agentic-workflow`](https://github.com/luis85/agentic-workflow) repo —
+  a software-development pipeline of dedicated tasks and roles
+  (planner / implementer / reviewer / releaser, etc.) that an
+  `agentonomous` agent can pick up and run.
 
 ## The problem
 
@@ -36,8 +54,17 @@ simulations that *could* explore emergent behavior get stuck on
 infrastructure. Most LLM-driven "agent" experiments can't be replayed
 or debugged because nothing's deterministic.
 
-Consumers who successfully ship living characters today either have
-a team of 10+ or pay the roll-your-own tax. We want to remove that tax.
+A fourth pain point joins them in v2 territory: today's
+**software-development agent workflows** (issue triage, planning,
+implementation, review, release) live as one-off prompt scripts welded
+to a single LLM SDK. They have no persistent identity, no needs / mood
+/ memory primitives, no deterministic replay, and no clean seam between
+"orchestrate the workflow" and "execute a single task in role". Every
+team rebuilds the same plumbing.
+
+Consumers who successfully ship living characters — or reliable
+agentic dev workflows — today either have a team of 10+ or pay the
+roll-your-own tax. We want to remove that tax.
 
 ## Target personas
 
@@ -81,6 +108,32 @@ into their existing event bus via adapters. LLM tool integration
 > 1.0 — see `examples/llm-mock/` for the deterministic playback
 > end-to-end. Concrete `AnthropicLlmProvider` / `OpenAiLlmProvider`
 > adapters land in Phase B; existing consumers pick them up additively.
+
+### P4 — The agentic-workflow author *(v2 / Phase B)*
+
+Maintains a structured software-development workflow (planning,
+implementation, code review, release) as a graph of dedicated tasks
+and roles — the [`agentic-workflow`](https://github.com/luis85/agentic-workflow)
+repo is the reference shape. Wants to drop a real, persistent agent
+into one of those roles — not a stateless prompt — so that the agent
+remembers prior runs, has shaped behavior (mood, modifiers, skill
+selection), and can be replayed deterministically when something goes
+wrong. Sometimes wants the agent to orchestrate the whole pipeline;
+sometimes wants it to execute exactly one task and hand back.
+
+**What success looks like for P4:** an agent loads a workflow
+descriptor, binds itself to a role (or to the orchestrator role),
+exposes that role's tasks as `Skill`s, and runs the pipeline against a
+real Anthropic / OpenAI provider. The same agent definition runs
+deterministically against `MockLlmProvider` in CI. Workflow runs
+produce diff-able `DecisionTrace`s and resumable snapshots — a crashed
+review run picks up where it left off, not from scratch.
+
+> Status: P4 is the headline v2 use case. v1 ships the primitives the
+> workflow needs (Skills, persistence, deterministic tick, LLM port).
+> v2 — driven by Phase B's concrete LLM adapters plus the
+> workflow-orchestrator subsystem (see "Workflow execution" below) —
+> turns those primitives into a first-class workflow runtime.
 
 ## Product pillars
 
@@ -141,6 +194,15 @@ renderer can consume. Every tick produces a `DecisionTrace` that
 tells the story of why the agent did what it did. Consumers build
 emergent narrative out of data, not hand-scripted sequences.
 
+### 8. One agent, two surfaces: simulation *and* workflow
+
+The same `Agent` that nurtures a virtual pet can pick up a role in a
+software-development workflow. We do not fork the runtime — workflows
+are an *additional surface area* over the v1 core: a workflow is a
+graph of tasks; a role binds tasks to `Skill`s; orchestration is a
+control mode. If something needs a separate runtime to make workflows
+work, the v1 core is wrong and we fix v1, not bolt on v2.
+
 ## What we build (feature pillars)
 
 ### Agent core
@@ -193,6 +255,59 @@ emergent narrative out of data, not hand-scripted sequences.
   controller, animation bridge.
 - Planned: sim-ecs, three.js, PixiJS, Phaser (Phase B+).
 
+### Workflow execution *(v2 / Phase B)*
+
+Once concrete LLM adapters land, the same agent core grows a
+**workflow surface** that consumes structured agentic workflows like
+[`agentic-workflow`](https://github.com/luis85/agentic-workflow). The
+goal is *not* a separate "workflow engine" package — it's a thin layer
+over the existing primitives.
+
+Three modes, one agent:
+
+1. **Aware.** The agent loads a workflow descriptor as data and
+   answers questions about it ("which task am I on?", "what's the
+   exit criterion of the current step?", "what role am I bound to?").
+   Workflows live as JSON / Markdown descriptors, not as code in the
+   library.
+2. **Orchestrate.** The agent is bound to the orchestrator role and
+   walks the workflow graph end-to-end: it dispatches tasks to other
+   agents (or to itself in a different role) via `RemoteController`,
+   gates transitions on task results, and persists progress in its
+   `AgentSnapshot` so a crash mid-pipeline is resumable.
+3. **Execute.** The agent is bound to a single role
+   (planner / implementer / reviewer / releaser / …) and exposes that
+   role's tasks as `Skill`s. The cognition layer picks the next task
+   the same way it picks "feed" vs "play" today — urgency reasoning
+   over inputs from the workflow context.
+
+Building blocks that already exist in v1 and carry over:
+
+- `Skill` + `SkillRegistry` → workflow tasks are skills.
+- `Modifier` system → "blocked on review", "rate-limited", "budget
+  exhausted" become first-class debuffs that gate skill selection.
+- `AgentSnapshot` + `SnapshotStorePort` → workflow state survives
+  restarts; resumable runs are the default, not the exception.
+- `DecisionTrace` → every workflow step produces an auditable trace.
+  A failed run is a diff against a previous successful one.
+- `LlmProviderPort` + `MockLlmProvider` → workflow runs are
+  CI-replayable against the mock; production swaps in
+  `AnthropicLlmProvider` / `OpenAiLlmProvider` without code changes.
+
+What v2 adds (Phase B scope, not v1):
+
+- `WorkflowDescriptor` + `WorkflowRunner` — parser + traversal over the
+  external workflow shape.
+- `RoleBinding` — declarative mapping from workflow roles to skill
+  bundles + cognition tuning.
+- A workflow-aware `RemoteController` adapter so an orchestrator agent
+  can dispatch to executor agents over whatever transport the consumer
+  picks (in-process, IPC, HTTP).
+- An end-to-end example: the `agentic-workflow` repo's
+  software-development pipeline, driven from `examples/agentic-workflow/`,
+  shipping a real PR against a sample repo deterministically against
+  the mock provider.
+
 ## What we refuse to build
 
 Calling these out now so they never show up as creeping scope.
@@ -222,23 +337,34 @@ Calling these out now so they never show up as creeping scope.
   ManualClock.
 - GitHub Pages demo linked from README, working on mobile.
 
-### 12 months
+### 12 months *(v2 milestone)*
 
-- Phase B complete (Markdown memory, jobs, social, LLM tool).
+- Phase B complete (Markdown memory, jobs, social, LLM tool,
+  concrete `AnthropicLlmProvider` / `OpenAiLlmProvider`).
+- **Workflow surface shipped**: `WorkflowDescriptor`, `WorkflowRunner`,
+  `RoleBinding`, plus an end-to-end `examples/agentic-workflow/` that
+  drives the [`agentic-workflow`](https://github.com/luis85/agentic-workflow)
+  pipeline against `MockLlmProvider` deterministically and against a
+  real provider for live runs.
+- First external team running the v2 agent in CI as their PR-review
+  or release-prep automation.
 - First academic paper / blog post citing `agentonomous` for a
   simulation study.
 - 5,000+ weekly npm downloads.
 - Integration adapters shipped for at least one of: sim-ecs,
   three.js, PixiJS.
-- First LLM-driven agent experiment using `LlmProviderPort` with
-  prompt caching.
 
 ### 24 months
 
 - Used as the agent layer in a commercial indie game on Steam / itch.
+- Used as the agent layer in a production software-development
+  workflow (orchestrator + executor agents) at one or more teams,
+  with crash-resumable runs and replayable traces.
 - Curriculum adoption: at least one university course references the
   determinism test harness as a reference implementation.
-- Multi-agent coordination (Phase C) stable in production.
+- Multi-agent coordination (Phase C) stable in production — including
+  multi-agent workflow runs where roles are filled by distinct agent
+  processes.
 - 20,000+ weekly npm downloads.
 
 ## Principles that guide trade-offs
@@ -292,6 +418,13 @@ is weighed against that feeling.
   to close the gap between current state and V1.0.0.
 - **`/root/.claude/plans/i-want-to-create-warm-matsumoto.md`** — the
   internal planning document that drove the initial build.
+- **[`agentic-workflow`](https://github.com/luis85/agentic-workflow)** —
+  external companion repo. Defines the structured
+  software-development workflow (tasks + roles) that v2 / Phase B
+  agents will consume. The contract that lives there is the
+  authoring surface; the runtime that executes it lives here. Changes
+  to the workflow shape feed into v2 design via the
+  `WorkflowDescriptor` schema.
 
 ## Signatures of success (anti-checklist)
 
@@ -309,6 +442,22 @@ How do we know we're building the right thing?
   was — including elapsed virtual time, modifiers that should have
   expired, and mood.
 
+For v2 specifically:
+
+- A `agentic-workflow` author writes a workflow descriptor *once* and
+  runs it under both `MockLlmProvider` (in CI, deterministic) and
+  `AnthropicLlmProvider` (in production, live) without changing the
+  agent definition.
+- An orchestrator agent's run crashes mid-pipeline, restarts, and
+  resumes from the last persisted task — no double-executed tasks, no
+  lost progress.
+- A reviewer-role agent can be swapped out for a different cognition
+  adapter (urgency / behavior tree / LLM) without touching the
+  workflow descriptor.
+- The same agent that nurtures the pet in the demo can be re-bound to
+  a workflow role and execute a real software-development task — same
+  runtime, different skills.
+
 ## Reviewing this document
 
 This vision is meant to be stable across Phase A, B, and C. When a
@@ -320,5 +469,10 @@ the vision. Changes to this document require:
 3. A corresponding update to `docs/specs/roadmap.md` showing how the
    change propagates.
 
-Last reviewed: 2026-04-26. Next review: when the pre-1.0 polish-and-harden
-roadmap closes (see `docs/plans/2026-04-25-comprehensive-polish-and-harden.md`).
+Last reviewed: 2026-04-26 (refined to introduce the v1 → v2 arc and
+the [`agentic-workflow`](https://github.com/luis85/agentic-workflow)
+companion repo as the v2 reference workflow). Next review: when the
+pre-1.0 polish-and-harden roadmap closes (see
+`docs/plans/2026-04-25-comprehensive-polish-and-harden.md`), or when
+the first `WorkflowDescriptor` design spec opens against Phase B —
+whichever comes first.
