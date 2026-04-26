@@ -16,30 +16,51 @@ keyed off a whitelist of safely previewable fields.
 
 ## Pre-flight
 
-- Blocked by: rename preflight.
+- Blocked by: rename preflight + Pillar-1 slice 1.2a (the
+  `useAgentSession` factory the editor patches into).
 - Coordinates with **Pillar 3** — every commit triggers a fresh
   fingerprint window. Confirm the `useFingerprintRecorder` API is
   stable before slice 4.3 lands.
 - Pre-v1 policy applies: the legacy restart-only path is **removed**,
   not left as a fallback.
+- **Legacy recycle.** Pillar-1 slice 1.2b deliberately PRESERVED
+  `examples/product-demo/src/speciesConfig.ts` so Pillar 4 can port
+  rather than rebuild. The legacy file already contains:
+  `EditableSpeciesConfig` shape, `currentEditableConfig`,
+  `validateEditableConfig`, `applyOverride`, `loadConfigOverride` —
+  all pure logic apart from the localStorage adapters. Slice 4.1
+  relocates the pure parts (validator + applyOverride + edit shape)
+  into `demo-domain/scenarios/petCare/config/`; slice 4.2 absorbs the storage
+  adapter into `useConfigDraft`. The legacy `mountConfigPanel` DOM
+  mount is replaced by the new `<JsonEditor>` SFC family (slice 4.3),
+  which then deletes `speciesConfig.ts` outright.
 
 ## Roadmap
 
 | # | Slice | Files | Spec FRs | Status | PR |
 |---|---|---|---|---|---|
-| 4.1 | Whitelisted-field schema + validator (pure domain) | `examples/product-demo/src/demo-domain/config/{types.ts,schema.ts,validate.ts,diff.ts}`, `examples/product-demo/test/demo-domain/config/*.test.ts` | P4-FR-2, P4-FR-6 | not started | — |
+| 4.1 | Whitelisted-field schema + validator (pure domain) — relocates `speciesConfig.ts`'s pure logic (`EditableSpeciesConfig`, `currentEditableConfig`, `validateEditableConfig`, `applyOverride`) into `demo-domain/scenarios/petCare/config/` and replaces the implicit list with the design's explicit `{ path, kind: 'preview' \| 'commit' }` whitelist | `examples/product-demo/src/demo-domain/scenarios/petCare/config/{types.ts,schema.ts,validate.ts,diff.ts,applyOverride.ts}`, `examples/product-demo/test/demo-domain/scenarios/petCare/config/*.test.ts` | P4-FR-2, P4-FR-6 | not started | — |
 | 4.2 | `useConfigDraft` domain store + preview lifecycle (headless) | `examples/product-demo/src/stores/domain/useConfigDraft.ts`, `examples/product-demo/test/stores/domain/useConfigDraft.test.ts` | P4-FR-1, P4-FR-3, P4-FR-5 | not started | — |
-| 4.3 | Editor view: Preview / Commit+Restart actions, diff summary, inline validation | `examples/product-demo/src/views/JsonEditorView.vue`, `examples/product-demo/src/components/config/{EditorPanel.vue,DiffSummary.vue,ValidationList.vue,ActionRow.vue}`, `examples/product-demo/src/stores/view/useJsonEditorView.ts` | P4-FR-3, P4-FR-4 | not started | — |
+| 4.3 | Editor view: Preview / Commit+Restart actions, diff summary, inline validation; **delete** legacy `examples/product-demo/src/speciesConfig.ts` once its mount logic is fully replaced | `examples/product-demo/src/views/JsonEditorView.vue`, `examples/product-demo/src/components/config/{EditorPanel.vue,DiffSummary.vue,ValidationList.vue,ActionRow.vue}`, `examples/product-demo/src/stores/view/useJsonEditorView.ts`, `examples/product-demo/eslint.config.js` (drop `speciesConfig.ts` from `ignores`) | P4-FR-3, P4-FR-4 | not started | — |
 | 4.4 | Storage migration cleanup + commit-triggers-fingerprint wiring | `examples/product-demo/src/app/main.ts` (legacy purge tick), `examples/product-demo/src/stores/domain/useConfigDraft.ts` (commit handshake with `useFingerprintRecorder`) | P4-FR-7, P4-AC-5 | not started | — |
 
 ## Slice notes
 
-### 4.1 — Schema first
+### 4.1 — Schema first (recycle, don't rebuild)
 
 - The whitelist is declarative: `{ path: ConfigPath, kind: 'preview' | 'commit' }`.
   All other fields are commit-only by default — explicit > implicit.
 - Validators return `ValidationFinding[]`; tests assert that an invalid
   draft never partially applies (P4-AC-4 evidence).
+- **Recycle from legacy `speciesConfig.ts`:** the existing
+  `validateEditableConfig` already implements range checks, monotonic
+  lifecycle ordering, and unknown-field rejection — port those rules
+  verbatim into `validate.ts` (translate the ad-hoc error strings into
+  `ValidationFinding` codes per spec). `applyOverride` already handles
+  the partial-edit merge — port it into `applyOverride.ts` and add the
+  test guarantee that an invalid draft never half-applies. The legacy
+  `EditableSpeciesConfig` shape becomes the starting point for
+  `NormalizedConfig` (rename + add `__brand` if needed).
 
 ### 4.2 — Headless lifecycle
 
