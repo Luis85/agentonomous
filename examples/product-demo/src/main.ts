@@ -73,58 +73,9 @@ const cognitionSwitcher = mountCognitionSwitcher(pet, cognitionSwitcherRoot);
 // causing two renders on event ticks. The RAF loop already covers
 // steady-state repaints.
 
-// Additional listener to decorate mildIllness / surpriseTreat side-effects.
-// Note: `Modifier.expiresAt` is wall-clock ms — it does not scale with
-// `setTimeScale`. At 8× the pet ages eight times faster but a 45 000 ms
-// `sick` modifier still expires after 45 s of real time. See
-// `CLAUDE.md → setTimeScale(0) pause semantics` for the full quirk.
-const unsubscribeModifierDecorator = pet.subscribe((event) => {
-  if (event.type !== 'RandomEvent') return;
-  const re = event as { subtype?: string };
-  if (re.subtype === 'mildIllness') {
-    pet.applyModifier({
-      id: 'sick',
-      source: 'event:illness',
-      appliedAt: pet.clock.now(),
-      expiresAt: pet.clock.now() + 45_000,
-      stack: 'refresh',
-      effects: [
-        { target: { type: 'skill-effectiveness', skillId: 'feed' }, kind: 'multiply', value: 0.5 },
-      ],
-      visual: { label: 'Sick', hudIcon: '🤒', fxHint: 'sick-swirl' },
-    });
-  } else if (re.subtype === 'surpriseTreat') {
-    pet.applyModifier({
-      id: 'happy-glow',
-      source: 'event:surpriseTreat',
-      appliedAt: pet.clock.now(),
-      expiresAt: pet.clock.now() + 20_000,
-      stack: 'refresh',
-      effects: [{ target: { type: 'mood-bias', category: 'playful' }, kind: 'add', value: 0.5 }],
-      visual: { label: 'Happy glow', hudIcon: '🎁', fxHint: 'sparkle-gold' },
-    });
-  } else if (re.subtype === 'messyPlay') {
-    // R-10: a mess to clean up + R-12: a reason to scold.
-    pet.applyModifier({
-      id: 'dirty',
-      source: 'event:messyPlay',
-      appliedAt: pet.clock.now(),
-      expiresAt: pet.clock.now() + 120_000,
-      stack: 'refresh',
-      effects: [{ target: { type: 'mood-bias', category: 'sad' }, kind: 'add', value: 0.2 }],
-      visual: { label: 'Dirty', hudIcon: '🧹', fxHint: 'dust-cloud' },
-    });
-    pet.applyModifier({
-      id: 'disobedient',
-      source: 'event:messyPlay',
-      appliedAt: pet.clock.now(),
-      expiresAt: pet.clock.now() + 60_000,
-      stack: 'replace',
-      effects: [],
-      visual: { label: 'Disobedient', hudIcon: '😼', fxHint: 'mischief' },
-    });
-  }
-});
+// Random-event modifier wiring (sick / happy-glow / dirty / disobedient)
+// now lives inside `buildAgent` so the same scenario behaviour rides the
+// Wave-0 bridge and the upcoming `useAgentSession` store path.
 
 // Drive HUD + trace panel off the AgentTicked bus event. The event
 // fires once per non-halted tick, synchronously during `pet.tick(dt)`,
@@ -170,17 +121,18 @@ rafHandle = requestAnimationFrame((t) => {
 });
 
 /**
- * Tear down the demo cleanly: stop the RAF loop, drop the modifier-decorator
- * subscription, and dispose the HUD's event subscription. Safe to call
- * multiple times. The production flow resets via `location.reload()` so
- * this path is mostly a safety net for future in-place reset flows and for
- * HMR correctness (it prevents listener stacks across hot reloads).
+ * Tear down the demo cleanly: stop the RAF loop and dispose the HUD's
+ * event subscription. Safe to call multiple times. The production flow
+ * resets via `location.reload()` so this path is mostly a safety net
+ * for future in-place reset flows and for HMR correctness (it prevents
+ * listener stacks across hot reloads). The modifier-decorator listener
+ * is bound by `buildAgent` and tied to the agent's own bus, so it is
+ * GC'd along with the agent — no explicit unsubscribe needed.
  */
 function disposeDemo(): void {
   if (stopped) return;
   stopped = true;
   if (rafHandle !== 0) cancelAnimationFrame(rafHandle);
-  unsubscribeModifierDecorator();
   unsubscribeUiRefresh();
   cognitionSwitcher.dispose();
   hud.dispose();

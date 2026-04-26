@@ -53,12 +53,33 @@ export type UseAgentSessionInitOptions = {
  * `Agent` itself via `markRaw` keeps Pinia's reactivity proxy from
  * traversing the framework's internal mutable state.
  */
+/**
+ * Per-subscriber bookkeeping. A subscriber survives agent rebuilds
+ * (init / replayFromSnapshot) by being re-attached to the new agent;
+ * `detach` holds the per-agent unsubscribe handle so the previous
+ * binding is released first.
+ */
+type SubscriberRecord = {
+  readonly listener: (event: DomainEvent) => void;
+  detach: () => void;
+};
+
 export const useAgentSession = defineStore('agentSession', () => {
   const agent = ref<Agent | null>(null);
   const scenarioId = ref<string>(DEFAULT_SCENARIO_ID);
   const seed = ref<string>('');
   const speedMultiplier = ref<number>(1);
   const running = ref<boolean>(false);
+  // Tracked outside the reactive state — Pinia must not traverse the
+  // listener closures (and the Set's identity is stable across rebuilds).
+  const subscribers = new Set<SubscriberRecord>();
+
+  function rebindSubscribers(target: Agent): void {
+    for (const record of subscribers) {
+      record.detach();
+      record.detach = target.subscribe(record.listener);
+    }
+  }
 
   function init(options: UseAgentSessionInitOptions = {}): void {
     const resolvedScenario = options.scenarioId ?? DEFAULT_SCENARIO_ID;
@@ -89,6 +110,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     // a null hydration scope and stale feature inputs (mood / recent
     // events).
     setLearningAgent(fresh);
+    rebindSubscribers(fresh);
     running.value = true;
     writePersistedSeed(resolvedScenario, resolvedSeed);
   }
@@ -159,13 +181,31 @@ export const useAgentSession = defineStore('agentSession', () => {
     const fresh = markRaw(buildAgent({ seed: seed.value }));
     agent.value = fresh;
     setLearningAgent(fresh);
+    rebindSubscribers(fresh);
     speedMultiplier.value = 1;
     running.value = true;
   }
 
+  /**
+   * Subscribe to the live agent's event bus. The returned unsubscribe
+   * detaches from whichever agent is current at the time of the call;
+   * across `init` / `replayFromSnapshot(null)` rebuilds the listener is
+   * automatically re-attached to the fresh agent so reset/replay
+   * doesn't silently break AGENT_TICKED-driven view stores.
+   *
+   * Calling `subscribe` before `init` parks the listener in the
+   * registry — it will fire once `init` builds the first agent.
+   */
   function subscribe(listener: (event: DomainEvent) => void): () => void {
-    if (agent.value === null) return () => {};
-    return agent.value.subscribe(listener);
+    const record: SubscriberRecord = {
+      listener,
+      detach: agent.value !== null ? agent.value.subscribe(listener) : () => {},
+    };
+    subscribers.add(record);
+    return () => {
+      record.detach();
+      subscribers.delete(record);
+    };
   }
 
   return {

@@ -146,6 +146,28 @@ describe('useAgentSession', () => {
     expect(session.speedMultiplier).toBe(1);
   });
 
+  it('subscribe handles survive replayFromSnapshot — listener fires on the rebuilt agent', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'rebind-seed' });
+    const ticked: AgentTickedEvent[] = [];
+    const unsub = session.subscribe((event: DomainEvent) => {
+      if (event.type === AGENT_TICKED) ticked.push(event as AgentTickedEvent);
+    });
+
+    await session.tick(0.1);
+    const firstCount = ticked.length;
+    expect(firstCount).toBeGreaterThan(0);
+
+    session.replayFromSnapshot(null);
+    await session.tick(0.1);
+    expect(ticked.length).toBeGreaterThan(firstCount);
+
+    unsub();
+    const afterUnsubCount = ticked.length;
+    await session.tick(0.1);
+    expect(ticked.length).toBe(afterUnsubCount);
+  });
+
   it('replayFromSnapshot(snapshot) is deferred to slice 1.2b and throws today', () => {
     const session = useAgentSession();
     session.init({ seed: 'defer-seed' });
