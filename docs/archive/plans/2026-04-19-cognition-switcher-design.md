@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #46.
+
 # 0.9.2 Cognition Switcher — Design
 
 > Brainstormed 2026-04-19. Feeds directly into

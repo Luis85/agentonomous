@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed (0.9.5 row of the v1 plan).
+
 # 0.9.5 Unify `AgentFacade.publishEvent` With Internal Publish Path — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if

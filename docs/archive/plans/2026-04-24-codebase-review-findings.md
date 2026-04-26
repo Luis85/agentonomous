@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Superseded by docs/plans/2026-04-25-comprehensive-polish-and-harden.md (recommendations folded into Track A1 + A2, all merged).
+
 # Codebase review — findings & actionable plan (2026-04-24)
 
 Comprehensive review of the `agentonomous` codebase on 2026-04-24. Each

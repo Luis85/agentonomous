@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Realised in #60 + the post-tfjs hardening PRs (#116 / #117 / #118). Design now lives in src/cognition/adapters/tfjs/.
+
 # TensorFlow.js cognition adapter — design
 
 > **Status:** draft (brainstorm complete, awaiting user + reviewer approval)

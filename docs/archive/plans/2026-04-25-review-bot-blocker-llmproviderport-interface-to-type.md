@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #103 (interface→type sweep across the cognition + adapters tree).
+
 ---
 date: 2026-04-25
 slug: review-bot-blocker-llmproviderport-interface-to-type

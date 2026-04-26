@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Superseded by docs/archive/plans/2026-04-24-tfjs-cognition-adapter.md (PR #60 swapped brain.js for tfjs).
+
 # 0.9.3 brain.js Training Persistence — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if

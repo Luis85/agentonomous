@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #7 / #8 / #9.
+
 # Pre-v1 handoff
 
 > **Status: superseded by [[v1-comprehensive-plan]] (2026-04-19).**

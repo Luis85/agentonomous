@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Realised in #120.
+
 # 2026-04-26 — Example favicon
 
 ## Goal

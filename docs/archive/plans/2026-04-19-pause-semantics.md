@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #8.
+
 # Pause semantics for `setTimeScale(0)`
 
 Status: **Option A adopted for Phase A**. Option B is the documented

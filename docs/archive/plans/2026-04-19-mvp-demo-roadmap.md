@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed across #7 / #8 / #9 / #13.
+
 # MVP demo roadmap
 
 > **Status: superseded by [[v1-comprehensive-plan]] (2026-04-19).**

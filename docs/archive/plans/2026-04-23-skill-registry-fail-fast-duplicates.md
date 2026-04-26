@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed (0.9.7 row of the v1 plan).
+
 # 0.9.8 Fail Fast on Duplicate `SkillRegistry` IDs — Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if

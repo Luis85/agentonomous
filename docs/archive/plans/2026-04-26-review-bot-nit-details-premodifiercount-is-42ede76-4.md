@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #121.
+
 ---
 date: 2026-04-26
 slug: review-bot-nit-details-premodifiercount-is-42ede76-4

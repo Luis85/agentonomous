@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #124 (sticky PR coverage-delta comment).
+
 ---
 date: 2026-04-26
 slug: review-bot-nit-coverage-thresholds-hardcoded-at-42ede76-3

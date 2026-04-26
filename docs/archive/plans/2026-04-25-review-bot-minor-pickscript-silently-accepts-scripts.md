@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #101.
+
 ---
 date: 2026-04-25
 slug: review-bot-minor-pickscript-silently-accepts-scripts

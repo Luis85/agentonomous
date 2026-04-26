@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Superseded by docs/plans/2026-04-25-comprehensive-polish-and-harden.md (the 2026-04-25 plan supersedes this file explicitly in its header).
+
 # Polish + harden — pre-1.0 increments
 
 > Cross-references: `docs/specs/vision.md`, `docs/specs/mvp-demo.md`,

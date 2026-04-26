@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #122.
+
 ---
 date: 2026-04-26
 slug: review-bot-minor-stage-blocked-failure-branch-has-42ede76-1

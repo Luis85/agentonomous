@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in #97; ongoing skill polish (e.g. #100 / #123) is incremental and not plan-tracked.
+
 # `review-fix` Skill Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
