@@ -339,8 +339,11 @@ comma-separated.
   tuples across workflows) into the bump PR. Divergent pins are a
   consistency-fixup, not a routine bump — open a separate issue under
   `actions-bump-bot` titled
-  `Divergent action pins: <owner>/<repo>` with the variant list and
-  exit cleanly. Owner reconciles in a follow-up PR.
+  `Divergent action pins: <owner>/<repo>` with the variant list, then
+  continue processing any `PENDING` rows from the same scan (per
+  [Process](#process) pre-flight + [Failure handling](#failure-handling),
+  `DIVERGENT` is non-blocking; only `ERROR` aborts the run). Owner
+  reconciles the divergent pins in a follow-up PR.
 - **Never** run on a `DIVERGENT` or `ERROR` row before the issue
   above is filed — failing to flag those silently regresses the
   guarantee that the label view shows every backlog item.
@@ -392,6 +395,7 @@ PRs on top of an unmerged backlog:
 EXISTING="$(gh pr list \
   --base develop \
   --state open \
+  --limit 200 \
   --search "author:${ROUTINE_GH_LOGIN}" \
   --json number,title,headRefName,headRefOid \
   --jq '[.[] | select(.headRefName | startswith("chore/actions-bump-"))][0]')"
