@@ -1,7 +1,6 @@
 # Quality automation — Dependabot triage cloud routine
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 2 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 2 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -105,6 +104,7 @@ git push -u origin docs/dep-triage-bot
 gh pr create --base develop \
   --title "docs(routine): add weekly Dependabot triage prompt" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds the weekly Dependabot triage cloud-routine prompt + README
 scaffold under docs/dep-triage-bot/. Also groups npm minor+patch

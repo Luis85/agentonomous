@@ -1,7 +1,6 @@
 # Quality automation — Weekly StrykerJS mutation run
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 7 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 7 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -172,6 +171,7 @@ git push -u origin test/mutation-testing
 gh pr create --base develop \
   --title "test(mutation): weekly Stryker run on develop (baseline N%)" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds a Mondays-07:00-UTC weekly StrykerJS mutation run. Mutates
 src/ only (skips integrations/internal). Uploads HTML report as a

@@ -1,7 +1,6 @@
 # Quality automation — CodeQL weekly + push scan
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 1 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 1 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -116,6 +115,7 @@ git push -u origin ci/codeql-weekly
 gh pr create --base develop \
   --title "ci(codeql): add weekly + push CodeQL JS/TS scan" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds a CodeQL JS/TS scan that runs on every push and PR to develop/main
 plus a Mondays-06:00-UTC weekly cron, using the security-and-quality

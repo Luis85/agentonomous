@@ -1,7 +1,6 @@
 # Quality automation — Weekly bundle-size trend snapshot
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 5 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 5 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -255,6 +254,7 @@ git push -u origin ci/bundle-size-trend
 gh pr create --base develop \
   --title "ci(metrics): weekly bundle-size trend snapshot" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds a Sundays-04:00-UTC weekly workflow that snapshots npx size-limit
 --json for the develop tip into docs/metrics/bundle-trend.jsonl. SHA

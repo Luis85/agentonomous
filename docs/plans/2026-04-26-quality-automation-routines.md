@@ -1,15 +1,22 @@
 # Quality automation routines — umbrella tracker
 
-> **Role.** This file is the **umbrella tracker** for the quality-
+> **Role.** This file is the **umbrella plan** for the quality-
 > automation increment. It does **not** contain implementation steps
 > directly — each row links to its own self-contained chunk plan that
 > is sized to ship as a single downstream PR off `develop`.
+>
+> **Durable tracker:** [Issue #131](https://github.com/Luis85/agentonomous/issues/131).
+> The issue is the **long-lived** record of this increment — it
+> survives PR merges. PR #130 ships these plan files; the issue
+> tracks every downstream chunk PR and auto-flips on merge. Closes
+> when every chunk lands AND the plans are archived to
+> `docs/archive/plans/`.
 >
 > **For agentic workers:** pick a row from the [Tracker table](#tracker-table)
 > below, open the linked chunk plan, follow it top-to-bottom on a
 > fresh worktree branch cut from `develop` (NOT from this PR's branch),
 > and open the downstream PR per the contract below. PR #130 itself
-> stays open, draft, until every row in the tracker is shipped.
+> stays open, draft, until every chunk PR has merged.
 
 ---
 
@@ -123,10 +130,16 @@ Every PR cut from a chunk plan above MUST:
 1. **Branch off `develop`**, NOT off this tracker's branch
    (`chore/quality-automation-routines`). Worktree path:
    `.worktrees/<branch-slug>` per `CLAUDE.md`.
-2. **Include the body line `Tracks: #130`** so GitHub auto-links the
-   PR back to this tracker.
+2. **Include both body lines** so GitHub auto-links the PR to the
+   planning surface AND the durable tracker:
+   - `Tracks: #130` (planning PR — supplies the chunk plan).
+   - `Tracks: #131` (durable issue tracker — auto-ticks the matching
+     row on the issue when this PR merges).
 3. **Tick its row in the [Tracker table](#tracker-table)** in the same
-   diff (same commit, even — no follow-up "tracker update" PR).
+   diff (same commit, even — no follow-up "tracker update" PR). The
+   row in this file and the matching row on issue #131 stay in sync
+   manually for now (the issue is the durable record after merge,
+   the umbrella section is the in-repo planning surface).
 4. **Pass `npm run verify`** locally before opening (the existing
    pre-PR gate). Workflow rows additionally pass `actionlint` clean.
 5. **Pin every new GHA `uses:` reference to a 40-char commit SHA**

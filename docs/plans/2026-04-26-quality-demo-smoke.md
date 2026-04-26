@@ -1,7 +1,6 @@
 # Quality automation — Nightly Playwright demo smoke
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 8 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 8 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -226,6 +225,7 @@ git push -u origin test/demo-smoke
 gh pr create --base develop \
   --title "test(demo): nightly Playwright smoke on golden path" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds Playwright headless smoke against the built demo: feed → pet →
 sleep, asserts HUD updates and zero console errors. Runs nightly at

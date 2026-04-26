@@ -1,7 +1,6 @@
 # Quality automation — Determinism replay (hash-pinned, 8 seeds)
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 6 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 6 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -211,6 +210,7 @@ git push -u origin test/determinism-replay
 gh pr create --base develop \
   --title "test(determinism): hash-pinned replay across 8 seeds" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds end-to-end determinism check: 8 seeds × 1000 ticks each, sha256
 of the bus event stream, asserted against a committed baseline.json.

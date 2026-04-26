@@ -1,7 +1,6 @@
 # Quality automation — Plan reconciliation cloud routine
 
-> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130)
-> (umbrella) · row 4 of
+> **Tracks:** [#130](https://github.com/Luis85/agentonomous/pull/130) (umbrella plan) · [#131](https://github.com/Luis85/agentonomous/issues/131) (durable issue tracker) · row 4 of
 > [`2026-04-26-quality-automation-routines.md`](./2026-04-26-quality-automation-routines.md)
 >
 > **Branch (this row):** cut a fresh worktree off `origin/develop` —
@@ -84,6 +83,7 @@ git push -u origin docs/plan-recon-bot
 gh pr create --base develop \
   --title "docs(routine): add monthly plan reconciliation prompt" \
   --body "Tracks: #130
+Tracks: #131
 
 Adds the monthly plan-reconciliation cloud-routine prompt + README
 scaffold under docs/plan-recon-bot/. Distinct from docs-review-bot
