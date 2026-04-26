@@ -97,6 +97,37 @@ describe('defineWalkthroughGraph', () => {
     const chapter1 = getChapterSteps(graph, 1);
     expect(chapter1.map((s) => String(s.id))).toEqual(['1.first', '1.second']);
   });
+
+  it('rejects a step id that collides with the TOUR_END sentinel', () => {
+    expect(() => defineWalkthroughGraph([step('end', 1, TOUR_END)])).toThrow(
+      /step id "end" collides with the reserved TOUR_END sentinel/,
+    );
+  });
+
+  it('rejects a graph whose chain cycles instead of reaching TOUR_END', () => {
+    const cyclic = [step('a', 1, 'b'), step('b', 1, 'a')];
+    expect(() => defineWalkthroughGraph(cyclic)).toThrow(
+      /walkthrough graph contains a cycle reachable from "a" \(re-enters "a"\)/,
+    );
+  });
+
+  it('rejects a chain that loops back further down the path', () => {
+    const cyclic = [step('a', 1, 'b'), step('b', 1, 'c'), step('c', 1, 'b')];
+    expect(() => defineWalkthroughGraph(cyclic)).toThrow(
+      /walkthrough graph contains a cycle reachable from/,
+    );
+  });
+
+  it('accepts multi-entry chains that each terminate at TOUR_END', () => {
+    // Chapter 2's start ("2.start") is not on chapter 1's chain — slice 1.3
+    // jumps to it via getStepById. The reachability check still validates it.
+    const graph = defineWalkthroughGraph([
+      step('1.only', 1, TOUR_END),
+      step('2.start', 2, '2.end'),
+      step('2.end', 2, TOUR_END),
+    ]);
+    expect(graph.steps).toHaveLength(3);
+  });
 });
 
 describe('getStepById', () => {

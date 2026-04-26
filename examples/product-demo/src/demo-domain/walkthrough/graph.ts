@@ -50,6 +50,16 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
 
   const stepsById = new Map<WalkthroughStepId, WalkthroughStep>();
   for (const step of steps) {
+    // The literal string `TOUR_END` ('end') is the terminal sentinel returned
+    // by `getNextStep` / `getSkipTarget`. A step authored with `id === 'end'`
+    // would silently shadow the sentinel — every transition meant to land on
+    // it would instead be interpreted as tour completion, and the step would
+    // be unreachable. Reject the collision at construction time.
+    if ((step.id as string) === TOUR_END) {
+      throw new WalkthroughGraphError(
+        `step id "${String(step.id)}" collides with the reserved TOUR_END sentinel`,
+      );
+    }
     if (stepsById.has(step.id)) {
       throw new WalkthroughGraphError(`duplicate walkthrough step id: ${String(step.id)}`);
     }
@@ -62,6 +72,36 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
       throw new WalkthroughGraphError(
         `step "${String(step.id)}" advances to unknown step "${String(step.nextOnComplete)}"`,
       );
+    }
+  }
+
+  // Reachability/termination check: from every step, the `nextOnComplete`
+  // chain must terminate at `TOUR_END`. Each step has exactly one successor,
+  // so a chain that revisits a step before hitting `TOUR_END` is a cycle —
+  // skipping or naturally completing along that chain would trap the user
+  // forever. Walk every step to be defensive against multi-entry-point
+  // graphs (slice 1.3 may use `getStepById` to jump to chapters 2-5's start
+  // ids without traversing chapter 1 first).
+  for (const startId of stepsById.keys()) {
+    const visited = new Set<WalkthroughStepId>();
+    let cursor: WalkthroughStepId | TourEnd = startId;
+    while (cursor !== TOUR_END) {
+      if (visited.has(cursor)) {
+        throw new WalkthroughGraphError(
+          `walkthrough graph contains a cycle reachable from "${String(startId)}" (re-enters "${String(cursor)}")`,
+        );
+      }
+      visited.add(cursor);
+      const step = stepsById.get(cursor);
+      // The earlier `nextOnComplete` validation guarantees this lookup
+      // succeeds; the explicit guard keeps the runtime error specific
+      // instead of a misleading `undefined.nextOnComplete`.
+      if (step === undefined) {
+        throw new WalkthroughGraphError(
+          `walkthrough graph references unknown step id "${String(cursor)}" while traversing from "${String(startId)}"`,
+        );
+      }
+      cursor = step.nextOnComplete;
     }
   }
 
