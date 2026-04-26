@@ -49,11 +49,20 @@ For each in-scope PR, classify by **dependency type** (runtime vs dev
 vs peer) and **bump magnitude** (patch / minor / major), then apply
 the matching action.
 
-Detect dependency type from the diff against `package.json`:
+Detect dependency type from the diff against `package.json`. `gh pr
+diff` does not accept pathspecs after `--` (only `--exclude` glob
+filtering), so use the REST `pulls/<num>/files` endpoint and filter
+the response with `jq`:
 
 ```bash
-gh pr diff "<pr-number>" -- package.json examples/nurture-pet/package.json
+gh api "repos/Luis85/agentonomous/pulls/<pr-number>/files" \
+  --jq '.[] | select(.filename | endswith("package.json")) | {file: .filename, patch: .patch}'
 ```
+
+Each entry's `.patch` is the unified diff GitHub stores for that
+file. Inspect the `+`/`-` lines under `"dependencies"`,
+`"devDependencies"`, or `"peerDependencies"` keys to classify the
+bumped package.
 
 | Type / magnitude          | Action                                                           |
 | ------------------------- | ---------------------------------------------------------------- |
