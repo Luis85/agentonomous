@@ -363,7 +363,7 @@
       "source_file": "src\\index.ts",
       "source_location": "L1",
       "id": "index_ts",
-      "community": 26,
+      "community": 22,
       "norm_label": "index.ts"
     },
     {
@@ -390,7 +390,7 @@
       "source_file": "src\\agent\\Agent.ts",
       "source_location": "L218",
       "id": "agent_agent_constructor",
-      "community": 1,
+      "community": 0,
       "norm_label": ".constructor()"
     },
     {
@@ -417,7 +417,7 @@
       "source_file": "src\\agent\\Agent.ts",
       "source_location": "L294",
       "id": "agent_agent_applylifecyclesnapshot",
-      "community": 3,
+      "community": 6,
       "norm_label": ".applylifecyclesnapshot()"
     },
     {
@@ -471,7 +471,7 @@
       "source_file": "src\\agent\\Agent.ts",
       "source_location": "L509",
       "id": "agent_agent_settimescale",
-      "community": 3,
+      "community": 6,
       "norm_label": ".settimescale()"
     },
     {
@@ -480,7 +480,7 @@
       "source_file": "src\\agent\\Agent.ts",
       "source_location": "L519",
       "id": "agent_agent_gettimescale",
-      "community": 3,
+      "community": 0,
       "norm_label": ".gettimescale()"
     },
     {
@@ -489,7 +489,7 @@
       "source_file": "src\\agent\\Agent.ts",
       "source_location": "L540",
       "id": "agent_agent_setreasoner",
-      "community": 0,
+      "community": 6,
       "norm_label": ".setreasoner()"
     },
     {
@@ -534,7 +534,7 @@
       "source_file": "src\\agent\\Agent.ts",
       "source_location": "L630",
       "id": "agent_agent_restore",
-      "community": 3,
+      "community": 6,
       "norm_label": ".restore()"
     },
     {
@@ -705,7 +705,7 @@
       "source_file": "src\\agent\\Persona.ts",
       "source_location": "L1",
       "id": "agent_persona_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "persona.ts"
     },
     {
@@ -723,7 +723,7 @@
       "source_file": "src\\agent\\RemoteController.ts",
       "source_location": "L33",
       "id": "remotecontroller_inmemoryremotecontroller",
-      "community": 4,
+      "community": 3,
       "norm_label": "inmemoryremotecontroller"
     },
     {
@@ -741,7 +741,7 @@
       "source_file": "src\\agent\\RemoteController.ts",
       "source_location": "L46",
       "id": "remotecontroller_inmemoryremotecontroller_pull",
-      "community": 4,
+      "community": 3,
       "norm_label": ".pull()"
     },
     {
@@ -750,7 +750,7 @@
       "source_file": "src\\agent\\RemoteController.ts",
       "source_location": "L52",
       "id": "remotecontroller_inmemoryremotecontroller_size",
-      "community": 4,
+      "community": 3,
       "norm_label": ".size()"
     },
     {
@@ -759,7 +759,7 @@
       "source_file": "src\\agent\\RemoteController.ts",
       "source_location": "L57",
       "id": "remotecontroller_inmemoryremotecontroller_clear",
-      "community": 4,
+      "community": 3,
       "norm_label": ".clear()"
     },
     {
@@ -777,7 +777,7 @@
       "source_file": "src\\agent\\ScriptedController.ts",
       "source_location": "L27",
       "id": "scriptedcontroller_arrayscriptedcontroller",
-      "community": 20,
+      "community": 18,
       "norm_label": "arrayscriptedcontroller"
     },
     {
@@ -786,7 +786,7 @@
       "source_file": "src\\agent\\ScriptedController.ts",
       "source_location": "L31",
       "id": "scriptedcontroller_arrayscriptedcontroller_constructor",
-      "community": 20,
+      "community": 18,
       "norm_label": ".constructor()"
     },
     {
@@ -795,7 +795,7 @@
       "source_file": "src\\agent\\ScriptedController.ts",
       "source_location": "L40",
       "id": "scriptedcontroller_arrayscriptedcontroller_next",
-      "community": 20,
+      "community": 18,
       "norm_label": ".next()"
     },
     {
@@ -804,7 +804,7 @@
       "source_file": "src\\agent\\ScriptedController.ts",
       "source_location": "L47",
       "id": "scriptedcontroller_arrayscriptedcontroller_reset",
-      "community": 20,
+      "community": 18,
       "norm_label": ".reset()"
     },
     {
@@ -813,7 +813,7 @@
       "source_file": "src\\agent\\ScriptedController.ts",
       "source_location": "L52",
       "id": "scriptedcontroller_arrayscriptedcontroller_isexhausted",
-      "community": 20,
+      "community": 18,
       "norm_label": ".isexhausted()"
     },
     {
@@ -840,7 +840,7 @@
       "source_file": "src\\agent\\createAgent.ts",
       "source_location": "L157",
       "id": "createagent_createagent",
-      "community": 9,
+      "community": 2,
       "norm_label": "createagent()"
     },
     {
@@ -849,7 +849,7 @@
       "source_file": "src\\agent\\createAgent.ts",
       "source_location": "L165",
       "id": "createagent_applypassivemodifiers",
-      "community": 9,
+      "community": 2,
       "norm_label": "applypassivemodifiers()"
     },
     {
@@ -858,7 +858,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L1",
       "id": "agent_errors_ts",
-      "community": 8,
+      "community": 2,
       "norm_label": "errors.ts"
     },
     {
@@ -867,7 +867,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L11",
       "id": "errors_agenterror",
-      "community": 8,
+      "community": 2,
       "norm_label": "agenterror"
     },
     {
@@ -876,7 +876,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L14",
       "id": "errors_agenterror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -885,7 +885,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L25",
       "id": "errors_missingdependencyerror",
-      "community": 8,
+      "community": 2,
       "norm_label": "missingdependencyerror"
     },
     {
@@ -894,7 +894,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L26",
       "id": "errors_missingdependencyerror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -903,7 +903,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L37",
       "id": "errors_snapshotrestoreerror",
-      "community": 8,
+      "community": 2,
       "norm_label": "snapshotrestoreerror"
     },
     {
@@ -912,7 +912,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L38",
       "id": "errors_snapshotrestoreerror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -921,7 +921,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L45",
       "id": "errors_invalidspecieserror",
-      "community": 8,
+      "community": 2,
       "norm_label": "invalidspecieserror"
     },
     {
@@ -930,7 +930,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L46",
       "id": "errors_invalidspecieserror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -939,7 +939,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L53",
       "id": "errors_skillinvocationerror",
-      "community": 8,
+      "community": 2,
       "norm_label": "skillinvocationerror"
     },
     {
@@ -948,7 +948,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L56",
       "id": "errors_skillinvocationerror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -957,7 +957,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L70",
       "id": "errors_duplicateskillerror",
-      "community": 8,
+      "community": 2,
       "norm_label": "duplicateskillerror"
     },
     {
@@ -966,7 +966,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L73",
       "id": "errors_duplicateskillerror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -975,7 +975,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L88",
       "id": "errors_budgetexceedederror",
-      "community": 8,
+      "community": 2,
       "norm_label": "budgetexceedederror"
     },
     {
@@ -984,7 +984,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L89",
       "id": "errors_budgetexceedederror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -993,7 +993,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L96",
       "id": "errors_invalidtimescaleerror",
-      "community": 8,
+      "community": 2,
       "norm_label": "invalidtimescaleerror"
     },
     {
@@ -1002,7 +1002,7 @@
       "source_file": "src\\agent\\errors.ts",
       "source_location": "L97",
       "id": "errors_invalidtimescaleerror_constructor",
-      "community": 8,
+      "community": 2,
       "norm_label": ".constructor()"
     },
     {
@@ -1011,7 +1011,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L1",
       "id": "agent_result_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "result.ts"
     },
     {
@@ -1020,7 +1020,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L11",
       "id": "result_ok",
-      "community": 6,
+      "community": 5,
       "norm_label": "ok()"
     },
     {
@@ -1029,7 +1029,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L12",
       "id": "result_err",
-      "community": 11,
+      "community": 9,
       "norm_label": "err()"
     },
     {
@@ -1038,7 +1038,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L15",
       "id": "result_isok",
-      "community": 11,
+      "community": 9,
       "norm_label": "isok()"
     },
     {
@@ -1047,7 +1047,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L20",
       "id": "result_iserr",
-      "community": 11,
+      "community": 9,
       "norm_label": "iserr()"
     },
     {
@@ -1056,7 +1056,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L25",
       "id": "result_map",
-      "community": 6,
+      "community": 5,
       "norm_label": "map()"
     },
     {
@@ -1065,7 +1065,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L30",
       "id": "result_maperr",
-      "community": 11,
+      "community": 9,
       "norm_label": "maperr()"
     },
     {
@@ -1074,7 +1074,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L35",
       "id": "result_andthen",
-      "community": 11,
+      "community": 9,
       "norm_label": "andthen()"
     },
     {
@@ -1083,7 +1083,7 @@
       "source_file": "src\\agent\\result.ts",
       "source_location": "L43",
       "id": "result_unwrap",
-      "community": 11,
+      "community": 9,
       "norm_label": "unwrap()"
     },
     {
@@ -1236,7 +1236,7 @@
       "source_file": "src\\agent\\internal\\DeathCoordinator.ts",
       "source_location": "L25",
       "id": "deathcoordinator_rundeath",
-      "community": 0,
+      "community": 10,
       "norm_label": "rundeath()"
     },
     {
@@ -1254,7 +1254,7 @@
       "source_file": "src\\agent\\internal\\LifecycleTicker.ts",
       "source_location": "L11",
       "id": "lifecycleticker_lifecycleticker",
-      "community": 18,
+      "community": 3,
       "norm_label": "lifecycleticker"
     },
     {
@@ -1263,7 +1263,7 @@
       "source_file": "src\\agent\\internal\\LifecycleTicker.ts",
       "source_location": "L12",
       "id": "lifecycleticker_lifecycleticker_constructor",
-      "community": 18,
+      "community": 3,
       "norm_label": ".constructor()"
     },
     {
@@ -1272,7 +1272,7 @@
       "source_file": "src\\agent\\internal\\LifecycleTicker.ts",
       "source_location": "L14",
       "id": "lifecycleticker_lifecycleticker_run",
-      "community": 18,
+      "community": 3,
       "norm_label": ".run()"
     },
     {
@@ -1326,7 +1326,7 @@
       "source_file": "src\\agent\\internal\\MoodReconciler.ts",
       "source_location": "L10",
       "id": "moodreconciler_moodreconciler",
-      "community": 3,
+      "community": 6,
       "norm_label": "moodreconciler"
     },
     {
@@ -1335,7 +1335,7 @@
       "source_file": "src\\agent\\internal\\MoodReconciler.ts",
       "source_location": "L11",
       "id": "moodreconciler_moodreconciler_constructor",
-      "community": 3,
+      "community": 6,
       "norm_label": ".constructor()"
     },
     {
@@ -1344,7 +1344,7 @@
       "source_file": "src\\agent\\internal\\MoodReconciler.ts",
       "source_location": "L13",
       "id": "moodreconciler_moodreconciler_run",
-      "community": 3,
+      "community": 6,
       "norm_label": ".run()"
     },
     {
@@ -1389,7 +1389,7 @@
       "source_file": "src\\agent\\internal\\RestoreCoordinator.ts",
       "source_location": "L1",
       "id": "agent_internal_restorecoordinator_ts",
-      "community": 3,
+      "community": 6,
       "norm_label": "restorecoordinator.ts"
     },
     {
@@ -1398,7 +1398,7 @@
       "source_file": "src\\agent\\internal\\RestoreCoordinator.ts",
       "source_location": "L29",
       "id": "restorecoordinator_runrestore",
-      "community": 3,
+      "community": 6,
       "norm_label": "runrestore()"
     },
     {
@@ -1416,7 +1416,7 @@
       "source_file": "src\\agent\\internal\\RestoreCoordinator.ts",
       "source_location": "L84",
       "id": "restorecoordinator_restoreanimation",
-      "community": 3,
+      "community": 6,
       "norm_label": "restoreanimation()"
     },
     {
@@ -1425,7 +1425,7 @@
       "source_file": "src\\agent\\internal\\RestoreCoordinator.ts",
       "source_location": "L89",
       "id": "restorecoordinator_restorememory",
-      "community": 3,
+      "community": 6,
       "norm_label": "restorememory()"
     },
     {
@@ -1434,7 +1434,7 @@
       "source_file": "src\\agent\\internal\\RestoreCoordinator.ts",
       "source_location": "L102",
       "id": "restorecoordinator_runcatchupifrequested",
-      "community": 3,
+      "community": 6,
       "norm_label": "runcatchupifrequested()"
     },
     {
@@ -1452,7 +1452,7 @@
       "source_file": "src\\agent\\internal\\SnapshotAssembler.ts",
       "source_location": "L20",
       "id": "snapshotassembler_assemblesnapshot",
-      "community": 3,
+      "community": 0,
       "norm_label": "assemblesnapshot()"
     },
     {
@@ -1461,7 +1461,7 @@
       "source_file": "src\\agent\\internal\\TickContext.ts",
       "source_location": "L1",
       "id": "agent_internal_tickcontext_ts",
-      "community": 27,
+      "community": 23,
       "norm_label": "tickcontext.ts"
     },
     {
@@ -1479,7 +1479,7 @@
       "source_file": "src\\agent\\internal\\agentDepsResolver.ts",
       "source_location": "L31",
       "id": "agentdepsresolver_assertrequireddeps",
-      "community": 1,
+      "community": 0,
       "norm_label": "assertrequireddeps()"
     },
     {
@@ -1488,7 +1488,7 @@
       "source_file": "src\\agent\\internal\\agentDepsResolver.ts",
       "source_location": "L45",
       "id": "agentdepsresolver_resolvecoreports",
-      "community": 1,
+      "community": 0,
       "norm_label": "resolvecoreports()"
     },
     {
@@ -1497,7 +1497,7 @@
       "source_file": "src\\agent\\internal\\agentDepsResolver.ts",
       "source_location": "L67",
       "id": "agentdepsresolver_resolvesubsystems",
-      "community": 1,
+      "community": 0,
       "norm_label": "resolvesubsystems()"
     },
     {
@@ -1506,7 +1506,7 @@
       "source_file": "src\\agent\\internal\\agentDepsResolver.ts",
       "source_location": "L91",
       "id": "agentdepsresolver_resolvecognition",
-      "community": 1,
+      "community": 0,
       "norm_label": "resolvecognition()"
     },
     {
@@ -1524,7 +1524,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L1",
       "id": "agent_internal_buildagentdeps_ts",
-      "community": 9,
+      "community": 2,
       "norm_label": "buildagentdeps.ts"
     },
     {
@@ -1533,7 +1533,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L60",
       "id": "buildagentdeps_buildagentdeps",
-      "community": 9,
+      "community": 2,
       "norm_label": "buildagentdeps()"
     },
     {
@@ -1542,7 +1542,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L89",
       "id": "buildagentdeps_toagentdependencies",
-      "community": 9,
+      "community": 2,
       "norm_label": "toagentdependencies()"
     },
     {
@@ -1551,7 +1551,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L114",
       "id": "buildagentdeps_installmoduleskills",
-      "community": 9,
+      "community": 2,
       "norm_label": "installmoduleskills()"
     },
     {
@@ -1560,7 +1560,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L128",
       "id": "buildagentdeps_buildidentity",
-      "community": 9,
+      "community": 2,
       "norm_label": "buildidentity()"
     },
     {
@@ -1569,7 +1569,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L145",
       "id": "buildagentdeps_buildagemodel",
-      "community": 9,
+      "community": 2,
       "norm_label": "buildagemodel()"
     },
     {
@@ -1578,7 +1578,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L161",
       "id": "buildagentdeps_portoptions",
-      "community": 9,
+      "community": 2,
       "norm_label": "portoptions()"
     },
     {
@@ -1587,7 +1587,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L171",
       "id": "buildagentdeps_lifecycleoptions",
-      "community": 9,
+      "community": 2,
       "norm_label": "lifecycleoptions()"
     },
     {
@@ -1596,7 +1596,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L186",
       "id": "buildagentdeps_worldoptions",
-      "community": 9,
+      "community": 2,
       "norm_label": "worldoptions()"
     },
     {
@@ -1605,7 +1605,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L195",
       "id": "buildagentdeps_persistenceoptions",
-      "community": 9,
+      "community": 2,
       "norm_label": "persistenceoptions()"
     },
     {
@@ -1614,7 +1614,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L203",
       "id": "buildagentdeps_cognitionoptions",
-      "community": 9,
+      "community": 2,
       "norm_label": "cognitionoptions()"
     },
     {
@@ -1623,7 +1623,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L216",
       "id": "buildagentdeps_resolveskills",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolveskills()"
     },
     {
@@ -1632,7 +1632,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L224",
       "id": "buildagentdeps_resolvespecies",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolvespecies()"
     },
     {
@@ -1641,7 +1641,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L240",
       "id": "buildagentdeps_resolverandomevents",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolverandomevents()"
     },
     {
@@ -1650,7 +1650,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L248",
       "id": "buildagentdeps_resolvepersistence",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolvepersistence()"
     },
     {
@@ -1659,7 +1659,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L264",
       "id": "buildagentdeps_resolvelifecycle",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolvelifecycle()"
     },
     {
@@ -1668,7 +1668,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L274",
       "id": "buildagentdeps_resolvemoodmodel",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolvemoodmodel()"
     },
     {
@@ -1677,7 +1677,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L283",
       "id": "buildagentdeps_resolveneeds",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolveneeds()"
     },
     {
@@ -1686,7 +1686,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L295",
       "id": "buildagentdeps_resolveneedspolicy",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolveneedspolicy()"
     },
     {
@@ -1695,7 +1695,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L304",
       "id": "buildagentdeps_resolverng",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolverng()"
     },
     {
@@ -1704,7 +1704,7 @@
       "source_file": "src\\agent\\internal\\buildAgentDeps.ts",
       "source_location": "L315",
       "id": "buildagentdeps_resolveembodiment",
-      "community": 9,
+      "community": 2,
       "norm_label": "resolveembodiment()"
     },
     {
@@ -1722,7 +1722,7 @@
       "source_file": "src\\agent\\internal\\tickHelpers.ts",
       "source_location": "L48",
       "id": "tickhelpers_buildtickdeltas",
-      "community": 6,
+      "community": 5,
       "norm_label": "buildtickdeltas()"
     },
     {
@@ -1749,7 +1749,7 @@
       "source_file": "src\\animation\\AnimationState.ts",
       "source_location": "L1",
       "id": "animation_animationstate_ts",
-      "community": 10,
+      "community": 1,
       "norm_label": "animationstate.ts"
     },
     {
@@ -1794,7 +1794,7 @@
       "source_file": "src\\animation\\AnimationStateMachine.ts",
       "source_location": "L83",
       "id": "animationstatemachine_animationstatemachine_current",
-      "community": 10,
+      "community": 0,
       "norm_label": ".current()"
     },
     {
@@ -1866,7 +1866,7 @@
       "source_file": "src\\animation\\AnimationTransitionEvent.ts",
       "source_location": "L1",
       "id": "animation_animationtransitionevent_ts",
-      "community": 10,
+      "community": 1,
       "norm_label": "animationtransitionevent.ts"
     },
     {
@@ -1875,7 +1875,7 @@
       "source_file": "src\\body\\Appearance.ts",
       "source_location": "L1",
       "id": "body_appearance_ts",
-      "community": 17,
+      "community": 2,
       "norm_label": "appearance.ts"
     },
     {
@@ -1884,7 +1884,7 @@
       "source_file": "src\\body\\Appearance.ts",
       "source_location": "L29",
       "id": "appearance_defaultappearance",
-      "community": 17,
+      "community": 2,
       "norm_label": "defaultappearance()"
     },
     {
@@ -1893,7 +1893,7 @@
       "source_file": "src\\body\\Embodiment.ts",
       "source_location": "L1",
       "id": "body_embodiment_ts",
-      "community": 17,
+      "community": 2,
       "norm_label": "embodiment.ts"
     },
     {
@@ -1902,7 +1902,7 @@
       "source_file": "src\\body\\Embodiment.ts",
       "source_location": "L21",
       "id": "embodiment_defaultembodiment",
-      "community": 17,
+      "community": 2,
       "norm_label": "defaultembodiment()"
     },
     {
@@ -1911,7 +1911,7 @@
       "source_file": "src\\body\\LocomotionMode.ts",
       "source_location": "L1",
       "id": "body_locomotionmode_ts",
-      "community": 17,
+      "community": 2,
       "norm_label": "locomotionmode.ts"
     },
     {
@@ -1920,7 +1920,7 @@
       "source_file": "src\\body\\Transform.ts",
       "source_location": "L1",
       "id": "body_transform_ts",
-      "community": 17,
+      "community": 2,
       "norm_label": "transform.ts"
     },
     {
@@ -1929,7 +1929,7 @@
       "source_file": "src\\body\\Transform.ts",
       "source_location": "L26",
       "id": "transform_identitytransform",
-      "community": 17,
+      "community": 2,
       "norm_label": "identitytransform()"
     },
     {
@@ -1938,7 +1938,7 @@
       "source_file": "src\\body\\Transform.ts",
       "source_location": "L39",
       "id": "transform_translate",
-      "community": 17,
+      "community": 2,
       "norm_label": "translate()"
     },
     {
@@ -1947,7 +1947,7 @@
       "source_file": "src\\cognition\\Intention.ts",
       "source_location": "L1",
       "id": "cognition_intention_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "intention.ts"
     },
     {
@@ -1956,7 +1956,7 @@
       "source_file": "src\\cognition\\IntentionCandidate.ts",
       "source_location": "L1",
       "id": "cognition_intentioncandidate_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "intentioncandidate.ts"
     },
     {
@@ -1965,16 +1965,25 @@
       "source_file": "src\\cognition\\personaBias.ts",
       "source_location": "L1",
       "id": "cognition_personabias_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "personabias.ts"
+    },
+    {
+      "label": "weightForRule()",
+      "file_type": "code",
+      "source_file": "src\\cognition\\personaBias.ts",
+      "source_location": "L57",
+      "id": "personabias_weightforrule",
+      "community": 5,
+      "norm_label": "weightforrule()"
     },
     {
       "label": "defaultPersonaBias()",
       "file_type": "code",
       "source_file": "src\\cognition\\personaBias.ts",
-      "source_location": "L53",
+      "source_location": "L62",
       "id": "personabias_defaultpersonabias",
-      "community": 1,
+      "community": 5,
       "norm_label": "defaultpersonabias()"
     },
     {
@@ -1983,7 +1992,7 @@
       "source_file": "src\\cognition\\tuning.ts",
       "source_location": "L1",
       "id": "cognition_tuning_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "tuning.ts"
     },
     {
@@ -1992,7 +2001,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L1",
       "id": "cognition_adapters_js_son_jssonreasoner_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "jssonreasoner.ts"
     },
     {
@@ -2001,7 +2010,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L95",
       "id": "jssonreasoner_defaulttobeliefs",
-      "community": 1,
+      "community": 5,
       "norm_label": "defaulttobeliefs()"
     },
     {
@@ -2010,7 +2019,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L103",
       "id": "jssonreasoner_isintentionaction",
-      "community": 15,
+      "community": 14,
       "norm_label": "isintentionaction()"
     },
     {
@@ -2019,7 +2028,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L129",
       "id": "jssonreasoner_jssonreasoner",
-      "community": 15,
+      "community": 14,
       "norm_label": "jssonreasoner"
     },
     {
@@ -2028,7 +2037,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L135",
       "id": "jssonreasoner_jssonreasoner_constructor",
-      "community": 15,
+      "community": 14,
       "norm_label": ".constructor()"
     },
     {
@@ -2037,7 +2046,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L146",
       "id": "jssonreasoner_jssonreasoner_selectintention",
-      "community": 15,
+      "community": 14,
       "norm_label": ".selectintention()"
     },
     {
@@ -2046,7 +2055,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L184",
       "id": "jssonreasoner_jssonreasoner_reset",
-      "community": 15,
+      "community": 14,
       "norm_label": ".reset()"
     },
     {
@@ -2055,7 +2064,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L189",
       "id": "jssonreasoner_jssonreasoner_getbeliefs",
-      "community": 15,
+      "community": 14,
       "norm_label": ".getbeliefs()"
     },
     {
@@ -2064,7 +2073,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\JsSonReasoner.ts",
       "source_location": "L193",
       "id": "jssonreasoner_jssonreasoner_buildagent",
-      "community": 15,
+      "community": 14,
       "norm_label": ".buildagent()"
     },
     {
@@ -2073,7 +2082,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\index.ts",
       "source_location": "L1",
       "id": "cognition_adapters_js_son_index_ts",
-      "community": 28,
+      "community": 24,
       "norm_label": "index.ts"
     },
     {
@@ -2082,7 +2091,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\js-son-agent.d.ts",
       "source_location": "L1",
       "id": "cognition_adapters_js_son_js_son_agent_d_ts",
-      "community": 25,
+      "community": 21,
       "norm_label": "js-son-agent.d.ts"
     },
     {
@@ -2091,7 +2100,7 @@
       "source_file": "src\\cognition\\adapters\\js-son\\js-son-agent.d.ts",
       "source_location": "L30",
       "id": "js_son_agent_d_agent",
-      "community": 25,
+      "community": 21,
       "norm_label": "agent"
     },
     {
@@ -2100,7 +2109,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\MistreevousReasoner.ts",
       "source_location": "L1",
       "id": "cognition_adapters_mistreevous_mistreevousreasoner_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "mistreevousreasoner.ts"
     },
     {
@@ -2109,7 +2118,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\MistreevousReasoner.ts",
       "source_location": "L96",
       "id": "mistreevousreasoner_mistreevousreasoner",
-      "community": 0,
+      "community": 6,
       "norm_label": "mistreevousreasoner"
     },
     {
@@ -2118,7 +2127,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\MistreevousReasoner.ts",
       "source_location": "L101",
       "id": "mistreevousreasoner_mistreevousreasoner_constructor",
-      "community": 0,
+      "community": 6,
       "norm_label": ".constructor()"
     },
     {
@@ -2127,7 +2136,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\MistreevousReasoner.ts",
       "source_location": "L136",
       "id": "mistreevousreasoner_mistreevousreasoner_selectintention",
-      "community": 0,
+      "community": 6,
       "norm_label": ".selectintention()"
     },
     {
@@ -2136,7 +2145,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\MistreevousReasoner.ts",
       "source_location": "L152",
       "id": "mistreevousreasoner_mistreevousreasoner_reset",
-      "community": 0,
+      "community": 6,
       "norm_label": ".reset()"
     },
     {
@@ -2145,7 +2154,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\MistreevousReasoner.ts",
       "source_location": "L157",
       "id": "mistreevousreasoner_mistreevousreasoner_gettreestate",
-      "community": 0,
+      "community": 6,
       "norm_label": ".gettreestate()"
     },
     {
@@ -2154,7 +2163,7 @@
       "source_file": "src\\cognition\\adapters\\mistreevous\\index.ts",
       "source_location": "L1",
       "id": "cognition_adapters_mistreevous_index_ts",
-      "community": 29,
+      "community": 25,
       "norm_label": "index.ts"
     },
     {
@@ -2163,7 +2172,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L1",
       "id": "cognition_adapters_tfjs_tfjslearner_ts",
-      "community": 6,
+      "community": 16,
       "norm_label": "tfjslearner.ts"
     },
     {
@@ -2172,7 +2181,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L111",
       "id": "tfjslearner_tfjslearner",
-      "community": 6,
+      "community": 16,
       "norm_label": "tfjslearner"
     },
     {
@@ -2181,7 +2190,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L116",
       "id": "tfjslearner_tfjslearner_constructor",
-      "community": 6,
+      "community": 16,
       "norm_label": ".constructor()"
     },
     {
@@ -2190,7 +2199,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L123",
       "id": "tfjslearner_tfjslearner_score",
-      "community": 6,
+      "community": 16,
       "norm_label": ".score()"
     },
     {
@@ -2199,7 +2208,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L139",
       "id": "tfjslearner_tfjslearner_flush",
-      "community": 6,
+      "community": 16,
       "norm_label": ".flush()"
     },
     {
@@ -2208,7 +2217,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L175",
       "id": "tfjslearner_tfjslearner_istraining",
-      "community": 6,
+      "community": 16,
       "norm_label": ".istraining()"
     },
     {
@@ -2217,7 +2226,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L182",
       "id": "tfjslearner_tfjslearner_bufferedcount",
-      "community": 6,
+      "community": 16,
       "norm_label": ".bufferedcount()"
     },
     {
@@ -2226,7 +2235,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L192",
       "id": "tfjslearner_tfjslearner_dispose",
-      "community": 6,
+      "community": 16,
       "norm_label": ".dispose()"
     },
     {
@@ -2235,7 +2244,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L197",
       "id": "tfjslearner_tfjslearner_batchsize",
-      "community": 6,
+      "community": 16,
       "norm_label": ".batchsize()"
     },
     {
@@ -2244,7 +2253,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L208",
       "id": "tfjslearner_tfjslearner_capacity",
-      "community": 6,
+      "community": 16,
       "norm_label": ".capacity()"
     },
     {
@@ -2253,7 +2262,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L230",
       "id": "tfjslearner_tfjslearner_maybescheduletrain",
-      "community": 6,
+      "community": 16,
       "norm_label": ".maybescheduletrain()"
     },
     {
@@ -2262,7 +2271,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L237",
       "id": "tfjslearner_tfjslearner_trainbackground",
-      "community": 6,
+      "community": 16,
       "norm_label": ".trainbackground()"
     },
     {
@@ -2271,7 +2280,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsLearner.ts",
       "source_location": "L252",
       "id": "tfjslearner_tfjslearner_runtrain",
-      "community": 6,
+      "community": 16,
       "norm_label": ".runtrain()"
     },
     {
@@ -2280,124 +2289,160 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
       "source_location": "L1",
       "id": "cognition_adapters_tfjs_tfjsreasoner_ts",
-      "community": 6,
+      "community": 5,
       "norm_label": "tfjsreasoner.ts"
+    },
+    {
+      "label": "loadBackendModule()",
+      "file_type": "code",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L28",
+      "id": "tfjsreasoner_loadbackendmodule",
+      "community": 5,
+      "norm_label": "loadbackendmodule()"
+    },
+    {
+      "label": "probeBackendInternal()",
+      "file_type": "code",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L59",
+      "id": "tfjsreasoner_probebackendinternal",
+      "community": 5,
+      "norm_label": "probebackendinternal()"
     },
     {
       "label": "makeLcg()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L19",
+      "source_location": "L73",
       "id": "tfjsreasoner_makelcg",
-      "community": 6,
+      "community": 5,
       "norm_label": "makelcg()"
     },
     {
       "label": "seededShuffle()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L31",
+      "source_location": "L85",
       "id": "tfjsreasoner_seededshuffle",
-      "community": 6,
+      "community": 5,
       "norm_label": "seededshuffle()"
     },
     {
       "label": "toInputTensor()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L55",
+      "source_location": "L109",
       "id": "tfjsreasoner_toinputtensor",
-      "community": 6,
+      "community": 5,
       "norm_label": "toinputtensor()"
     },
     {
       "label": "TfjsBackendNotRegisteredError",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L75",
+      "source_location": "L141",
       "id": "tfjsreasoner_tfjsbackendnotregisterederror",
-      "community": 6,
+      "community": 5,
       "norm_label": "tfjsbackendnotregisterederror"
     },
     {
       "label": ".constructor()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L79",
+      "source_location": "L145",
       "id": "tfjsreasoner_tfjsbackendnotregisterederror_constructor",
-      "community": 6,
+      "community": 5,
       "norm_label": ".constructor()"
     },
     {
       "label": "TfjsReasoner",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L207",
+      "source_location": "L273",
       "id": "tfjsreasoner_tfjsreasoner",
-      "community": 6,
+      "community": 5,
       "norm_label": "tfjsreasoner"
     },
     {
       "label": ".constructor()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L212",
+      "source_location": "L289",
       "id": "tfjsreasoner_tfjsreasoner_constructor",
-      "community": 6,
+      "community": 5,
       "norm_label": ".constructor()"
     },
     {
       "label": ".selectIntention()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L222",
+      "source_location": "L299",
       "id": "tfjsreasoner_tfjsreasoner_selectintention",
-      "community": 6,
+      "community": 5,
       "norm_label": ".selectintention()"
     },
     {
       "label": ".getModel()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L257",
+      "source_location": "L334",
       "id": "tfjsreasoner_tfjsreasoner_getmodel",
-      "community": 6,
+      "community": 5,
       "norm_label": ".getmodel()"
     },
     {
       "label": ".dispose()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L261",
+      "source_location": "L338",
       "id": "tfjsreasoner_tfjsreasoner_dispose",
-      "community": 6,
+      "community": 5,
       "norm_label": ".dispose()"
     },
     {
       "label": ".train()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L275",
+      "source_location": "L352",
       "id": "tfjsreasoner_tfjsreasoner_train",
-      "community": 6,
+      "community": 5,
       "norm_label": ".train()"
     },
     {
       "label": ".toJSON()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L328",
+      "source_location": "L405",
       "id": "tfjsreasoner_tfjsreasoner_tojson",
-      "community": 6,
+      "community": 5,
       "norm_label": ".tojson()"
+    },
+    {
+      "label": ".detectBestBackend()",
+      "file_type": "code",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L463",
+      "id": "tfjsreasoner_tfjsreasoner_detectbestbackend",
+      "community": 5,
+      "norm_label": ".detectbestbackend()"
+    },
+    {
+      "label": ".probeBackend()",
+      "file_type": "code",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L563",
+      "id": "tfjsreasoner_tfjsreasoner_probebackend",
+      "community": 5,
+      "norm_label": ".probebackend()"
     },
     {
       "label": ".fromJSON()",
       "file_type": "code",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L361",
+      "source_location": "L578",
       "id": "tfjsreasoner_tfjsreasoner_fromjson",
-      "community": 6,
+      "community": 5,
       "norm_label": ".fromjson()"
     },
     {
@@ -2406,7 +2451,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsSnapshot.ts",
       "source_location": "L1",
       "id": "cognition_adapters_tfjs_tfjssnapshot_ts",
-      "community": 6,
+      "community": 5,
       "norm_label": "tfjssnapshot.ts"
     },
     {
@@ -2415,7 +2460,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsSnapshot.ts",
       "source_location": "L34",
       "id": "tfjssnapshot_encodeweights",
-      "community": 6,
+      "community": 5,
       "norm_label": "encodeweights()"
     },
     {
@@ -2424,7 +2469,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsSnapshot.ts",
       "source_location": "L54",
       "id": "tfjssnapshot_decodeweights",
-      "community": 6,
+      "community": 5,
       "norm_label": "decodeweights()"
     },
     {
@@ -2433,7 +2478,7 @@
       "source_file": "src\\cognition\\adapters\\tfjs\\index.ts",
       "source_location": "L1",
       "id": "cognition_adapters_tfjs_index_ts",
-      "community": 30,
+      "community": 26,
       "norm_label": "index.ts"
     },
     {
@@ -2460,7 +2505,7 @@
       "source_file": "src\\cognition\\behavior\\DirectBehaviorRunner.ts",
       "source_location": "L26",
       "id": "directbehaviorrunner_directbehaviorrunner",
-      "community": 22,
+      "community": 19,
       "norm_label": "directbehaviorrunner"
     },
     {
@@ -2469,7 +2514,7 @@
       "source_file": "src\\cognition\\behavior\\DirectBehaviorRunner.ts",
       "source_location": "L30",
       "id": "directbehaviorrunner_directbehaviorrunner_constructor",
-      "community": 22,
+      "community": 19,
       "norm_label": ".constructor()"
     },
     {
@@ -2478,7 +2523,7 @@
       "source_file": "src\\cognition\\behavior\\DirectBehaviorRunner.ts",
       "source_location": "L35",
       "id": "directbehaviorrunner_directbehaviorrunner_run",
-      "community": 22,
+      "community": 19,
       "norm_label": ".run()"
     },
     {
@@ -2487,7 +2532,7 @@
       "source_file": "src\\cognition\\behavior\\DirectBehaviorRunner.ts",
       "source_location": "L48",
       "id": "directbehaviorrunner_directbehaviorrunner_mapintention",
-      "community": 22,
+      "community": 19,
       "norm_label": ".mapintention()"
     },
     {
@@ -2559,7 +2604,7 @@
       "source_file": "src\\cognition\\reasoning\\NoopReasoner.ts",
       "source_location": "L1",
       "id": "cognition_reasoning_noopreasoner_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "noopreasoner.ts"
     },
     {
@@ -2568,7 +2613,7 @@
       "source_file": "src\\cognition\\reasoning\\NoopReasoner.ts",
       "source_location": "L9",
       "id": "noopreasoner_noopreasoner",
-      "community": 1,
+      "community": 5,
       "norm_label": "noopreasoner"
     },
     {
@@ -2577,7 +2622,7 @@
       "source_file": "src\\cognition\\reasoning\\NoopReasoner.ts",
       "source_location": "L10",
       "id": "noopreasoner_noopreasoner_selectintention",
-      "community": 1,
+      "community": 5,
       "norm_label": ".selectintention()"
     },
     {
@@ -2586,7 +2631,7 @@
       "source_file": "src\\cognition\\reasoning\\Reasoner.ts",
       "source_location": "L1",
       "id": "cognition_reasoning_reasoner_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "reasoner.ts"
     },
     {
@@ -2595,7 +2640,7 @@
       "source_file": "src\\cognition\\reasoning\\UrgencyReasoner.ts",
       "source_location": "L1",
       "id": "cognition_reasoning_urgencyreasoner_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "urgencyreasoner.ts"
     },
     {
@@ -2604,7 +2649,7 @@
       "source_file": "src\\cognition\\reasoning\\UrgencyReasoner.ts",
       "source_location": "L23",
       "id": "urgencyreasoner_urgencyreasoner",
-      "community": 16,
+      "community": 0,
       "norm_label": "urgencyreasoner"
     },
     {
@@ -2613,7 +2658,7 @@
       "source_file": "src\\cognition\\reasoning\\UrgencyReasoner.ts",
       "source_location": "L27",
       "id": "urgencyreasoner_urgencyreasoner_constructor",
-      "community": 16,
+      "community": 0,
       "norm_label": ".constructor()"
     },
     {
@@ -2622,7 +2667,7 @@
       "source_file": "src\\cognition\\reasoning\\UrgencyReasoner.ts",
       "source_location": "L32",
       "id": "urgencyreasoner_urgencyreasoner_selectintention",
-      "community": 16,
+      "community": 0,
       "norm_label": ".selectintention()"
     },
     {
@@ -2703,7 +2748,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAgentActor.ts",
       "source_location": "L1",
       "id": "integrations_excalibur_excaliburagentactor_ts",
-      "community": 10,
+      "community": 1,
       "norm_label": "excaliburagentactor.ts"
     },
     {
@@ -2712,7 +2757,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAgentActor.ts",
       "source_location": "L20",
       "id": "excaliburagentactor_excaliburagentactor",
-      "community": 10,
+      "community": 1,
       "norm_label": "excaliburagentactor"
     },
     {
@@ -2721,7 +2766,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAgentActor.ts",
       "source_location": "L21",
       "id": "excaliburagentactor_excaliburagentactor_constructor",
-      "community": 10,
+      "community": 1,
       "norm_label": ".constructor()"
     },
     {
@@ -2730,7 +2775,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAgentActor.ts",
       "source_location": "L31",
       "id": "excaliburagentactor_excaliburagentactor_sync",
-      "community": 10,
+      "community": 1,
       "norm_label": ".sync()"
     },
     {
@@ -2739,7 +2784,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAnimationBridge.ts",
       "source_location": "L1",
       "id": "integrations_excalibur_excaliburanimationbridge_ts",
-      "community": 10,
+      "community": 1,
       "norm_label": "excaliburanimationbridge.ts"
     },
     {
@@ -2748,7 +2793,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAnimationBridge.ts",
       "source_location": "L33",
       "id": "excaliburanimationbridge_excaliburanimationbridge",
-      "community": 10,
+      "community": 0,
       "norm_label": "excaliburanimationbridge"
     },
     {
@@ -2757,7 +2802,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAnimationBridge.ts",
       "source_location": "L40",
       "id": "excaliburanimationbridge_excaliburanimationbridge_constructor",
-      "community": 10,
+      "community": 0,
       "norm_label": ".constructor()"
     },
     {
@@ -2766,7 +2811,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAnimationBridge.ts",
       "source_location": "L48",
       "id": "excaliburanimationbridge_excaliburanimationbridge_attach",
-      "community": 10,
+      "community": 0,
       "norm_label": ".attach()"
     },
     {
@@ -2775,7 +2820,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAnimationBridge.ts",
       "source_location": "L58",
       "id": "excaliburanimationbridge_excaliburanimationbridge_detach",
-      "community": 10,
+      "community": 0,
       "norm_label": ".detach()"
     },
     {
@@ -2784,7 +2829,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburAnimationBridge.ts",
       "source_location": "L63",
       "id": "excaliburanimationbridge_excaliburanimationbridge_applystate",
-      "community": 10,
+      "community": 0,
       "norm_label": ".applystate()"
     },
     {
@@ -2802,7 +2847,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburRemoteController.ts",
       "source_location": "L25",
       "id": "excaliburremotecontroller_excaliburremotecontroller",
-      "community": 17,
+      "community": 0,
       "norm_label": "excaliburremotecontroller"
     },
     {
@@ -2811,7 +2856,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburRemoteController.ts",
       "source_location": "L26",
       "id": "excaliburremotecontroller_excaliburremotecontroller_constructor",
-      "community": 17,
+      "community": 0,
       "norm_label": ".constructor()"
     },
     {
@@ -2820,7 +2865,7 @@
       "source_file": "src\\integrations\\excalibur\\ExcaliburRemoteController.ts",
       "source_location": "L34",
       "id": "excaliburremotecontroller_excaliburremotecontroller_pull",
-      "community": 17,
+      "community": 0,
       "norm_label": ".pull()"
     },
     {
@@ -2829,7 +2874,7 @@
       "source_file": "src\\integrations\\excalibur\\index.ts",
       "source_location": "L1",
       "id": "integrations_excalibur_index_ts",
-      "community": 31,
+      "community": 27,
       "norm_label": "index.ts"
     },
     {
@@ -2838,7 +2883,7 @@
       "source_file": "src\\integrations\\excalibur\\types.ts",
       "source_location": "L1",
       "id": "integrations_excalibur_types_ts",
-      "community": 10,
+      "community": 1,
       "norm_label": "types.ts"
     },
     {
@@ -2865,7 +2910,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L37",
       "id": "agemodel_agemodel",
-      "community": 0,
+      "community": 10,
       "norm_label": "agemodel"
     },
     {
@@ -2874,7 +2919,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L43",
       "id": "agemodel_agemodel_constructor",
-      "community": 0,
+      "community": 10,
       "norm_label": ".constructor()"
     },
     {
@@ -2883,7 +2928,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L51",
       "id": "agemodel_agemodel_ageseconds",
-      "community": 0,
+      "community": 10,
       "norm_label": ".ageseconds()"
     },
     {
@@ -2892,7 +2937,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L55",
       "id": "agemodel_agemodel_stage",
-      "community": 0,
+      "community": 10,
       "norm_label": ".stage()"
     },
     {
@@ -2901,7 +2946,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L64",
       "id": "agemodel_agemodel_advance",
-      "community": 0,
+      "community": 10,
       "norm_label": ".advance()"
     },
     {
@@ -2910,7 +2955,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L83",
       "id": "agemodel_agemodel_markdeceased",
-      "community": 0,
+      "community": 10,
       "norm_label": ".markdeceased()"
     },
     {
@@ -2919,7 +2964,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L91",
       "id": "agemodel_agemodel_snapshot",
-      "community": 0,
+      "community": 10,
       "norm_label": ".snapshot()"
     },
     {
@@ -2928,7 +2973,7 @@
       "source_file": "src\\lifecycle\\AgeModel.ts",
       "source_location": "L96",
       "id": "agemodel_agemodel_restore",
-      "community": 0,
+      "community": 10,
       "norm_label": ".restore()"
     },
     {
@@ -3000,7 +3045,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L8",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter",
-      "community": 4,
+      "community": 3,
       "norm_label": "inmemorymemoryadapter"
     },
     {
@@ -3009,7 +3054,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L11",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_save",
-      "community": 4,
+      "community": 3,
       "norm_label": ".save()"
     },
     {
@@ -3018,7 +3063,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L16",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_get",
-      "community": 4,
+      "community": 3,
       "norm_label": ".get()"
     },
     {
@@ -3027,7 +3072,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L20",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_query",
-      "community": 4,
+      "community": 3,
       "norm_label": ".query()"
     },
     {
@@ -3036,7 +3081,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L30",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_delete",
-      "community": 4,
+      "community": 3,
       "norm_label": ".delete()"
     },
     {
@@ -3045,7 +3090,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L35",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_count",
-      "community": 4,
+      "community": 3,
       "norm_label": ".count()"
     },
     {
@@ -3054,7 +3099,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L40",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_snapshot",
-      "community": 4,
+      "community": 3,
       "norm_label": ".snapshot()"
     },
     {
@@ -3063,7 +3108,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L45",
       "id": "inmemorymemoryadapter_inmemorymemoryadapter_restore",
-      "community": 4,
+      "community": 3,
       "norm_label": ".restore()"
     },
     {
@@ -3072,7 +3117,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L56",
       "id": "inmemorymemoryadapter_isinmemorymemoryadapter",
-      "community": 3,
+      "community": 6,
       "norm_label": "isinmemorymemoryadapter()"
     },
     {
@@ -3081,7 +3126,7 @@
       "source_file": "src\\memory\\InMemoryMemoryAdapter.ts",
       "source_location": "L60",
       "id": "inmemorymemoryadapter_matchesfilter",
-      "community": 4,
+      "community": 3,
       "norm_label": "matchesfilter()"
     },
     {
@@ -3099,7 +3144,7 @@
       "source_file": "src\\memory\\MemoryRepository.ts",
       "source_location": "L1",
       "id": "memory_memoryrepository_ts",
-      "community": 3,
+      "community": 1,
       "norm_label": "memoryrepository.ts"
     },
     {
@@ -3144,7 +3189,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L27",
       "id": "modifiers_modifiers",
-      "community": 16,
+      "community": 0,
       "norm_label": "modifiers"
     },
     {
@@ -3162,7 +3207,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L73",
       "id": "modifiers_modifiers_remove",
-      "community": 16,
+      "community": 0,
       "norm_label": ".remove()"
     },
     {
@@ -3171,7 +3216,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L82",
       "id": "modifiers_modifiers_removeall",
-      "community": 16,
+      "community": 0,
       "norm_label": ".removeall()"
     },
     {
@@ -3180,7 +3225,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L94",
       "id": "modifiers_modifiers_has",
-      "community": 16,
+      "community": 0,
       "norm_label": ".has()"
     },
     {
@@ -3189,7 +3234,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L98",
       "id": "modifiers_modifiers_list",
-      "community": 6,
+      "community": 5,
       "norm_label": ".list()"
     },
     {
@@ -3198,7 +3243,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L106",
       "id": "modifiers_modifiers_tick",
-      "community": 16,
+      "community": 0,
       "norm_label": ".tick()"
     },
     {
@@ -3207,7 +3252,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L130",
       "id": "modifiers_modifiers_decaymultiplier",
-      "community": 16,
+      "community": 0,
       "norm_label": ".decaymultiplier()"
     },
     {
@@ -3216,7 +3261,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L141",
       "id": "modifiers_modifiers_moodbias",
-      "community": 16,
+      "community": 0,
       "norm_label": ".moodbias()"
     },
     {
@@ -3225,7 +3270,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L149",
       "id": "modifiers_modifiers_skilleffectiveness",
-      "community": 16,
+      "community": 0,
       "norm_label": ".skilleffectiveness()"
     },
     {
@@ -3234,7 +3279,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L157",
       "id": "modifiers_modifiers_intentionbonus",
-      "community": 16,
+      "community": 0,
       "norm_label": ".intentionbonus()"
     },
     {
@@ -3243,7 +3288,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L167",
       "id": "modifiers_modifiers_locomotionspeedmultiplier",
-      "community": 16,
+      "community": 0,
       "norm_label": ".locomotionspeedmultiplier()"
     },
     {
@@ -3252,7 +3297,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L178",
       "id": "modifiers_modifiers_resolvenumeric",
-      "community": 16,
+      "community": 0,
       "norm_label": ".resolvenumeric()"
     },
     {
@@ -3261,7 +3306,7 @@
       "source_file": "src\\modifiers\\Modifiers.ts",
       "source_location": "L183",
       "id": "modifiers_modifiers_itereffects",
-      "community": 16,
+      "community": 0,
       "norm_label": ".itereffects()"
     },
     {
@@ -3288,7 +3333,7 @@
       "source_file": "src\\modifiers\\NumericModifierResolver.ts",
       "source_location": "L38",
       "id": "numericmodifierresolver_numericmodifierresolver_resolve",
-      "community": 4,
+      "community": 3,
       "norm_label": ".resolve()"
     },
     {
@@ -3297,7 +3342,7 @@
       "source_file": "src\\modifiers\\defineModifier.ts",
       "source_location": "L1",
       "id": "modifiers_definemodifier_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "definemodifier.ts"
     },
     {
@@ -3306,7 +3351,7 @@
       "source_file": "src\\modifiers\\defineModifier.ts",
       "source_location": "L45",
       "id": "definemodifier_definemodifier",
-      "community": 11,
+      "community": 9,
       "norm_label": "definemodifier()"
     },
     {
@@ -3315,7 +3360,7 @@
       "source_file": "src\\mood\\DefaultMoodModel.ts",
       "source_location": "L1",
       "id": "mood_defaultmoodmodel_ts",
-      "community": 3,
+      "community": 6,
       "norm_label": "defaultmoodmodel.ts"
     },
     {
@@ -3324,7 +3369,7 @@
       "source_file": "src\\mood\\DefaultMoodModel.ts",
       "source_location": "L18",
       "id": "defaultmoodmodel_defaultmoodmodel",
-      "community": 3,
+      "community": 6,
       "norm_label": "defaultmoodmodel"
     },
     {
@@ -3333,7 +3378,7 @@
       "source_file": "src\\mood\\DefaultMoodModel.ts",
       "source_location": "L19",
       "id": "defaultmoodmodel_defaultmoodmodel_evaluate",
-      "community": 3,
+      "community": 6,
       "norm_label": ".evaluate()"
     },
     {
@@ -3342,7 +3387,7 @@
       "source_file": "src\\mood\\DefaultMoodModel.ts",
       "source_location": "L34",
       "id": "defaultmoodmodel_computeavgurgency",
-      "community": 3,
+      "community": 6,
       "norm_label": "computeavgurgency()"
     },
     {
@@ -3351,7 +3396,7 @@
       "source_file": "src\\mood\\DefaultMoodModel.ts",
       "source_location": "L44",
       "id": "defaultmoodmodel_pickbasecategory",
-      "community": 3,
+      "community": 6,
       "norm_label": "pickbasecategory()"
     },
     {
@@ -3360,7 +3405,7 @@
       "source_file": "src\\mood\\DefaultMoodModel.ts",
       "source_location": "L58",
       "id": "defaultmoodmodel_applymodifierbias",
-      "community": 3,
+      "community": 6,
       "norm_label": "applymodifierbias()"
     },
     {
@@ -3387,7 +3432,7 @@
       "source_file": "src\\needs\\ActiveNeedsPolicy.ts",
       "source_location": "L1",
       "id": "needs_activeneedspolicy_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "activeneedspolicy.ts"
     },
     {
@@ -3423,7 +3468,7 @@
       "source_file": "src\\needs\\ComposedNeedsPolicy.ts",
       "source_location": "L1",
       "id": "needs_composedneedspolicy_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "composedneedspolicy.ts"
     },
     {
@@ -3459,7 +3504,7 @@
       "source_file": "src\\needs\\ExpressiveNeedsPolicy.ts",
       "source_location": "L1",
       "id": "needs_expressiveneedspolicy_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "expressiveneedspolicy.ts"
     },
     {
@@ -3495,7 +3540,7 @@
       "source_file": "src\\needs\\Need.ts",
       "source_location": "L1",
       "id": "needs_need_ts",
-      "community": 1,
+      "community": 6,
       "norm_label": "need.ts"
     },
     {
@@ -3504,7 +3549,7 @@
       "source_file": "src\\needs\\Need.ts",
       "source_location": "L40",
       "id": "need_default_urgency_curve",
-      "community": 3,
+      "community": 6,
       "norm_label": "default_urgency_curve()"
     },
     {
@@ -3513,7 +3558,7 @@
       "source_file": "src\\needs\\Need.ts",
       "source_location": "L42",
       "id": "need_clamp01",
-      "community": 3,
+      "community": 6,
       "norm_label": "clamp01()"
     },
     {
@@ -3522,7 +3567,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L1",
       "id": "needs_needs_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "needs.ts"
     },
     {
@@ -3531,7 +3576,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L18",
       "id": "needs_needs",
-      "community": 3,
+      "community": 6,
       "norm_label": "needs"
     },
     {
@@ -3540,7 +3585,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L21",
       "id": "needs_needs_constructor",
-      "community": 3,
+      "community": 6,
       "norm_label": ".constructor()"
     },
     {
@@ -3549,7 +3594,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L28",
       "id": "needs_needs_register",
-      "community": 3,
+      "community": 6,
       "norm_label": ".register()"
     },
     {
@@ -3558,7 +3603,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L32",
       "id": "needs_needs_has",
-      "community": 3,
+      "community": 6,
       "norm_label": ".has()"
     },
     {
@@ -3567,7 +3612,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L36",
       "id": "needs_needs_get",
-      "community": 3,
+      "community": 6,
       "norm_label": ".get()"
     },
     {
@@ -3576,7 +3621,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L40",
       "id": "needs_needs_list",
-      "community": 3,
+      "community": 6,
       "norm_label": ".list()"
     },
     {
@@ -3585,7 +3630,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L48",
       "id": "needs_needs_tick",
-      "community": 3,
+      "community": 6,
       "norm_label": ".tick()"
     },
     {
@@ -3594,7 +3639,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L67",
       "id": "needs_needs_satisfy",
-      "community": 3,
+      "community": 6,
       "norm_label": ".satisfy()"
     },
     {
@@ -3603,7 +3648,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L79",
       "id": "needs_needs_snapshot",
-      "community": 3,
+      "community": 0,
       "norm_label": ".snapshot()"
     },
     {
@@ -3612,7 +3657,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L88",
       "id": "needs_needs_restore",
-      "community": 3,
+      "community": 6,
       "norm_label": ".restore()"
     },
     {
@@ -3621,7 +3666,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L97",
       "id": "needs_needs_urgency",
-      "community": 3,
+      "community": 6,
       "norm_label": ".urgency()"
     },
     {
@@ -3630,7 +3675,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L108",
       "id": "needs_needs_mosturgent",
-      "community": 3,
+      "community": 6,
       "norm_label": ".mosturgent()"
     },
     {
@@ -3639,7 +3684,7 @@
       "source_file": "src\\needs\\Needs.ts",
       "source_location": "L121",
       "id": "needs_needs_builddelta",
-      "community": 3,
+      "community": 6,
       "norm_label": ".builddelta()"
     },
     {
@@ -3648,7 +3693,7 @@
       "source_file": "src\\needs\\NeedsPolicy.ts",
       "source_location": "L1",
       "id": "needs_needspolicy_ts",
-      "community": 1,
+      "community": 5,
       "norm_label": "needspolicy.ts"
     },
     {
@@ -3657,7 +3702,7 @@
       "source_file": "src\\persistence\\AgentSnapshot.ts",
       "source_location": "L1",
       "id": "persistence_agentsnapshot_ts",
-      "community": 13,
+      "community": 3,
       "norm_label": "agentsnapshot.ts"
     },
     {
@@ -3747,7 +3792,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L1",
       "id": "persistence_fssnapshotstore_ts",
-      "community": 13,
+      "community": 12,
       "norm_label": "fssnapshotstore.ts"
     },
     {
@@ -3756,7 +3801,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L29",
       "id": "fssnapshotstore_fssnapshotstore",
-      "community": 13,
+      "community": 12,
       "norm_label": "fssnapshotstore"
     },
     {
@@ -3765,7 +3810,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L35",
       "id": "fssnapshotstore_fssnapshotstore_constructor",
-      "community": 13,
+      "community": 12,
       "norm_label": ".constructor()"
     },
     {
@@ -3774,7 +3819,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L41",
       "id": "fssnapshotstore_fssnapshotstore_save",
-      "community": 13,
+      "community": 12,
       "norm_label": ".save()"
     },
     {
@@ -3783,7 +3828,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L46",
       "id": "fssnapshotstore_fssnapshotstore_load",
-      "community": 13,
+      "community": 12,
       "norm_label": ".load()"
     },
     {
@@ -3792,7 +3837,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L56",
       "id": "fssnapshotstore_fssnapshotstore_list",
-      "community": 13,
+      "community": 12,
       "norm_label": ".list()"
     },
     {
@@ -3801,7 +3846,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L81",
       "id": "fssnapshotstore_fssnapshotstore_delete",
-      "community": 13,
+      "community": 12,
       "norm_label": ".delete()"
     },
     {
@@ -3810,7 +3855,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L89",
       "id": "fssnapshotstore_fssnapshotstore_ensuredir",
-      "community": 13,
+      "community": 12,
       "norm_label": ".ensuredir()"
     },
     {
@@ -3819,7 +3864,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L95",
       "id": "fssnapshotstore_fssnapshotstore_pathfor",
-      "community": 13,
+      "community": 12,
       "norm_label": ".pathfor()"
     },
     {
@@ -3828,7 +3873,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L112",
       "id": "fssnapshotstore_encodekey",
-      "community": 13,
+      "community": 12,
       "norm_label": "encodekey()"
     },
     {
@@ -3837,7 +3882,7 @@
       "source_file": "src\\persistence\\FsSnapshotStore.ts",
       "source_location": "L137",
       "id": "fssnapshotstore_decodekey",
-      "community": 13,
+      "community": 12,
       "norm_label": "decodekey()"
     },
     {
@@ -3846,7 +3891,7 @@
       "source_file": "src\\persistence\\InMemorySnapshotStore.ts",
       "source_location": "L1",
       "id": "persistence_inmemorysnapshotstore_ts",
-      "community": 13,
+      "community": 3,
       "norm_label": "inmemorysnapshotstore.ts"
     },
     {
@@ -3855,7 +3900,7 @@
       "source_file": "src\\persistence\\InMemorySnapshotStore.ts",
       "source_location": "L8",
       "id": "inmemorysnapshotstore_inmemorysnapshotstore",
-      "community": 4,
+      "community": 3,
       "norm_label": "inmemorysnapshotstore"
     },
     {
@@ -3864,7 +3909,7 @@
       "source_file": "src\\persistence\\InMemorySnapshotStore.ts",
       "source_location": "L11",
       "id": "inmemorysnapshotstore_inmemorysnapshotstore_save",
-      "community": 4,
+      "community": 3,
       "norm_label": ".save()"
     },
     {
@@ -3873,7 +3918,7 @@
       "source_file": "src\\persistence\\InMemorySnapshotStore.ts",
       "source_location": "L17",
       "id": "inmemorysnapshotstore_inmemorysnapshotstore_load",
-      "community": 4,
+      "community": 2,
       "norm_label": ".load()"
     },
     {
@@ -3882,7 +3927,7 @@
       "source_file": "src\\persistence\\InMemorySnapshotStore.ts",
       "source_location": "L22",
       "id": "inmemorysnapshotstore_inmemorysnapshotstore_list",
-      "community": 4,
+      "community": 3,
       "norm_label": ".list()"
     },
     {
@@ -3891,7 +3936,7 @@
       "source_file": "src\\persistence\\InMemorySnapshotStore.ts",
       "source_location": "L26",
       "id": "inmemorysnapshotstore_inmemorysnapshotstore_delete",
-      "community": 4,
+      "community": 3,
       "norm_label": ".delete()"
     },
     {
@@ -3900,7 +3945,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L1",
       "id": "persistence_localstoragesnapshotstore_ts",
-      "community": 13,
+      "community": 3,
       "norm_label": "localstoragesnapshotstore.ts"
     },
     {
@@ -3909,7 +3954,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L49",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore",
-      "community": 4,
+      "community": 3,
       "norm_label": "localstoragesnapshotstore"
     },
     {
@@ -3918,7 +3963,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L53",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_constructor",
-      "community": 13,
+      "community": 3,
       "norm_label": ".constructor()"
     },
     {
@@ -3927,7 +3972,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L74",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_save",
-      "community": 4,
+      "community": 3,
       "norm_label": ".save()"
     },
     {
@@ -3936,7 +3981,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L86",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_load",
-      "community": 4,
+      "community": 3,
       "norm_label": ".load()"
     },
     {
@@ -3945,7 +3990,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L102",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_list",
-      "community": 4,
+      "community": 3,
       "norm_label": ".list()"
     },
     {
@@ -3954,7 +3999,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L106",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_delete",
-      "community": 4,
+      "community": 3,
       "norm_label": ".delete()"
     },
     {
@@ -3963,7 +4008,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L118",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_datakey",
-      "community": 4,
+      "community": 3,
       "norm_label": ".datakey()"
     },
     {
@@ -3972,7 +4017,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L133",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_indexkey",
-      "community": 4,
+      "community": 3,
       "norm_label": ".indexkey()"
     },
     {
@@ -3981,7 +4026,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L137",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_appendindex",
-      "community": 4,
+      "community": 3,
       "norm_label": ".appendindex()"
     },
     {
@@ -3990,7 +4035,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L143",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_removefromindex",
-      "community": 4,
+      "community": 3,
       "norm_label": ".removefromindex()"
     },
     {
@@ -3999,7 +4044,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L148",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_readindex",
-      "community": 4,
+      "community": 3,
       "norm_label": ".readindex()"
     },
     {
@@ -4008,7 +4053,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L159",
       "id": "localstoragesnapshotstore_localstoragesnapshotstore_writeindex",
-      "community": 4,
+      "community": 3,
       "norm_label": ".writeindex()"
     },
     {
@@ -4017,7 +4062,7 @@
       "source_file": "src\\persistence\\LocalStorageSnapshotStore.ts",
       "source_location": "L164",
       "id": "localstoragesnapshotstore_resolvebrowserstorage",
-      "community": 13,
+      "community": 3,
       "norm_label": "resolvebrowserstorage()"
     },
     {
@@ -4026,7 +4071,7 @@
       "source_file": "src\\persistence\\SnapshotStorePort.ts",
       "source_location": "L1",
       "id": "persistence_snapshotstoreport_ts",
-      "community": 13,
+      "community": 3,
       "norm_label": "snapshotstoreport.ts"
     },
     {
@@ -4053,7 +4098,7 @@
       "source_file": "src\\persistence\\migrateSnapshot.ts",
       "source_location": "L1",
       "id": "persistence_migratesnapshot_ts",
-      "community": 8,
+      "community": 3,
       "norm_label": "migratesnapshot.ts"
     },
     {
@@ -4062,7 +4107,7 @@
       "source_file": "src\\persistence\\migrateSnapshot.ts",
       "source_location": "L26",
       "id": "migratesnapshot_migratesnapshot",
-      "community": 8,
+      "community": 3,
       "norm_label": "migratesnapshot()"
     },
     {
@@ -4071,7 +4116,7 @@
       "source_file": "src\\persistence\\offlineCatchUp.ts",
       "source_location": "L1",
       "id": "persistence_offlinecatchup_ts",
-      "community": 3,
+      "community": 6,
       "norm_label": "offlinecatchup.ts"
     },
     {
@@ -4080,7 +4125,7 @@
       "source_file": "src\\persistence\\offlineCatchUp.ts",
       "source_location": "L34",
       "id": "offlinecatchup_runcatchup",
-      "community": 3,
+      "community": 6,
       "norm_label": "runcatchup()"
     },
     {
@@ -4089,7 +4134,7 @@
       "source_file": "src\\persistence\\pickDefaultSnapshotStore.ts",
       "source_location": "L1",
       "id": "persistence_pickdefaultsnapshotstore_ts",
-      "community": 13,
+      "community": 3,
       "norm_label": "pickdefaultsnapshotstore.ts"
     },
     {
@@ -4098,7 +4143,7 @@
       "source_file": "src\\persistence\\pickDefaultSnapshotStore.ts",
       "source_location": "L18",
       "id": "pickdefaultsnapshotstore_pickdefaultsnapshotstore",
-      "community": 13,
+      "community": 3,
       "norm_label": "pickdefaultsnapshotstore()"
     },
     {
@@ -4107,7 +4152,7 @@
       "source_file": "src\\persistence\\pickDefaultSnapshotStore.ts",
       "source_location": "L31",
       "id": "pickdefaultsnapshotstore_hasbrowserlocalstorage",
-      "community": 13,
+      "community": 3,
       "norm_label": "hasbrowserlocalstorage()"
     },
     {
@@ -4116,7 +4161,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L1",
       "id": "ports_consolelogger_ts",
-      "community": 19,
+      "community": 17,
       "norm_label": "consolelogger.ts"
     },
     {
@@ -4125,7 +4170,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L16",
       "id": "consolelogger_consolelogger",
-      "community": 19,
+      "community": 17,
       "norm_label": "consolelogger"
     },
     {
@@ -4134,7 +4179,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L20",
       "id": "consolelogger_consolelogger_constructor",
-      "community": 19,
+      "community": 17,
       "norm_label": ".constructor()"
     },
     {
@@ -4143,7 +4188,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L25",
       "id": "consolelogger_consolelogger_debug",
-      "community": 19,
+      "community": 17,
       "norm_label": ".debug()"
     },
     {
@@ -4152,7 +4197,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L29",
       "id": "consolelogger_consolelogger_info",
-      "community": 19,
+      "community": 17,
       "norm_label": ".info()"
     },
     {
@@ -4161,7 +4206,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L33",
       "id": "consolelogger_consolelogger_warn",
-      "community": 19,
+      "community": 17,
       "norm_label": ".warn()"
     },
     {
@@ -4170,7 +4215,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L37",
       "id": "consolelogger_consolelogger_error",
-      "community": 19,
+      "community": 17,
       "norm_label": ".error()"
     },
     {
@@ -4179,7 +4224,7 @@
       "source_file": "src\\ports\\ConsoleLogger.ts",
       "source_location": "L41",
       "id": "consolelogger_consolelogger_write",
-      "community": 19,
+      "community": 17,
       "norm_label": ".write()"
     },
     {
@@ -4188,7 +4233,7 @@
       "source_file": "src\\ports\\LlmProviderPort.ts",
       "source_location": "L1",
       "id": "ports_llmproviderport_ts",
-      "community": 8,
+      "community": 15,
       "norm_label": "llmproviderport.ts"
     },
     {
@@ -4206,7 +4251,7 @@
       "source_file": "src\\ports\\Logger.ts",
       "source_location": "L14",
       "id": "logger_nulllogger",
-      "community": 21,
+      "community": 0,
       "norm_label": "nulllogger"
     },
     {
@@ -4215,7 +4260,7 @@
       "source_file": "src\\ports\\Logger.ts",
       "source_location": "L15",
       "id": "logger_nulllogger_debug",
-      "community": 21,
+      "community": 0,
       "norm_label": ".debug()"
     },
     {
@@ -4224,7 +4269,7 @@
       "source_file": "src\\ports\\Logger.ts",
       "source_location": "L16",
       "id": "logger_nulllogger_info",
-      "community": 21,
+      "community": 0,
       "norm_label": ".info()"
     },
     {
@@ -4233,7 +4278,7 @@
       "source_file": "src\\ports\\Logger.ts",
       "source_location": "L17",
       "id": "logger_nulllogger_warn",
-      "community": 21,
+      "community": 0,
       "norm_label": ".warn()"
     },
     {
@@ -4242,7 +4287,7 @@
       "source_file": "src\\ports\\Logger.ts",
       "source_location": "L18",
       "id": "logger_nulllogger_error",
-      "community": 21,
+      "community": 0,
       "norm_label": ".error()"
     },
     {
@@ -4251,7 +4296,7 @@
       "source_file": "src\\ports\\ManualClock.ts",
       "source_location": "L1",
       "id": "ports_manualclock_ts",
-      "community": 18,
+      "community": 3,
       "norm_label": "manualclock.ts"
     },
     {
@@ -4260,7 +4305,7 @@
       "source_file": "src\\ports\\ManualClock.ts",
       "source_location": "L7",
       "id": "manualclock_manualclock",
-      "community": 18,
+      "community": 3,
       "norm_label": "manualclock"
     },
     {
@@ -4269,7 +4314,7 @@
       "source_file": "src\\ports\\ManualClock.ts",
       "source_location": "L10",
       "id": "manualclock_manualclock_constructor",
-      "community": 18,
+      "community": 3,
       "norm_label": ".constructor()"
     },
     {
@@ -4278,7 +4323,7 @@
       "source_file": "src\\ports\\ManualClock.ts",
       "source_location": "L14",
       "id": "manualclock_manualclock_now",
-      "community": 18,
+      "community": 3,
       "norm_label": ".now()"
     },
     {
@@ -4287,7 +4332,7 @@
       "source_file": "src\\ports\\ManualClock.ts",
       "source_location": "L19",
       "id": "manualclock_manualclock_advance",
-      "community": 18,
+      "community": 3,
       "norm_label": ".advance()"
     },
     {
@@ -4296,7 +4341,7 @@
       "source_file": "src\\ports\\ManualClock.ts",
       "source_location": "L27",
       "id": "manualclock_manualclock_set",
-      "community": 4,
+      "community": 3,
       "norm_label": ".set()"
     },
     {
@@ -4305,7 +4350,7 @@
       "source_file": "src\\ports\\MockLlmProvider.ts",
       "source_location": "L1",
       "id": "ports_mockllmprovider_ts",
-      "community": 8,
+      "community": 15,
       "norm_label": "mockllmprovider.ts"
     },
     {
@@ -4314,7 +4359,7 @@
       "source_file": "src\\ports\\MockLlmProvider.ts",
       "source_location": "L61",
       "id": "mockllmprovider_mockllmprovider",
-      "community": 8,
+      "community": 15,
       "norm_label": "mockllmprovider"
     },
     {
@@ -4323,7 +4368,7 @@
       "source_file": "src\\ports\\MockLlmProvider.ts",
       "source_location": "L67",
       "id": "mockllmprovider_mockllmprovider_constructor",
-      "community": 8,
+      "community": 15,
       "norm_label": ".constructor()"
     },
     {
@@ -4332,7 +4377,7 @@
       "source_file": "src\\ports\\MockLlmProvider.ts",
       "source_location": "L83",
       "id": "mockllmprovider_mockllmprovider_complete",
-      "community": 8,
+      "community": 15,
       "norm_label": ".complete()"
     },
     {
@@ -4341,52 +4386,88 @@
       "source_file": "src\\ports\\MockLlmProvider.ts",
       "source_location": "L92",
       "id": "mockllmprovider_mockllmprovider_completesync",
-      "community": 8,
+      "community": 15,
       "norm_label": ".completesync()"
     },
     {
       "label": ".pickScript()",
       "file_type": "code",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L132",
+      "source_location": "L104",
       "id": "mockllmprovider_mockllmprovider_pickscript",
-      "community": 8,
+      "community": 15,
       "norm_label": ".pickscript()"
+    },
+    {
+      "label": "abortStub()",
+      "file_type": "code",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L129",
+      "id": "mockllmprovider_abortstub",
+      "community": 15,
+      "norm_label": "abortstub()"
+    },
+    {
+      "label": "runScript()",
+      "file_type": "code",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L143",
+      "id": "mockllmprovider_runscript",
+      "community": 15,
+      "norm_label": "runscript()"
+    },
+    {
+      "label": "pickFromMatchOrError()",
+      "file_type": "code",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L182",
+      "id": "mockllmprovider_pickfrommatchorerror",
+      "community": 15,
+      "norm_label": "pickfrommatchorerror()"
+    },
+    {
+      "label": "pickFromQueue()",
+      "file_type": "code",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L207",
+      "id": "mockllmprovider_pickfromqueue",
+      "community": 15,
+      "norm_label": "pickfromqueue()"
     },
     {
       "label": "enforceBudget()",
       "file_type": "code",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L176",
+      "source_location": "L228",
       "id": "mockllmprovider_enforcebudget",
-      "community": 8,
+      "community": 15,
       "norm_label": "enforcebudget()"
     },
     {
       "label": "buildUsage()",
       "file_type": "code",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L204",
+      "source_location": "L256",
       "id": "mockllmprovider_buildusage",
-      "community": 8,
+      "community": 15,
       "norm_label": "buildusage()"
     },
     {
       "label": "estimateTokens()",
       "file_type": "code",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L223",
+      "source_location": "L275",
       "id": "mockllmprovider_estimatetokens",
-      "community": 8,
+      "community": 15,
       "norm_label": "estimatetokens()"
     },
     {
       "label": "estimateTokensFor()",
       "file_type": "code",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L229",
+      "source_location": "L281",
       "id": "mockllmprovider_estimatetokensfor",
-      "community": 8,
+      "community": 15,
       "norm_label": "estimatetokensfor()"
     },
     {
@@ -4404,7 +4485,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L1",
       "id": "ports_seededrng_ts",
-      "community": 15,
+      "community": 14,
       "norm_label": "seededrng.ts"
     },
     {
@@ -4413,7 +4494,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L12",
       "id": "seededrng_seededrng",
-      "community": 15,
+      "community": 14,
       "norm_label": "seededrng"
     },
     {
@@ -4422,7 +4503,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L18",
       "id": "seededrng_seededrng_constructor",
-      "community": 15,
+      "community": 14,
       "norm_label": ".constructor()"
     },
     {
@@ -4431,7 +4512,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L28",
       "id": "seededrng_seededrng_next",
-      "community": 15,
+      "community": 14,
       "norm_label": ".next()"
     },
     {
@@ -4440,7 +4521,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L47",
       "id": "seededrng_seededrng_int",
-      "community": 15,
+      "community": 14,
       "norm_label": ".int()"
     },
     {
@@ -4449,7 +4530,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L57",
       "id": "seededrng_seededrng_chance",
-      "community": 15,
+      "community": 14,
       "norm_label": ".chance()"
     },
     {
@@ -4458,7 +4539,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L63",
       "id": "seededrng_seededrng_pick",
-      "community": 15,
+      "community": 14,
       "norm_label": ".pick()"
     },
     {
@@ -4467,7 +4548,7 @@
       "source_file": "src\\ports\\SeededRng.ts",
       "source_location": "L77",
       "id": "seededrng_hashseed",
-      "community": 15,
+      "community": 14,
       "norm_label": "hashseed()"
     },
     {
@@ -4476,7 +4557,7 @@
       "source_file": "src\\ports\\SystemClock.ts",
       "source_location": "L1",
       "id": "ports_systemclock_ts",
-      "community": 9,
+      "community": 2,
       "norm_label": "systemclock.ts"
     },
     {
@@ -4485,7 +4566,7 @@
       "source_file": "src\\ports\\SystemClock.ts",
       "source_location": "L6",
       "id": "systemclock_systemclock",
-      "community": 9,
+      "community": 2,
       "norm_label": "systemclock"
     },
     {
@@ -4611,7 +4692,7 @@
       "source_file": "src\\randomEvents\\fxHint.ts",
       "source_location": "L1",
       "id": "randomevents_fxhint_ts",
-      "community": 24,
+      "community": 1,
       "norm_label": "fxhint.ts"
     },
     {
@@ -4620,7 +4701,7 @@
       "source_file": "src\\randomEvents\\fxHint.ts",
       "source_location": "L8",
       "id": "fxhint_withfxhint",
-      "community": 24,
+      "community": 1,
       "norm_label": "withfxhint()"
     },
     {
@@ -4629,7 +4710,7 @@
       "source_file": "src\\randomEvents\\fxHint.ts",
       "source_location": "L13",
       "id": "fxhint_getfxhint",
-      "community": 24,
+      "community": 1,
       "norm_label": "getfxhint()"
     },
     {
@@ -4638,7 +4719,7 @@
       "source_file": "src\\skills\\Skill.ts",
       "source_location": "L1",
       "id": "skills_skill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "skill.ts"
     },
     {
@@ -4647,7 +4728,7 @@
       "source_file": "src\\skills\\SkillContext.ts",
       "source_location": "L1",
       "id": "skills_skillcontext_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "skillcontext.ts"
     },
     {
@@ -4656,7 +4737,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L1",
       "id": "skills_skillregistry_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "skillregistry.ts"
     },
     {
@@ -4665,7 +4746,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L17",
       "id": "skillregistry_skillregistry",
-      "community": 4,
+      "community": 12,
       "norm_label": "skillregistry"
     },
     {
@@ -4674,7 +4755,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L24",
       "id": "skillregistry_skillregistry_register",
-      "community": 4,
+      "community": 12,
       "norm_label": ".register()"
     },
     {
@@ -4683,7 +4764,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L36",
       "id": "skillregistry_skillregistry_registerall",
-      "community": 4,
+      "community": 12,
       "norm_label": ".registerall()"
     },
     {
@@ -4692,7 +4773,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L45",
       "id": "skillregistry_skillregistry_replace",
-      "community": 4,
+      "community": 12,
       "norm_label": ".replace()"
     },
     {
@@ -4701,7 +4782,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L49",
       "id": "skillregistry_skillregistry_has",
-      "community": 4,
+      "community": 12,
       "norm_label": ".has()"
     },
     {
@@ -4710,7 +4791,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L53",
       "id": "skillregistry_skillregistry_get",
-      "community": 4,
+      "community": 12,
       "norm_label": ".get()"
     },
     {
@@ -4719,7 +4800,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L57",
       "id": "skillregistry_skillregistry_list",
-      "community": 4,
+      "community": 12,
       "norm_label": ".list()"
     },
     {
@@ -4728,7 +4809,7 @@
       "source_file": "src\\skills\\SkillRegistry.ts",
       "source_location": "L69",
       "id": "skillregistry_skillregistry_invoke",
-      "community": 4,
+      "community": 12,
       "norm_label": ".invoke()"
     },
     {
@@ -4737,7 +4818,7 @@
       "source_file": "src\\skills\\defaults\\CleanSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_cleanskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "cleanskill.ts"
     },
     {
@@ -4746,7 +4827,7 @@
       "source_file": "src\\skills\\defaults\\ExpressMeowSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_expressmeowskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "expressmeowskill.ts"
     },
     {
@@ -4755,7 +4836,7 @@
       "source_file": "src\\skills\\defaults\\ExpressSadSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_expresssadskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "expresssadskill.ts"
     },
     {
@@ -4764,7 +4845,7 @@
       "source_file": "src\\skills\\defaults\\ExpressSleepySkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_expresssleepyskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "expresssleepyskill.ts"
     },
     {
@@ -4773,7 +4854,7 @@
       "source_file": "src\\skills\\defaults\\ExpressionSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_expressionskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "expressionskill.ts"
     },
     {
@@ -4782,7 +4863,7 @@
       "source_file": "src\\skills\\defaults\\ExpressionSkill.ts",
       "source_location": "L16",
       "id": "expressionskill_createexpressionskill",
-      "community": 11,
+      "community": 9,
       "norm_label": "createexpressionskill()"
     },
     {
@@ -4791,7 +4872,7 @@
       "source_file": "src\\skills\\defaults\\FeedSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_feedskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "feedskill.ts"
     },
     {
@@ -4800,7 +4881,7 @@
       "source_file": "src\\skills\\defaults\\MedicateSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_medicateskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "medicateskill.ts"
     },
     {
@@ -4809,7 +4890,7 @@
       "source_file": "src\\skills\\defaults\\PetSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_petskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "petskill.ts"
     },
     {
@@ -4818,7 +4899,7 @@
       "source_file": "src\\skills\\defaults\\PlaySkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_playskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "playskill.ts"
     },
     {
@@ -4827,7 +4908,7 @@
       "source_file": "src\\skills\\defaults\\RestSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_restskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "restskill.ts"
     },
     {
@@ -4836,7 +4917,7 @@
       "source_file": "src\\skills\\defaults\\ScoldSkill.ts",
       "source_location": "L1",
       "id": "skills_defaults_scoldskill_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "scoldskill.ts"
     },
     {
@@ -4845,7 +4926,7 @@
       "source_file": "src\\skills\\defaults\\effectiveness.ts",
       "source_location": "L1",
       "id": "skills_defaults_effectiveness_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "effectiveness.ts"
     },
     {
@@ -4854,7 +4935,7 @@
       "source_file": "src\\skills\\defaults\\effectiveness.ts",
       "source_location": "L8",
       "id": "effectiveness_effectivenessfor",
-      "community": 11,
+      "community": 9,
       "norm_label": "effectivenessfor()"
     },
     {
@@ -4863,7 +4944,7 @@
       "source_file": "src\\skills\\defaults\\index.ts",
       "source_location": "L1",
       "id": "skills_defaults_index_ts",
-      "community": 11,
+      "community": 9,
       "norm_label": "index.ts"
     },
     {
@@ -4872,7 +4953,7 @@
       "source_file": "src\\species\\SpeciesDescriptor.ts",
       "source_location": "L1",
       "id": "species_speciesdescriptor_ts",
-      "community": 1,
+      "community": 2,
       "norm_label": "speciesdescriptor.ts"
     },
     {
@@ -4881,7 +4962,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L1",
       "id": "species_speciesregistry_ts",
-      "community": 1,
+      "community": 2,
       "norm_label": "speciesregistry.ts"
     },
     {
@@ -4890,7 +4971,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L13",
       "id": "speciesregistry_speciesregistry",
-      "community": 9,
+      "community": 2,
       "norm_label": "speciesregistry"
     },
     {
@@ -4899,7 +4980,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L16",
       "id": "speciesregistry_speciesregistry_register",
-      "community": 9,
+      "community": 2,
       "norm_label": ".register()"
     },
     {
@@ -4908,7 +4989,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L23",
       "id": "speciesregistry_speciesregistry_registerall",
-      "community": 9,
+      "community": 2,
       "norm_label": ".registerall()"
     },
     {
@@ -4917,7 +4998,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L27",
       "id": "speciesregistry_speciesregistry_has",
-      "community": 9,
+      "community": 2,
       "norm_label": ".has()"
     },
     {
@@ -4926,7 +5007,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L31",
       "id": "speciesregistry_speciesregistry_get",
-      "community": 9,
+      "community": 2,
       "norm_label": ".get()"
     },
     {
@@ -4935,7 +5016,7 @@
       "source_file": "src\\species\\SpeciesRegistry.ts",
       "source_location": "L35",
       "id": "speciesregistry_speciesregistry_require",
-      "community": 9,
+      "community": 2,
       "norm_label": ".require()"
     },
     {
@@ -4953,7 +5034,7 @@
       "source_file": "src\\species\\defineSpecies.ts",
       "source_location": "L1",
       "id": "species_definespecies_ts",
-      "community": 8,
+      "community": 2,
       "norm_label": "definespecies.ts"
     },
     {
@@ -4962,7 +5043,7 @@
       "source_file": "src\\species\\defineSpecies.ts",
       "source_location": "L10",
       "id": "definespecies_definespecies",
-      "community": 8,
+      "community": 2,
       "norm_label": "definespecies()"
     },
     {
@@ -4974,7 +5055,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 32,
+      "community": 28,
       "norm_label": "registry is deliberately local (no global singleton)",
       "id": "rationale_species_registry_local"
     },
@@ -4987,7 +5068,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 33,
+      "community": 29,
       "norm_label": "definespecies validates duplicate need ids and lifecycle stages",
       "id": "rationale_define_species_validation"
     },
@@ -5000,7 +5081,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "publishing.md",
       "id": "doc_publishing"
     },
@@ -5013,7 +5094,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "branch model (main/develop/demo)",
       "id": "concept_branch_model"
     },
@@ -5026,7 +5107,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "branch protection checklist",
       "id": "concept_branch_protection"
     },
@@ -5039,7 +5120,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "release-candidate.yml workflow",
       "id": "concept_release_candidate"
     },
@@ -5052,7 +5133,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "npm provenance attestation",
       "id": "concept_npm_provenance"
     },
@@ -5065,7 +5146,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "changesets (semver bump + summary)",
       "id": "concept_changesets"
     },
@@ -5078,7 +5159,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "release.yml automated release",
       "id": "concept_release_workflow"
     },
@@ -5091,7 +5172,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "first release v1.0.0 setup",
       "id": "concept_first_release_v1"
     },
@@ -5104,7 +5185,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "demo deployment (github pages)",
       "id": "concept_demo_deployment"
     },
@@ -5117,7 +5198,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "size-limit bundle budget (gzip)",
       "id": "concept_size_limit_budget"
     },
@@ -5130,7 +5211,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "rolling back via npm deprecate (no unpublish)",
       "id": "concept_rolling_back_deprecate"
     },
@@ -5143,7 +5224,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "demo branch decoupled from main so docs/demo updates ship without cutting release",
       "id": "rationale_demo_decoupled"
     },
@@ -5156,7 +5237,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "release-candidate not required on main because workflow only runs on release/v* branches",
       "id": "rationale_main_no_release_check"
     },
@@ -5169,7 +5250,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "never npm unpublish a\u20ac\u201d breaks existing installs; deprecate instead",
       "id": "rationale_no_unpublish"
     },
@@ -5182,7 +5263,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "readme.md",
       "id": "doc_readme"
     },
@@ -5195,7 +5276,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "agent class deterministic tick pipeline",
       "id": "concept_agent_class_overview"
     },
@@ -5208,7 +5289,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "interaction flow (agent.interact)",
       "id": "concept_interaction_flow"
     },
@@ -5221,7 +5302,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "defaultpetinteractionmodule",
       "id": "concept_default_pet_module"
     },
@@ -5234,7 +5315,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "determinism contract",
       "id": "concept_determinism_contract"
     },
@@ -5247,7 +5328,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "bindagenttostore",
       "id": "concept_reactive_store_binding"
     },
@@ -5260,7 +5341,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "llmproviderport (preview)",
       "id": "concept_llm_provider_port_preview"
     },
@@ -5273,7 +5354,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "mockllmprovider",
       "id": "concept_mock_llm_provider"
     },
@@ -5286,7 +5367,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "style_guide.md",
       "id": "doc_style_guide"
     },
@@ -5299,7 +5380,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "strict ts mode (exactoptionalpropertytypes etc.)",
       "id": "rule_strict_ts_mode"
     },
@@ -5312,7 +5393,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "esm only with .js extensions",
       "id": "rule_esm_only"
     },
@@ -5325,7 +5406,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "prefer type over interface",
       "id": "rule_type_over_interface"
     },
@@ -5338,7 +5419,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "no enums; use as const unions",
       "id": "rule_no_enums"
     },
@@ -5351,7 +5432,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "unknown over any",
       "id": "rule_unknown_over_any"
     },
@@ -5364,7 +5445,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "no default exports",
       "id": "rule_no_default_exports"
     },
@@ -5377,7 +5458,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "jsdoc on every exported symbol",
       "id": "rule_jsdoc_exports"
     },
@@ -5390,7 +5471,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "seed everything in tests (seededrng + manualclock)",
       "id": "rule_test_seeding"
     },
@@ -5403,7 +5484,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "r-27 flagged files (sub-agent authored)",
       "id": "concept_r27_flagged_files"
     },
@@ -5416,7 +5497,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "enums are a runtime payload for compile-time concept; conflict with determinism",
       "id": "rationale_no_enums_runtime_payload"
     },
@@ -5429,7 +5510,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "default exports break re-exporting and grep",
       "id": "rationale_no_default_exports"
     },
@@ -5442,7 +5523,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "contributing.md",
       "id": "doc_contributing"
     },
@@ -5455,7 +5536,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "one pr, one branch policy",
       "id": "concept_one_pr_one_branch"
     },
@@ -5468,7 +5549,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "topic branch naming (feat/fix/refactor/docs/chore/test)",
       "id": "concept_topic_branch_naming"
     },
@@ -5481,7 +5562,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "husky + lint-staged pre-commit hooks",
       "id": "concept_husky_pre_commit"
     },
@@ -5494,7 +5575,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "no --no-verify bypass",
       "id": "concept_no_no_verify"
     },
@@ -5507,7 +5588,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "squash-merge to develop",
       "id": "concept_squash_merge"
     },
@@ -5520,7 +5601,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 12,
+      "community": 11,
       "norm_label": "stacking branches forces cherry-picking and duplicate review/verify cycles",
       "id": "rationale_one_pr_one_branch"
     },
@@ -5533,7 +5614,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "daily review 2026-04-25",
       "id": "doc_daily_review_2026_04_25"
     },
@@ -5546,7 +5627,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "blocker: 16 interface declarations should be type",
       "id": "finding_682b557_blocker_interface_vs_type"
     },
@@ -5559,7 +5640,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "minor: mockllmprovider match-or-error silently accepts no-match scripts",
       "id": "finding_682b557_minor_match_or_error"
     },
@@ -5572,7 +5653,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "interface enables declaration merging a\u20ac\u201d silent contract widening",
       "id": "rationale_interface_declaration_merging"
     },
@@ -5585,7 +5666,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 23,
+      "community": 20,
       "norm_label": "how to add a species",
       "id": "doc_how_to_add_species"
     },
@@ -5598,7 +5679,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 23,
+      "community": 20,
       "norm_label": "speciesregistry string-lookup convenience",
       "id": "concept_species_registry_string_lookup"
     },
@@ -5611,7 +5692,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 23,
+      "community": 20,
       "norm_label": "passivemodifiers (species-level buffs/debuffs)",
       "id": "concept_passive_modifiers"
     },
@@ -5624,7 +5705,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 23,
+      "community": 20,
       "norm_label": "createagent overrides species defaults per-agent",
       "id": "concept_create_agent_overrides_species"
     },
@@ -5637,7 +5718,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "0.9.1 agentticked bus event plan",
       "id": "plan_agent_ticked_event"
     },
@@ -5650,7 +5731,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "agent_ticked constant + agenttickedevent",
       "id": "concept_agent_ticked_event_const"
     },
@@ -5663,7 +5744,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "replay-equivalence test (seeded)",
       "id": "concept_replay_equivalence_test"
     },
@@ -5676,7 +5757,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "snapshot-copy trace.emitted to prevent meta-event self-reference",
       "id": "rationale_snapshot_copy_emitted"
     },
@@ -5689,7 +5770,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "filter agent_ticked out of next tick's perceived stream a\u20ac\u201d meta event, not stimulus",
       "id": "rationale_filter_agent_ticked_perceived"
     },
@@ -5702,7 +5783,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "0.9.2 cognition switcher design",
       "id": "design_cognition_switcher"
     },
@@ -5715,7 +5796,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "async import() peer-dep capability probe",
       "id": "concept_capability_probe_dynamic_import"
     },
@@ -5728,7 +5809,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "bt reactive interrupt on surprisetreat",
       "id": "concept_bt_reactive_interrupt"
     },
@@ -5741,7 +5822,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "approachtreatskill (examples-local)",
       "id": "concept_approach_treat_skill_demo"
     },
@@ -5754,7 +5835,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "agent.setreasoner live-swap",
       "id": "concept_set_reasoner_live_swap"
     },
@@ -5767,7 +5848,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "stub bdi (jssonreasoner)",
       "id": "concept_stub_bdi"
     },
@@ -5780,7 +5861,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "stub learning (brainjsreasoner with toy net)",
       "id": "concept_stub_learning_brainjs"
     },
@@ -5793,7 +5874,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "bt chosen as showcase: reactive + stateful behavior hardest to express via weighted scorer",
       "id": "rationale_bt_chosen_showcase"
     },
@@ -5806,7 +5887,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "dynamic import probe avoids static-import build failure for missing peers",
       "id": "rationale_dynamic_import_probe"
     },
@@ -5819,7 +5900,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "mvp demo roadmap (superseded)",
       "id": "plan_mvp_demo_roadmap"
     },
@@ -5832,7 +5913,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "p0 a\u20ac\u201d need-decay calibration",
       "id": "concept_p0_decay_calibration"
     },
@@ -5845,7 +5926,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "p1 a\u20ac\u201d decision trace panel",
       "id": "concept_p1_trace_panel"
     },
@@ -5858,7 +5939,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "p2 a\u20ac\u201d seed controls + determinism proof",
       "id": "concept_p2_seed_controls"
     },
@@ -5871,7 +5952,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "p3 a\u20ac\u201d json config panel",
       "id": "concept_p3_json_config"
     },
@@ -5884,7 +5965,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "p4 a\u20ac\u201d cognition switcher",
       "id": "concept_p4_cognition_switcher"
     },
@@ -5897,7 +5978,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "pause semantics (settimescale 0)",
       "id": "spec_pause_semantics"
     },
@@ -5910,7 +5991,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "option a a\u20ac\u201d skip stages 2/2.7/2.8 at scale 0 (phase a)",
       "id": "concept_pause_option_a"
     },
@@ -5923,7 +6004,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "option b a\u20ac\u201d virtual-time-based reconciliation (phase b)",
       "id": "concept_pause_option_b"
     },
@@ -5936,7 +6017,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "modifier expiry deferred to first post-resume tick",
       "id": "concept_modifier_expiry_deferred"
     },
@@ -5949,7 +6030,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "option a: no schema change, no consumer migration; preserves wall-clock expiresat",
       "id": "rationale_option_a_no_breaking"
     },
@@ -5962,7 +6043,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "pre-v1 handoff (superseded)",
       "id": "plan_pre_v1_handoff"
     },
@@ -5975,7 +6056,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "snapshot a\u2014 settimescale interaction fix",
       "id": "concept_snapshot_timescale_fix"
     },
@@ -5988,7 +6069,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "demo snapshot export / import",
       "id": "concept_export_import_demo"
     },
@@ -6001,7 +6082,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "0.9.2 cognition switcher implementation plan",
       "id": "plan_set_reasoner_switcher"
     },
@@ -6014,7 +6095,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "v1 comprehensive plan",
       "id": "plan_v1_comprehensive"
     },
@@ -6027,7 +6108,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "two release trains: 0.9.0 (demo) a\u2020\u2019 1.0.0 (npm)",
       "id": "concept_two_release_trains"
     },
@@ -6040,7 +6121,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "_internalpublish / _internaldie rename (breaking)",
       "id": "concept_internal_publish_rename"
     },
@@ -6053,7 +6134,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "brain.js a\u2020\u2019 tensorflow.js swap (pr #60)",
       "id": "concept_tfjs_swap"
     },
@@ -6066,7 +6147,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "kernel modularization, agentbuilder, factory presets deferred post-v1",
       "id": "rationale_kernel_modularization_post_v1"
     },
@@ -6079,7 +6160,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "0.9.3 brain.js training persistence (obsolete)",
       "id": "plan_brainjs_training_persistence"
     },
@@ -6092,7 +6173,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "train button + localstorage persistence for trained network",
       "id": "concept_brainjs_train_button"
     },
@@ -6105,7 +6186,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "0.9.4 reasoner.reset() harmonization",
       "id": "plan_reasoner_reset_harmonization"
     },
@@ -6118,7 +6199,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "reasoner.reset?() optional port method",
       "id": "concept_reasoner_reset_optional"
     },
@@ -6131,7 +6212,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 5,
+      "community": 7,
       "norm_label": "two fixed call sites: after setreasoner and after restore catch-up",
       "id": "rationale_reset_two_call_sites"
     },
@@ -6144,7 +6225,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "0.9.5 unify facade.publishevent with internal publish path",
       "id": "plan_facade_publish_unify"
     },
@@ -6157,7 +6238,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "facade.publishevent bypassed trace + autosave hooks",
       "id": "concept_facade_publish_bypass_bug"
     },
@@ -6170,7 +6251,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "0.9.7 fssnapshotstore reversible key encoding",
       "id": "plan_fs_snapshot_reversible_keys"
     },
@@ -6183,7 +6264,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "percent-encoding for filename-safe reversible keys",
       "id": "concept_percent_encoding_keys"
     },
@@ -6196,7 +6277,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "sanitizekey lossy substitution causes key collisions",
       "id": "concept_sanitize_key_collision_bug"
     },
@@ -6209,7 +6290,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "percent-encoding chosen over base64url to keep filenames human-inspectable",
       "id": "rationale_percent_over_base64"
     },
@@ -6222,7 +6303,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "0.9.8 fail fast on duplicate skillregistry ids",
       "id": "plan_skill_registry_fail_fast"
     },
@@ -6235,7 +6316,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "duplicateskillerror type + replace() escape hatch",
       "id": "concept_duplicate_skill_error"
     },
@@ -6248,7 +6329,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "fail-fast aligns with no-silent-data-loss principle (cf invalidtimescaleerror)",
       "id": "rationale_fail_fast_no_silent_dataloss"
     },
@@ -6261,7 +6342,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "0.9.6 remove dead pendingevents field",
       "id": "plan_snapshot_pending_events_cleanup"
     },
@@ -6274,7 +6355,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "pendingevents was dead field a\u20ac\u201d never populated/read",
       "id": "concept_pending_events_dead_field"
     },
@@ -6287,7 +6368,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "codebase review findings 2026-04-24",
       "id": "plan_codebase_review_findings"
     },
@@ -6300,7 +6381,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "track a a\u20ac\u201d eslint guardrails (no defaults, no enums, peer import bans)",
       "id": "concept_track_a_guardrails"
     },
@@ -6313,7 +6394,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "agent.ts extractions (restorecoordinator, deathcoordinator, snapshotassembler)",
       "id": "concept_agent_ts_extractions"
     },
@@ -6326,7 +6407,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 7,
+      "community": 8,
       "norm_label": "createexpressionskill factory consolidates 3 express skills",
       "id": "concept_express_skill_factory"
     },
@@ -6339,7 +6420,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "polish + harden a\u20ac\u201d pre-1.0 increments",
       "id": "plan_polish_and_harden_2026_04_24"
     },
@@ -6352,7 +6433,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tfjs cognition adapter plan",
       "id": "plan_tfjs_cognition_adapter_2026_04_24"
     },
@@ -6365,7 +6446,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "comprehensive polish + hardening pass a\u20ac\u201d pre-1.0",
       "id": "plan_comprehensive_polish_2026_04_25"
     },
@@ -6378,7 +6459,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "review-fix skill implementation plan",
       "id": "plan_review_fix_skill_2026_04_25"
     },
@@ -6391,7 +6472,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "daily code review system prompt",
       "id": "review_bot_prompt"
     },
@@ -6404,7 +6485,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "review-bot/ daily code-review routine readme",
       "id": "review_bot_readme"
     },
@@ -6417,7 +6498,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "post-tfjs improvements roadmap",
       "id": "spec_post_tfjs_improvements_2026_04_24"
     },
@@ -6430,7 +6511,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tensorflow.js cognition adapter design",
       "id": "spec_tfjs_cognition_adapter_design_2026_04_24"
     },
@@ -6443,7 +6524,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "agentonomous mvp demo spec",
       "id": "spec_mvp_demo"
     },
@@ -6456,7 +6537,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "agentonomous product vision",
       "id": "spec_vision"
     },
@@ -6469,7 +6550,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "review-fix skill design spec",
       "id": "spec_review_fix_skill_2026_04_25"
     },
@@ -6482,7 +6563,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "ports & adapters all the way down",
       "id": "concept_ports_and_adapters"
     },
@@ -6495,7 +6576,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "zero-config for the common case",
       "id": "concept_zero_config_common_case"
     },
@@ -6508,7 +6589,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "species-agnostic, data-driven",
       "id": "concept_species_agnostic_data_driven"
     },
@@ -6521,7 +6602,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "engine-agnostic at the core, integration subpaths at the edge",
       "id": "concept_engine_agnostic_core"
     },
@@ -6534,7 +6615,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "peer-optional brains",
       "id": "concept_peer_optional_brains"
     },
@@ -6547,7 +6628,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "persona p1 a\u20ac\u201d indie game developer",
       "id": "concept_persona_p1_indie_dev"
     },
@@ -6560,7 +6641,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "persona p2 a\u20ac\u201d simulation researcher",
       "id": "concept_persona_p2_simulation_researcher"
     },
@@ -6573,7 +6654,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "persona p3 a\u20ac\u201d llm/agent-framework builder",
       "id": "concept_persona_p3_llm_builder"
     },
@@ -6586,7 +6667,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "finding id format <head-sha[:7]>.<idx>",
       "id": "concept_finding_id_format"
     },
@@ -6599,7 +6680,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "magic pr body line: refs #87 finding:<id>",
       "id": "concept_magic_pr_body_line"
     },
@@ -6612,7 +6693,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "review-fix-shipped github action",
       "id": "concept_review_fix_shipped_workflow"
     },
@@ -6625,7 +6706,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "tracker issue #87 a\u20ac\u201d daily code review a\u20ac\u201d develop (rolling, append-only)",
       "id": "concept_tracker_issue_87"
     },
@@ -6638,7 +6719,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "dual sink: rolling issue comment + immutable daily doc",
       "id": "concept_dual_sink_persistence"
     },
@@ -6651,7 +6732,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "severity tags blocker/major/minor/nit",
       "id": "concept_severity_tags"
     },
@@ -6664,7 +6745,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "counter-argument check (self-rebuttal of top blocker)",
       "id": "concept_counter_argument_check"
     },
@@ -6677,7 +6758,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "repo invariants a\u20ac\u201d hard rules (blocker on violation)",
       "id": "concept_repo_invariants_hard_rules"
     },
@@ -6690,7 +6771,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "changeset process gate (library behavior change requires .changeset/*.md)",
       "id": "concept_changeset_gate"
     },
@@ -6703,7 +6784,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "ci-gate aggregator + doc-only short-circuit via dorny/paths-filter",
       "id": "concept_ci_gate_doc_only_short_circuit"
     },
@@ -6716,7 +6797,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "track a a\u20ac\u201d remediation (4 persistence/restore findings)",
       "id": "concept_track_a_remediation"
     },
@@ -6729,7 +6810,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "track b a\u20ac\u201d ci hygiene",
       "id": "concept_track_b_ci_hygiene"
     },
@@ -6742,7 +6823,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "track c a\u20ac\u201d demo polish",
       "id": "concept_track_c_demo_polish"
     },
@@ -6755,7 +6836,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "track d a\u20ac\u201d library seams",
       "id": "concept_track_d_library_seams"
     },
@@ -6768,7 +6849,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "one finding = one branch = one pr (no bundling)",
       "id": "concept_per_finding_per_pr"
     },
@@ -6781,7 +6862,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "1.0.0 npm publish on hold",
       "id": "concept_v1_release_hold"
     },
@@ -6794,7 +6875,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "independent prs, batch open, multi-pass codex resolution",
       "id": "concept_pr_workflow_batch_codex"
     },
@@ -6807,7 +6888,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "pre-1.0 a\u20ac\u201d no compat shims; clean breaks",
       "id": "concept_prerelease_no_migration"
     },
@@ -6820,7 +6901,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "a1 architectural guardrails (pr #75)",
       "id": "concept_a1_architectural_guardrails"
     },
@@ -6833,7 +6914,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "a2 remediation track (prs #71-#74)",
       "id": "concept_a2_remediation_shipped"
     },
@@ -6846,7 +6927,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "track 3 a\u20ac\u201d complexity ratchet (refactor cyclomatic)",
       "id": "concept_complexity_ratchet_track"
     },
@@ -6859,7 +6940,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tfjslearner a\u20ac\u201d concrete learner for stage-8 scoring",
       "id": "concept_tfjs_learner"
     },
@@ -6872,7 +6953,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "multi-output softmax action selection",
       "id": "concept_multi_output_softmax"
     },
@@ -6885,7 +6966,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "richer 13-dim feature vector (needs+mood+modifiers+events)",
       "id": "concept_richer_feature_vector"
     },
@@ -6898,7 +6979,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "svg loss curve sparkline under train button",
       "id": "concept_loss_curve_sparkline"
     },
@@ -6911,7 +6992,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tfjsreasoner.train onepochend callback",
       "id": "concept_per_epoch_progress_callback"
     },
@@ -6924,7 +7005,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tfjsreasoner.detectbestbackend + demo backend picker",
       "id": "concept_backend_probe_picker"
     },
@@ -6937,7 +7018,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "live prediction strip (per-tick softmax + idle threshold)",
       "id": "concept_prediction_strip"
     },
@@ -6950,7 +7031,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "brain.js a\u2020\u2019 tfjs swap (rationale: abandoned upstream + install-hostile)",
       "id": "concept_brainjs_to_tfjs_swap"
     },
@@ -6963,7 +7044,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tfjssnapshot type (version+topology+weights base64+shapes)",
       "id": "concept_tfjs_snapshot_shape"
     },
@@ -6976,7 +7057,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "reasoner.reset() intentionally not implemented for tfjsreasoner",
       "id": "concept_reasoner_reset_intentionally_omitted"
     },
@@ -6989,7 +7070,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "demo aha moments (autonomy / explainability / swappability / data-driven / determinism)",
       "id": "concept_demo_aha_moments"
     },
@@ -7002,7 +7083,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "decision trace panel (needs + candidates + selected skill)",
       "id": "concept_decision_trace_panel"
     },
@@ -7015,7 +7096,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "cognition switcher with capability states",
       "id": "concept_cognition_switcher"
     },
@@ -7028,7 +7109,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "tfjslearner wired into demo learning mode (agent.setlearner, skillfailed scoring)",
       "id": "concept_tfjs_learner_in_demo_shipped"
     },
@@ -7041,7 +7122,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "rationale: tracker stays open (long-lived append-only log)",
       "id": "rationale_tracker_stays_open"
     },
@@ -7054,7 +7135,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "rationale: remediation lands first (correctness work later tracks ride on)",
       "id": "rationale_remediation_first"
     },
@@ -7067,7 +7148,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 34,
+      "community": 30,
       "norm_label": "rationale: pull_request_target trigger gives write-capable token from forks safely",
       "id": "rationale_pull_request_target_in_workflow"
     },
@@ -7080,7 +7161,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 35,
+      "community": 31,
       "norm_label": "rationale: global concurrency group prevents shipped-state race overwrites",
       "id": "rationale_concurrency_global_group"
     },
@@ -7093,7 +7174,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 36,
+      "community": 32,
       "norm_label": "rationale: only flip when pr base is develop (avoids hotfix/main false-shipped)",
       "id": "rationale_develop_base_only_flip"
     },
@@ -7106,7 +7187,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 37,
+      "community": 33,
       "norm_label": "rationale: surface non-404 read errors and write failures via hardfailures counter",
       "id": "rationale_hardfailures_surface_writes"
     },
@@ -7119,7 +7200,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "rationale: html comment marker last token + renderer-hidden + action keys off it",
       "id": "rationale_html_marker_last_token"
     },
@@ -7132,7 +7213,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 38,
+      "community": 34,
       "norm_label": "rationale: never use git worktree add -b (force) a\u20ac\u201d would silently rewind work",
       "id": "rationale_never_force_worktree_b"
     },
@@ -7145,7 +7226,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 14,
+      "community": 13,
       "norm_label": "rationale: daily doc immutable; only rolling issue comment is flip target",
       "id": "rationale_immutable_daily_doc"
     },
@@ -7158,7 +7239,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "rationale: clean replacement of brainjs (pre-release, dual-tracking adds liability)",
       "id": "rationale_clean_replacement_brainjs"
     },
@@ -7171,7 +7252,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "rationale: no migration shims pre-1.0 (no shipped consumers; pr #72 burned 11 fixups)",
       "id": "rationale_no_migration_pre_v1"
     },
@@ -7184,7 +7265,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 2,
+      "community": 4,
       "norm_label": "rationale: softmax over 7 active-care skills only; expression skills stay heuristic",
       "id": "rationale_softmax_active_care_only"
     }
@@ -8793,8 +8874,8 @@
       "source_file": "D:\\Projects\\agent-library\\src\\agent\\Agent.ts",
       "source_location": "L642",
       "weight": 1.0,
-      "_src": "remotecontroller_inmemoryremotecontroller_push",
-      "_tgt": "agent_agent_publish",
+      "_src": "agent_agent_publish",
+      "_tgt": "remotecontroller_inmemoryremotecontroller_push",
       "source": "agent_agent_publish",
       "target": "remotecontroller_inmemoryremotecontroller_push"
     },
@@ -8841,8 +8922,8 @@
       "source_file": "D:\\Projects\\agent-library\\src\\agent\\createAgent.ts",
       "source_location": "L168",
       "weight": 1.0,
-      "_src": "createagent_applypassivemodifiers",
-      "_tgt": "agent_agent_applymodifier",
+      "_src": "agent_agent_applymodifier",
+      "_tgt": "createagent_applypassivemodifiers",
       "source": "agent_agent_applymodifier",
       "target": "createagent_applypassivemodifiers"
     },
@@ -8961,8 +9042,8 @@
       "source_file": "D:\\Projects\\agent-library\\src\\agent\\Agent.ts",
       "source_location": "L751",
       "weight": 1.0,
-      "_src": "remotecontroller_inmemoryremotecontroller_push",
-      "_tgt": "agent_agent_installmodule",
+      "_src": "agent_agent_installmodule",
+      "_tgt": "remotecontroller_inmemoryremotecontroller_push",
       "source": "agent_agent_installmodule",
       "target": "remotecontroller_inmemoryremotecontroller_push"
     },
@@ -14190,7 +14271,19 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\personaBias.ts",
-      "source_location": "L53",
+      "source_location": "L57",
+      "weight": 1.0,
+      "_src": "cognition_personabias_ts",
+      "_tgt": "personabias_weightforrule",
+      "source": "cognition_personabias_ts",
+      "target": "personabias_weightforrule",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\personaBias.ts",
+      "source_location": "L62",
       "weight": 1.0,
       "_src": "cognition_personabias_ts",
       "_tgt": "personabias_defaultpersonabias",
@@ -14886,7 +14979,31 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L19",
+      "source_location": "L28",
+      "weight": 1.0,
+      "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
+      "_tgt": "tfjsreasoner_loadbackendmodule",
+      "source": "cognition_adapters_tfjs_tfjsreasoner_ts",
+      "target": "tfjsreasoner_loadbackendmodule",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L59",
+      "weight": 1.0,
+      "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
+      "_tgt": "tfjsreasoner_probebackendinternal",
+      "source": "cognition_adapters_tfjs_tfjsreasoner_ts",
+      "target": "tfjsreasoner_probebackendinternal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L73",
       "weight": 1.0,
       "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
       "_tgt": "tfjsreasoner_makelcg",
@@ -14898,7 +15015,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L31",
+      "source_location": "L85",
       "weight": 1.0,
       "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
       "_tgt": "tfjsreasoner_seededshuffle",
@@ -14910,7 +15027,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L55",
+      "source_location": "L109",
       "weight": 1.0,
       "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
       "_tgt": "tfjsreasoner_toinputtensor",
@@ -14922,7 +15039,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L75",
+      "source_location": "L141",
       "weight": 1.0,
       "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
       "_tgt": "tfjsreasoner_tfjsbackendnotregisterederror",
@@ -14934,7 +15051,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L207",
+      "source_location": "L273",
       "weight": 1.0,
       "_src": "cognition_adapters_tfjs_tfjsreasoner_ts",
       "_tgt": "tfjsreasoner_tfjsreasoner",
@@ -14946,7 +15063,43 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L289",
+      "source_location": "L61",
+      "weight": 1.0,
+      "_src": "tfjsreasoner_probebackendinternal",
+      "_tgt": "tfjsreasoner_loadbackendmodule",
+      "source": "tfjsreasoner_loadbackendmodule",
+      "target": "tfjsreasoner_probebackendinternal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L600",
+      "weight": 1.0,
+      "_src": "tfjsreasoner_tfjsreasoner_fromjson",
+      "_tgt": "tfjsreasoner_loadbackendmodule",
+      "source": "tfjsreasoner_loadbackendmodule",
+      "target": "tfjsreasoner_tfjsreasoner_fromjson",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L564",
+      "weight": 1.0,
+      "_src": "tfjsreasoner_tfjsreasoner_probebackend",
+      "_tgt": "tfjsreasoner_probebackendinternal",
+      "source": "tfjsreasoner_probebackendinternal",
+      "target": "tfjsreasoner_tfjsreasoner_probebackend",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L366",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner_train",
       "_tgt": "tfjsreasoner_makelcg",
@@ -14958,7 +15111,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L289",
+      "source_location": "L366",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner_train",
       "_tgt": "tfjsreasoner_seededshuffle",
@@ -14970,7 +15123,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L79",
+      "source_location": "L145",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsbackendnotregisterederror",
       "_tgt": "tfjsreasoner_tfjsbackendnotregisterederror_constructor",
@@ -14982,7 +15135,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L212",
+      "source_location": "L289",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_constructor",
@@ -14994,7 +15147,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L222",
+      "source_location": "L299",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_selectintention",
@@ -15006,7 +15159,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L257",
+      "source_location": "L334",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_getmodel",
@@ -15018,7 +15171,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L261",
+      "source_location": "L338",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_dispose",
@@ -15030,7 +15183,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L275",
+      "source_location": "L352",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_train",
@@ -15042,7 +15195,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L328",
+      "source_location": "L405",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_tojson",
@@ -15054,7 +15207,31 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L361",
+      "source_location": "L463",
+      "weight": 1.0,
+      "_src": "tfjsreasoner_tfjsreasoner",
+      "_tgt": "tfjsreasoner_tfjsreasoner_detectbestbackend",
+      "source": "tfjsreasoner_tfjsreasoner",
+      "target": "tfjsreasoner_tfjsreasoner_detectbestbackend",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L563",
+      "weight": 1.0,
+      "_src": "tfjsreasoner_tfjsreasoner",
+      "_tgt": "tfjsreasoner_tfjsreasoner_probebackend",
+      "source": "tfjsreasoner_tfjsreasoner",
+      "target": "tfjsreasoner_tfjsreasoner_probebackend",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
+      "source_location": "L578",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner",
       "_tgt": "tfjsreasoner_tfjsreasoner_fromjson",
@@ -15066,7 +15243,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L318",
+      "source_location": "L395",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner_train",
       "_tgt": "tfjsreasoner_tfjsreasoner_dispose",
@@ -15078,7 +15255,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
-      "source_location": "L394",
+      "source_location": "L621",
       "weight": 1.0,
       "_src": "tfjsreasoner_tfjsreasoner_fromjson",
       "_tgt": "tfjsreasoner_tfjsreasoner_dispose",
@@ -15093,8 +15270,8 @@
       "source_file": "D:\\Projects\\agent-library\\src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
       "source_location": "L345",
       "weight": 1.0,
-      "_src": "tfjssnapshot_encodeweights",
-      "_tgt": "tfjsreasoner_tfjsreasoner_tojson",
+      "_src": "tfjsreasoner_tfjsreasoner_tojson",
+      "_tgt": "tfjssnapshot_encodeweights",
       "source": "tfjsreasoner_tfjsreasoner_tojson",
       "target": "tfjssnapshot_encodeweights"
     },
@@ -15105,8 +15282,8 @@
       "source_file": "D:\\Projects\\agent-library\\src\\cognition\\adapters\\tfjs\\TfjsReasoner.ts",
       "source_location": "L387",
       "weight": 1.0,
-      "_src": "tfjssnapshot_decodeweights",
-      "_tgt": "tfjsreasoner_tfjsreasoner_fromjson",
+      "_src": "tfjsreasoner_tfjsreasoner_fromjson",
+      "_tgt": "tfjssnapshot_decodeweights",
       "source": "tfjsreasoner_tfjsreasoner_fromjson",
       "target": "tfjssnapshot_decodeweights"
     },
@@ -19158,7 +19335,55 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L176",
+      "source_location": "L129",
+      "weight": 1.0,
+      "_src": "ports_mockllmprovider_ts",
+      "_tgt": "mockllmprovider_abortstub",
+      "source": "ports_mockllmprovider_ts",
+      "target": "mockllmprovider_abortstub",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L143",
+      "weight": 1.0,
+      "_src": "ports_mockllmprovider_ts",
+      "_tgt": "mockllmprovider_runscript",
+      "source": "ports_mockllmprovider_ts",
+      "target": "mockllmprovider_runscript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L182",
+      "weight": 1.0,
+      "_src": "ports_mockllmprovider_ts",
+      "_tgt": "mockllmprovider_pickfrommatchorerror",
+      "source": "ports_mockllmprovider_ts",
+      "target": "mockllmprovider_pickfrommatchorerror",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L207",
+      "weight": 1.0,
+      "_src": "ports_mockllmprovider_ts",
+      "_tgt": "mockllmprovider_pickfromqueue",
+      "source": "ports_mockllmprovider_ts",
+      "target": "mockllmprovider_pickfromqueue",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L228",
       "weight": 1.0,
       "_src": "ports_mockllmprovider_ts",
       "_tgt": "mockllmprovider_enforcebudget",
@@ -19170,7 +19395,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L204",
+      "source_location": "L256",
       "weight": 1.0,
       "_src": "ports_mockllmprovider_ts",
       "_tgt": "mockllmprovider_buildusage",
@@ -19182,7 +19407,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L223",
+      "source_location": "L275",
       "weight": 1.0,
       "_src": "ports_mockllmprovider_ts",
       "_tgt": "mockllmprovider_estimatetokens",
@@ -19194,7 +19419,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L229",
+      "source_location": "L281",
       "weight": 1.0,
       "_src": "ports_mockllmprovider_ts",
       "_tgt": "mockllmprovider_estimatetokensfor",
@@ -19242,7 +19467,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L132",
+      "source_location": "L104",
       "weight": 1.0,
       "_src": "mockllmprovider_mockllmprovider",
       "_tgt": "mockllmprovider_mockllmprovider_pickscript",
@@ -19254,7 +19479,19 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L105",
+      "source_location": "L97",
+      "weight": 1.0,
+      "_src": "mockllmprovider_mockllmprovider_completesync",
+      "_tgt": "mockllmprovider_abortstub",
+      "source": "mockllmprovider_mockllmprovider_completesync",
+      "target": "mockllmprovider_abortstub",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L100",
       "weight": 1.0,
       "_src": "mockllmprovider_mockllmprovider_completesync",
       "_tgt": "mockllmprovider_mockllmprovider_pickscript",
@@ -19266,11 +19503,47 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L112",
+      "source_location": "L101",
       "weight": 1.0,
       "_src": "mockllmprovider_mockllmprovider_completesync",
-      "_tgt": "mockllmprovider_estimatetokens",
+      "_tgt": "mockllmprovider_runscript",
       "source": "mockllmprovider_mockllmprovider_completesync",
+      "target": "mockllmprovider_runscript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L106",
+      "weight": 1.0,
+      "_src": "mockllmprovider_mockllmprovider_pickscript",
+      "_tgt": "mockllmprovider_pickfrommatchorerror",
+      "source": "mockllmprovider_mockllmprovider_pickscript",
+      "target": "mockllmprovider_pickfrommatchorerror",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L107",
+      "weight": 1.0,
+      "_src": "mockllmprovider_mockllmprovider_pickscript",
+      "_tgt": "mockllmprovider_pickfromqueue",
+      "source": "mockllmprovider_mockllmprovider_pickscript",
+      "target": "mockllmprovider_pickfromqueue",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\ports\\MockLlmProvider.ts",
+      "source_location": "L155",
+      "weight": 1.0,
+      "_src": "mockllmprovider_runscript",
+      "_tgt": "mockllmprovider_estimatetokens",
+      "source": "mockllmprovider_runscript",
       "target": "mockllmprovider_estimatetokens",
       "confidence_score": 1.0
     },
@@ -19278,11 +19551,11 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L114",
+      "source_location": "L157",
       "weight": 1.0,
-      "_src": "mockllmprovider_mockllmprovider_completesync",
+      "_src": "mockllmprovider_runscript",
       "_tgt": "mockllmprovider_estimatetokensfor",
-      "source": "mockllmprovider_mockllmprovider_completesync",
+      "source": "mockllmprovider_runscript",
       "target": "mockllmprovider_estimatetokensfor",
       "confidence_score": 1.0
     },
@@ -19290,11 +19563,11 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L117",
+      "source_location": "L160",
       "weight": 1.0,
-      "_src": "mockllmprovider_mockllmprovider_completesync",
+      "_src": "mockllmprovider_runscript",
       "_tgt": "mockllmprovider_enforcebudget",
-      "source": "mockllmprovider_mockllmprovider_completesync",
+      "source": "mockllmprovider_runscript",
       "target": "mockllmprovider_enforcebudget",
       "confidence_score": 1.0
     },
@@ -19302,11 +19575,11 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L126",
+      "source_location": "L169",
       "weight": 1.0,
-      "_src": "mockllmprovider_mockllmprovider_completesync",
+      "_src": "mockllmprovider_runscript",
       "_tgt": "mockllmprovider_buildusage",
-      "source": "mockllmprovider_mockllmprovider_completesync",
+      "source": "mockllmprovider_runscript",
       "target": "mockllmprovider_buildusage",
       "confidence_score": 1.0
     },
@@ -19314,7 +19587,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\ports\\MockLlmProvider.ts",
-      "source_location": "L225",
+      "source_location": "L277",
       "weight": 1.0,
       "_src": "mockllmprovider_estimatetokens",
       "_tgt": "mockllmprovider_estimatetokensfor",
