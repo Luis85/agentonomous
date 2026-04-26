@@ -482,7 +482,7 @@ consumer-visible documentation beyond JSDoc. Add:
   traces across two runs.
 - `examples/llm-mock/package.json` (new — minimal).
 - `examples/llm-mock/README.md` (new — 1-page how-to).
-- `docs/specs/vision.md` — one-line clarification: port shipped,
+- `docs/PRODUCT_VISION.md` — one-line clarification: port shipped,
   concrete adapters Phase B.
 
 **No library change. No changeset.** Pure docs + example.
