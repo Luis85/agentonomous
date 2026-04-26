@@ -1,21 +1,8 @@
-import {
-  AGENT_TICKED,
-  createAgent,
-  defaultPetInteractionModule,
-  defineRandomEvent,
-  DirectBehaviorRunner,
-  ExpressMeowSkill,
-  ExpressSadSkill,
-  ExpressSleepySkill,
-  InMemoryMemoryAdapter,
-  RandomEventTicker,
-  SkillRegistry,
-  type AgentTickedEvent,
-} from 'agentonomous';
-import { ApproachTreatSkill } from './skills/ApproachTreatSkill.js';
-import { setLearningAgent } from './cognition/learning.js';
+import { AGENT_TICKED, type AgentTickedEvent } from 'agentonomous';
+import { BASE_TIME_SCALE, buildAgent } from './demo-domain/scenarios/petCare/buildAgent.js';
+import { setLearningAgent } from './demo-domain/scenarios/petCare/cognition/learning.js';
 import { mountCognitionSwitcher } from './cognitionSwitcher.js';
-import { catSpecies } from './species.js';
+import { catSpecies } from './demo-domain/scenarios/petCare/species.js';
 import {
   mountExportImport,
   mountHud,
@@ -32,7 +19,6 @@ import {
   mountConfigPanel,
 } from './speciesConfig.js';
 
-const STORAGE_KEY = 'whiskers';
 const SPEED_STORAGE_KEY = 'agentonomous/speed';
 const LEGACY_SPEED_STORAGE_KEY = 'whiskers:speed';
 
@@ -51,48 +37,6 @@ try {
 } catch {
   // localStorage unavailable (private mode, quota) — skip migration.
 }
-// Base wall→virtual scale. The speed picker multiplies this; 1× == base.
-// Tuned alongside catSpecies decay rates so hunger reaches its critical
-// threshold in ~45 s of wall time at 1×, per the Phase A demo spec.
-const BASE_TIME_SCALE = 10;
-
-// --- Random events ------------------------------------------------------------
-// R-11: cadence tuned so a player sees 2–3 events per virtual minute.
-// R-10: messyPlay applies a `dirty` modifier so the Clean button has a real
-// reason to exist, and simultaneously applies `disobedient` so the Scold
-// button (gated by default ScoldSkill) is corrective rather than abusive.
-const randomEvents = new RandomEventTicker([
-  defineRandomEvent({
-    id: 'mildIllness',
-    probabilityPerSecond: 0.01,
-    cooldownSeconds: 30,
-    emit: () => ({ type: 'RandomEvent', subtype: 'mildIllness', at: 0 }),
-  }),
-  defineRandomEvent({
-    id: 'surpriseTreat',
-    probabilityPerSecond: 0.01,
-    cooldownSeconds: 30,
-    emit: () => ({ type: 'RandomEvent', subtype: 'surpriseTreat', at: 0 }),
-  }),
-  defineRandomEvent({
-    id: 'messyPlay',
-    probabilityPerSecond: 0.008,
-    cooldownSeconds: 30,
-    emit: () => ({ type: 'RandomEvent', subtype: 'messyPlay', at: 0 }),
-  }),
-]);
-
-// --- Skill registry populated with expressive + approach defaults -------------
-// `createAgent({ modules: [defaultPetInteractionModule] })` auto-installs
-// that module's active-care skills (feed/clean/play/rest/pet/scold/
-// medicate), so we don't pre-register them here. The expressive + approach
-// skills below are not bundled in any module, so they still need manual
-// registration.
-const skills = new SkillRegistry();
-skills.register(ExpressMeowSkill);
-skills.register(ExpressSadSkill);
-skills.register(ExpressSleepySkill);
-skills.register(ApproachTreatSkill);
 
 // --- Species (base + optional user JSON override) -----------------------------
 const speciesOverride = loadConfigOverride(catSpecies);
@@ -100,26 +44,7 @@ const effectiveSpecies = speciesOverride ? applyOverride(catSpecies, speciesOver
 
 // --- Agent --------------------------------------------------------------------
 const seed = loadSeed();
-const pet = createAgent({
-  id: STORAGE_KEY,
-  name: 'Whiskers',
-  species: effectiveSpecies,
-  timeScale: BASE_TIME_SCALE,
-  rng: seed,
-  memory: new InMemoryMemoryAdapter(),
-  modules: [defaultPetInteractionModule],
-  skills,
-  // Behavior runner — only consulted for reasoner-committed intentions.
-  // Player button interactions invoke skills directly via `pet.invokeSkill`
-  // and bypass this table. The single mapping routes the BT cognition
-  // mode's `approach-treat` interrupt intention to its namesake skill.
-  behavior: new DirectBehaviorRunner({
-    skillByIntentionType: {
-      'approach-treat': 'approach-treat',
-    },
-  }),
-  randomEvents,
-});
+const pet = buildAgent({ seed, speciesOverride: effectiveSpecies });
 
 // Wire the learning mode to the agent: scopes the persisted-network
 // localStorage key per-pet AND subscribes to the standard event bus to

@@ -94,6 +94,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
+    "@pinia/testing": "^0.1.7",
     "@size-limit/file": "^12.1.0",
     "@tensorflow/tfjs-backend-cpu": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
@@ -102,6 +103,7 @@
     "@tensorflow/tfjs-layers": "^4.22.0",
     "@types/node": "^25.6.0",
     "@vitest/coverage-v8": "^4.1.4",
+    "@vue/test-utils": "^2.4.6",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
     "excalibur": "^0.32.0",
@@ -110,6 +112,7 @@
     "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
     "mistreevous": "^4.3.1",
+    "pinia": "^2.3.0",
     "prettier": "^3.8.3",
     "size-limit": "^12.1.0",
     "typedoc": "^0.28.19",
@@ -117,7 +120,9 @@
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.8",
     "vite-plugin-dts": "^4.5.4",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0"
   },
   "peerDependencies": {
     "@anthropic-ai/sdk": "^0.91.0",

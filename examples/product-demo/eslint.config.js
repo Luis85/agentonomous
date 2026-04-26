@@ -20,12 +20,16 @@
 // | demo-domain/**,    | Date / Math.random / setTimeout / setInterval /     |
 // | stores/domain/**   | requestAnimationFrame (NFR-D-1)                     |
 //
-// Vue SFC support (`*.vue` parser) is added by the first pillar that
-// introduces a `.vue` file. Until then the `*.vue` glob simply matches
-// nothing.
+// Vue SFC support: Pillar 1 slice 1.2a wires `vue-eslint-parser` +
+// `eslint-plugin-vue` so the placeholder SFCs (`App.vue`, `views/*.vue`,
+// `components/shell/AppHeader.vue`) lint cleanly. The first SFCs land
+// in this slice; richer Vue rule tuning rides with slice 1.2b's
+// chapter-1 vertical when the SFCs gain real templates.
 
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import vueParser from 'vue-eslint-parser';
+import vuePlugin from 'eslint-plugin-vue';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
@@ -42,6 +46,13 @@ export default tseslint.config(
       'node_modules',
       'playwright-report',
       'test-results',
+      // Legacy vanilla-TS DOM mounts that Pillar 1 slice 1.2b ports into
+      // SFCs and deletes. Cognition switcher / loss sparkline / prediction
+      // strip / species config stay here until Pillar 2 slice 2.5 + Pillar
+      // 4 slice 4.3 port + delete them. The pure modules previously listed
+      // here (`species.ts`, `constants.ts`, `cognition/**`, `skills/**`)
+      // moved into `src/demo-domain/scenarios/petCare/` in slice 1.2a and
+      // are now lint-covered by the demo-domain block below.
       'src/main.ts',
       'src/seed.ts',
       'src/ui.ts',
@@ -49,16 +60,28 @@ export default tseslint.config(
       'src/lossSparkline.ts',
       'src/predictionStrip.ts',
       'src/speciesConfig.ts',
-      'src/species.ts',
       'src/cognitionSwitcher.ts',
-      'src/constants.ts',
-      'src/cognition/**',
-      'src/skills/**',
     ],
   },
   js.configs.recommended,
   // Type-aware rules use the demo workspace's tsconfig.
   ...tseslint.configs.recommended,
+  ...vuePlugin.configs['flat/recommended'],
+  // Vue SFC parser: `@vue/eslint-parser` reads the `<template>` block and
+  // hands `<script>` content to `@typescript-eslint/parser`. Slice 1.2a
+  // only ships placeholder SFCs (`App.vue`, `views/*.vue`,
+  // `components/shell/AppHeader.vue`), so we keep the recommended rule
+  // bundle and let slice 1.2b layer scenario-specific tuning on top.
+  {
+    files: ['src/**/*.vue'],
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        parser: '@typescript-eslint/parser',
+        extraFileExtensions: ['.vue'],
+      },
+    },
+  },
   {
     languageOptions: {
       parserOptions: {
@@ -222,6 +245,16 @@ export default tseslint.config(
   // structural rules above. Mirrors the root config.
   {
     files: ['eslint.config.js', '*.config.ts', '*.config.js'],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
+  },
+
+  // Vue SFCs compile to a default-exported component object; relax the
+  // structural `no-default-export` rule for `*.vue`. The Vue type shim
+  // also relies on `export default` to satisfy SFC import semantics.
+  {
+    files: ['src/**/*.vue', 'src/vue-shims.d.ts'],
     rules: {
       'no-restricted-syntax': 'off',
     },
