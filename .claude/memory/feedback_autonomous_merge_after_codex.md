@@ -25,10 +25,18 @@ all of the following hold**:
 **How to apply:**
 
 - After Codex 👍 + CI green + `mergeStateStatus=CLEAN`, run
-  `gh pr merge <n> --merge --delete-branch` (project uses merge
-  commits, not squash — see recent `Merge pull request #N` history).
+  `gh pr merge <n> --squash --delete-branch` (project switched to
+  **squash-merge** post-PR #119; all PRs from #133 onward land as
+  squash commits with title pattern `<type>: <subject> (#NNN)`. Trying
+  `--merge` returns `enablePullRequestAutoMerge` GraphQL error). Use
+  `--auto` if the head SHA is mid-CI run — GitHub will fire the merge
+  once required checks pass.
+- After local merge commit blocked on CI, the post-merge branch is
+  squash-merged so the local topic branch will not be "fully merged"
+  ancestor of `develop`. Use `git branch -D <topic>` (force) for
+  cleanup, not `-d`.
 - Then `git switch develop && git pull origin develop && git
-worktree remove .worktrees/<slug> && git branch -d <topic>`.
+worktree remove .worktrees/<slug> && git branch -D <topic>`.
 - If Codex finds something or CI fails, do NOT merge — fix and
   re-trigger `@codex review`.
 - If user is paired in real-time and watching, still default to
