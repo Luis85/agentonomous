@@ -1,22 +1,25 @@
 ---
 name: review-fix
-description: Ingests one or all open findings from the rolling daily-code-review tracker issue (`#87 Daily code review — develop`) and produces a worktree-isolated topic branch + implementation plan per finding. Use when the user says "fix review finding <id>", "pick a finding", "/review-fix <id>", names a finding-ID like `682b557.3`, OR invokes `/review-fix` with no argument (sweeps every unshipped finding in the latest tracker comment). Does NOT close the tracker issue — the tracker is append-only and the auto-flip workflow handles shipped state.
+description: Ingests one or all open findings from a review-bot tracker issue (one issue per scheduled run, label `review-bot`) and produces a worktree-isolated topic branch + implementation plan per finding. Use when the user says "fix review finding <id>", "pick a finding", "/review-fix <id>", names a finding-ID like `682b557.3`, OR invokes `/review-fix` with no argument (sweeps every unshipped finding in the newest review-bot issue). Does NOT close any tracker issue — every issue stays open as the run's archive and the auto-flip workflow handles shipped state.
 ---
 
 # review-fix — turn tracker finding(s) into worktree(s) + plan(s)
 
 ## Terminology
 
-- **Tracker issue** — `#87 Daily code review — develop`. Long-lived,
-  one comment per scheduled bot run, body holds the canonical
-  `Last reviewed SHA`. **Never closed by this skill.**
+- **Tracker issue** — any issue carrying the label `review-bot`.
+  Each scheduled bot run opens its own issue; the body holds that
+  run's full findings block. Sweep mode targets the newest issue;
+  single mode scans every issue (open + closed) for the requested
+  finding ID. **Never closed by this skill.**
 - **Finding** — one `[BLOCKER] / [MAJOR] / [MINOR] / [NIT]` checklist
-  item inside a bot comment.
+  item inside a tracker issue's body.
 - **Finding ID** — `<head-sha[:7]>.<idx>` (e.g. `682b557.3`). Embedded
   as an HTML comment on each finding's checklist line.
-- **Magic line** — `Refs #87 finding:<id>` in a PR body. The
-  contract between this skill's output and the
-  `review-fix-shipped` Action.
+- **Magic line** — `Refs #<issue-number> finding:<id>` in a PR body.
+  The contract between this skill's output and the
+  `review-fix-shipped` Action. The issue number varies per finding
+  — it is always the tracker issue that holds that finding's body.
 
 ## Modes
 
@@ -25,8 +28,8 @@ description: Ingests one or all open findings from the rolling daily-code-review
   Step 7 (post-merge cleanup) is user-driven and happens after the
   PR ships.
 - **Sweep mode** — user invokes the skill with no argument. Pull the
-  most recent comment on `#87` that contains finding markers (skip
-  no-op comments), parse every `<!-- f:<id> -->` marker, skip ones
+  newest tracker issue (label `review-bot`, sorted by createdAt),
+  parse every `<!-- f:<id> -->` marker in its body, skip ones
   already rendered `- [x]`, and run steps 2 → 5 once per remaining
   finding. Each finding still gets its own worktree + branch + plan
   (one finding = one branch = one PR — sweep just batches the _setup_,
@@ -54,14 +57,15 @@ they run after the PR merges:
 4. npm run verify                   ← pre-PR gate
 
 5. gh pr create --base develop ...
-     PR body MUST include the magic line: Refs #87 finding:<id>
+     PR body MUST include the magic line: Refs #<issue> finding:<id>
+     (issue number is captured by this skill into the plan frontmatter)
 
 6. Codex review → resolve threads → owner merges PR to develop
 
 7. Post-merge cleanup (this skill, §7 below)
      prune worktree · delete branch · refresh develop
      `review-fix-shipped` Action ticks the tracker line and appends
-     `(shipped in #<PR>)` automatically — do NOT edit the comment.
+     `(shipped in #<PR>)` automatically — do NOT edit the issue.
 ```
 
 ## Before you start
@@ -70,11 +74,13 @@ Confirm with the user:
 
 1. **Finding ID (single mode only)** — exact form `<sha7>.<idx>`. If
    they paste a free-text description instead, refuse and ask them to
-   grab the ID from `gh issue view 87 --comments`. In sweep mode
-   (no-arg invocation), skip this check.
+   grab the ID from
+   `gh issue list --label review-bot --limit 5` then
+   `gh issue view <n>`. In sweep mode (no-arg invocation), skip this
+   check.
 2. **Already shipped?** — if the tracker line for the chosen ID renders
    `- [x]`, refuse (single mode) or silently skip (sweep mode) and tell
-   them which PR shipped it (the comment line carries `(shipped in #N)`).
+   them which PR shipped it (the line carries `(shipped in #N)`).
 3. **Worktree clear?** — if `.worktrees/fix-review-<slug>` already
    exists, refuse (single mode) or skip that finding with a logged
    warning (sweep mode). The user resolves collisions via
@@ -86,42 +92,41 @@ Confirm with the user:
 
 Both modes share the same fetch step. Node 22 is a hard project
 requirement (`.nvmrc`), so the parser is a checked-in script at
-`scripts/review-fix-parse.mjs`. **Do not** try to filter the comments
+`scripts/review-fix-parse.mjs`. **Do not** try to filter the issues
 JSON inline with `gh --jq`, `jq`, `node -e` heredocs, or `grep | sed`.
-The recipe below dodges five real footguns:
+The recipe below dodges four real footguns:
 
-1. `gh api --paginate --slurp --jq` is rejected by current `gh`
-   versions ("the `--slurp` option is not supported with `--jq` or
-   `--template`"). Slurp must run with no `--jq` filter.
-2. `--slurp` returns an array-of-pages (`[[...page1...], [...page2...]]`),
-   not a flat comment list. The script flattens; do not assume flat.
-3. `jq` is not installed by default on Windows or many CI images, so
+1. `jq` is not installed by default on Windows or many CI images, so
    the skill must not depend on it.
-4. Windows Git Bash maps `/tmp` for shell builtins but native Node
+2. Windows Git Bash maps `/tmp` for shell builtins but native Node
    resolves the same path to `D:\tmp` (which usually does not exist).
    Cache files therefore live under `.review-fix-cache/` in the repo
    root (gitignored), not `/tmp` or `${HOME}`.
-5. Finding-marker text can appear inside another finding's
+3. Finding-marker text can appear inside another finding's
    `<details>` body or quoted diff. The script only treats top-level
    checklist lines (`^- \[[ x]\] `) as finding boundaries.
+4. Issues with `--label review-bot` may include the cosmetic PR
+   label too; `gh issue list` only returns true issues, but make
+   sure the JSON shape is the issue list output (objects with
+   `number`, `body`, `url`, `createdAt`), not the PR list.
 
-Fetch every comment once into the project-local cache:
+Fetch every review-bot issue once into the project-local cache:
 
 ```bash
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 mkdir -p .review-fix-cache
-gh api "repos/${REPO}/issues/87/comments" --paginate --slurp \
-  > .review-fix-cache/comments.json
+gh issue list --label review-bot --state all \
+  --json number,body,url,createdAt --limit 50 \
+  > .review-fix-cache/issues.json
 ```
 
-**Single-finding mode.** Pass the ID via `--id`. The parser searches
-the **full comment history** (newest first) for that marker, so
-backlog findings on older tracker comments stay reachable — sweep
-mode only ever picks the newest comment, but single mode must not.
+**Single-finding mode.** Pass the ID via `--id`. The parser scans
+every issue in the cache (newest first) for that marker, so backlog
+findings on older tracker issues stay reachable — sweep mode only
+ever picks the newest issue, but single mode must not.
 
 ```bash
 ID="<sha7>.<idx>"            # e.g. 682b557.3
-node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
+node scripts/review-fix-parse.mjs .review-fix-cache/issues.json \
   --id "${ID}" \
   > .review-fix-cache/finding.json
 ```
@@ -129,26 +134,27 @@ node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
 Parser exit codes (single mode):
 
 - `0` → match written to `finding.json` as
-  `{commentId, commentUrl, createdAt, finding: {…}}`.
-- `1` → ID not found in any comment. Refuse with
-  `Finding ${ID} not found in #87 comments`.
+  `{issueNumber, issueUrl, createdAt, finding: {…}}`.
+- `1` → ID not found in any review-bot issue. Refuse with
+  `Finding ${ID} not found in any review-bot issue`.
 - `2` → bad CLI args (e.g. user pasted a free-text description).
   Refuse and ask them to grab the ID from
-  `gh issue view 87 --comments`.
+  `gh issue list --label review-bot --limit 5`.
 - `3` → ID found but already shipped. The script's stderr already
   says `Finding <id> already shipped in #<PR>`; surface it and stop.
 
 **Sweep mode (no argument).** Run the parser without `--id` to get
-every finding from the most recent comment that contains markers:
+every finding from the newest tracker issue:
 
 ```bash
-node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
+node scripts/review-fix-parse.mjs .review-fix-cache/issues.json \
   > .review-fix-cache/parsed.json
 ```
 
-Sweep output: `{commentId, commentUrl, createdAt, findings: [Finding, …]}`.
-Exit 1 with `No comment on the tracker contains findings` if every
-comment is a no-op summary — surface that to the user and stop.
+Sweep output: `{issueNumber, issueUrl, createdAt, findings: [Finding, …]}`.
+Exit 1 with `No review-bot issue contains findings — nothing to sweep`
+if every issue body is empty or summary-only — surface that to the
+user and stop.
 
 For each entry in `parsed.json` `.findings[]`:
 
@@ -178,17 +184,24 @@ For each entry in `parsed.json` `.findings[]`:
 `{id, shipped, shippedPr, severity, path, title, body}`. Read those
 fields from `.review-fix-cache/finding.json` `.finding` (single mode)
 or from `.review-fix-cache/parsed.json` `.findings[i]` (sweep mode).
-Do not re-parse the comment body by hand — the regex lives in the
+Do not re-parse the issue body by hand — the regex lives in the
 script.
 
 The parser already hard-fails single mode on `shipped === true`
 (exit 3). In sweep mode, you must perform the equivalent skip
 yourself (step 1).
 
+Capture `issueNumber` from the same JSON — it is the tracker issue
+that holds this finding, and step 5 / 6 substitute it into the plan
+frontmatter and PR magic line. Sweep mode shares one
+`issueNumber` across every finding (they all come from the same
+newest issue); single mode's `issueNumber` is whichever issue the
+matching finding lives in.
+
 ### 3. Compute slug + paths
 
 The slug always ends with the finding's `<sha7>-<idx>` so two
-findings in the same tracker comment that happen to share a
+findings in the same tracker issue that happen to share a
 severity + first-4-title-words prefix get distinct paths. Without
 that suffix, sweep mode would create the worktree for finding A,
 then silently skip finding B as an "existing worktree" collision.
@@ -234,7 +247,7 @@ body. The `tracker` value MUST be quoted — `#` opens a YAML comment.
 date: YYYY-MM-DD
 slug: review-bot-<slug>
 finding-id: <sha7>.<idx>
-tracker: '#87'
+tracker: '#<issueNumber>'
 severity: <BLOCKER|MAJOR|MINOR|NIT>
 ---
 
@@ -242,7 +255,7 @@ severity: <BLOCKER|MAJOR|MINOR|NIT>
 
 ## Source
 
-From `#87` comment <comment-id>, finding `<id>`:
+From `#<issueNumber>` (<issueUrl>), finding `<id>`:
 
 > **[<SEVERITY>]** `<path>` — <title>
 >
@@ -259,8 +272,8 @@ From `#87` comment <comment-id>, finding `<id>`:
 
 - Branch: `fix/review-bot-<slug>` (already cut by review-fix skill).
 - PR base: `develop`.
-- PR body MUST contain on its own line: `Refs #87 finding:<id>`.
-- PR body MUST NOT contain `Closes #87` / `Fixes #87`.
+- PR body MUST contain on its own line: `Refs #<issueNumber> finding:<id>`.
+- PR body MUST NOT contain `Closes #<issueNumber>` / `Fixes #<issueNumber>`.
 - Changeset required if behavior changes (`npm run changeset`).
 ```
 
@@ -274,8 +287,8 @@ Use these exact headings — they're what the user scans for.
 
 ```text
 ✅ Done by /review-fix:
-  - Cached tracker comments to .review-fix-cache/comments.json
-  - Picked finding <id> from comment <comment-id> (<commentUrl>)
+  - Cached review-bot issues to .review-fix-cache/issues.json
+  - Picked finding <id> from #<issueNumber> (<issueUrl>)
   - Cut branch <branch> off origin/develop
   - Created worktree at <worktree-dir> (npm install complete)
   - Wrote plan at <plan-path>
@@ -287,20 +300,20 @@ Use these exact headings — they're what the user scans for.
   4. npm run verify                                    (pre-PR gate)
   5. gh pr create --base develop  --title "..."  --body "..."
        PR body MUST include this line on its own:
-         Refs #87 finding:<id>
+         Refs #<issueNumber> finding:<id>
   6. After PR merges: run the cleanup commands in §7 of the skill
      (or re-invoke /review-fix; the skill prints them again).
 
 ℹ️ What happens automatically:
   - The `review-fix-shipped` Action ticks the tracker line `[x]` and
     appends `(shipped in #<your-pr>)` once the PR merges. Do NOT
-    edit the tracker comment yourself.
+    edit the tracker issue body yourself.
 ```
 
 **Sweep mode.** One block listing every plan + every skip:
 
 ```text
-Sweep of #87 latest comment: <N> findings processed.
+Sweep of #<issueNumber>: <N> findings processed.
 
 ✅ Plans written:
   - <id-1>  →  <plan-path-1>  (branch <branch-1>, worktree <worktree-dir-1>)
@@ -352,12 +365,12 @@ git fetch --prune origin
 **Sweep cleanup.** If multiple PRs merged in a batch, repeat the
 block above per `<slug>`. The user can list candidate worktrees
 with `git worktree list` and cross-check against `gh pr list
---state merged --search "Refs #87 finding:" --limit 20`.
+--state merged --search "Refs # finding:" --limit 20`.
 
 **What the skill does NOT touch:**
 
-- The tracker comment on `#87`. The `review-fix-shipped` Action edits
-  it post-merge. Manual edits race the Action and corrupt the
+- The tracker issue body. The `review-fix-shipped` Action edits it
+  post-merge. Manual edits race the Action and corrupt the
   `(shipped in #N)` rendering.
 - The `.review-fix-cache/` directory. It's gitignored and cheap to
   rebuild on the next run; leaving it speeds up the next sweep.
@@ -366,10 +379,11 @@ with `git worktree list` and cross-check against `gh pr list
 
 - Do NOT open the PR. PR creation belongs to the implementation
   session, not the plan session.
-- Do NOT close the tracker issue. Do NOT add `Closes #87` / `Fixes #87`
-  anywhere.
-- Do NOT edit the tracker comment from the skill — only the
-  `review-fix-shipped` Action edits comments, and only post-merge.
+- Do NOT close any tracker issue. Do NOT add
+  `Closes #<issueNumber>` / `Fixes #<issueNumber>` anywhere.
+- Do NOT edit the tracker issue body from the skill — only the
+  `review-fix-shipped` Action edits issue bodies, and only
+  post-merge.
 - Do NOT batch findings into a single branch / PR. One finding = one
   branch = one PR. Sweep mode produces N branches + N plans, never a
   combined plan.

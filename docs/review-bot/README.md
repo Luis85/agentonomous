@@ -12,14 +12,18 @@ per weekday and persists findings to two sinks.
 
 ## Output sinks
 
-1. **Rolling GitHub issue** — title `Daily code review — develop`,
-   label `review-bot`. New comment per run. Issue body holds the
-   canonical `Last reviewed SHA` so the next run knows where to
-   resume.
+1. **GitHub issue per run** — title
+   `Code review YYYY-MM-DD — <head-sha[:7]>`, label `review-bot`.
+   Each scheduled run opens a fresh issue whose **body** holds the
+   full findings block. There is no rolling tracker and no
+   append-to-comments step; the `review-fix-shipped` Action edits
+   the body in place when individual findings ship.
 2. **Committed daily docs** — `docs/daily-reviews/YYYY-MM-DD.md`
-   (one file per UTC day, frontmatter + findings body). Reaches
-   `develop` via an automated PR `chore/daily-review-YYYY-MM-DD`,
-   never a direct push.
+   (one file per UTC day, frontmatter + findings body, plus an
+   `issue: <n>` cross-link). Reaches `develop` via an automated PR
+   `chore/daily-review-YYYY-MM-DD`, never a direct push. The doc's
+   `range:` end SHA is the canonical "Last reviewed SHA" the next
+   run reads to resume.
 
 ## Ingesting findings via `review-fix`
 
@@ -35,43 +39,50 @@ line. `head-sha[:7]` is the seven-char prefix of the head SHA
 reviewed in that run; `idx` is the 1-based position of the finding
 within the run.
 
-IDs do not deduplicate across reruns: tomorrow's run on a new SHA
+IDs do not deduplicate across runs: tomorrow's run on a new SHA
 emits a fresh set of IDs even for findings that were already
-unshipped. The unshipped checkbox on the prior comment still flips
-when the eventual PR ships.
+unshipped, and they live on a different issue. The unshipped
+checkbox on the prior issue still flips when the eventual PR ships.
 
 ### Workflow
 
 ```text
-gh issue view 87 --comments       # find a finding ID
-/review-fix pick <id>             # creates worktree + plan
-/superpowers:writing-plans <plan> # expand plan into chunked tasks
-/superpowers:executing-plans …    # implement, verify, open PR
+gh issue list --label review-bot --limit 5     # find the latest issue
+gh issue view <n>                              # read the body, pick a finding ID
+/review-fix pick <id>                          # creates worktree + plan
+/superpowers:writing-plans <plan>              # expand plan into chunked tasks
+/superpowers:executing-plans …                 # implement, verify, open PR
 ```
 
 The PR body MUST contain, on its own line:
 
 ```
-Refs #87 finding:<sha7>.<idx>
+Refs #<issue-number> finding:<sha7>.<idx>
 ```
 
-Trailing whitespace is tolerated; trailing punctuation breaks the
-match. The PR body MUST NOT contain `Closes #87` / `Fixes #87` —
-the tracker is long-lived and stays open.
+`<issue-number>` is the review-bot issue that holds the matching
+finding (the `review-fix` skill writes it into the plan
+frontmatter). Trailing whitespace is tolerated; trailing
+punctuation breaks the match. The PR body MUST NOT contain
+`Closes #<n>` / `Fixes #<n>` for the review-bot issue — those
+issues are long-lived archives of each run, even after every
+finding ships.
 
 ### Auto-flip on merge
 
 `.github/workflows/review-fix-shipped.yml` triggers on
-`pull_request: closed && merged`, regexes the PR body for the magic
-line, locates the matching tracker comment, and edits the body so
-the checklist item becomes:
+`pull_request: closed && merged`, regexes the PR body for every
+`Refs #<n> finding:<sha7>.<idx>` line, fetches each referenced
+issue's body, and edits the matching checklist item in place:
 
 ```markdown
 - [x] **[BLOCKER]** `path/to/file.ts:42` — short title (shipped in #N) <!-- f:<sha7>.<idx> -->
 ```
 
 The Action does not block merges; it observes them. If the magic
-line is missing, it logs and exits 0.
+line is missing or the referenced issue does not exist, it logs and
+exits 0. Read failures (403/429/5xx) fail the run loudly so a
+silently-dropped flip never goes unnoticed.
 
 ## CI behavior on the daily PR
 
@@ -105,11 +116,16 @@ invariants, or output-format pain. To change it:
 
 ## Initial setup checklist (one-time)
 
-- [ ] Create the rolling issue `Daily code review — develop`. Add label
-      `review-bot`. Seed the body with `Last reviewed SHA: <none>` so
-      the first run falls back to `--since="24 hours ago"`.
-- [ ] Add a PR label `review-bot` (cosmetic — lets you filter the
-      automated PRs out of the human review queue).
+- [ ] Create the `review-bot` label (issue + PR scope). Issue scope
+      lets the bot tag every per-run issue and lets `review-fix`
+      query them with `gh issue list --label review-bot`. PR scope
+      is cosmetic — filters automated review-fix PRs out of the
+      human queue.
+- [ ] Confirm the first run will fall back to
+      `git log --since="24 hours ago"` because no
+      `docs/daily-reviews/*.md` exists yet on `develop`. After the
+      first run lands, the doc's `range:` end SHA becomes the
+      resume point automatically.
 - [ ] Enable auto-merge on the repo (`Settings → General → Pull
       Requests → Allow auto-merge`). The routine sets
       `gh pr merge --auto --squash`.
@@ -137,10 +153,11 @@ just noisy in the rolling issue.
 
 ## Known tradeoffs
 
-- **Rolling issue grows forever.** Rotate quarterly: close the current
-  issue, open `Daily code review — develop (QN YYYY)`. Add a step to the
-  routine that opens a new issue once the active one passes 500
-  comments.
+- **Issue list grows over time.** Each run opens an issue; close
+  them once every finding is shipped (or auto-close via a
+  separate routine if you want zero backlog). Active +
+  partially-shipped issues stay open and remain reachable to
+  `review-fix`.
 - **Doc PR still costs CI minutes** for `format-check`, `actionlint`,
   `audit`, and `ci-gate`. Acceptable — combined under a minute.
 - **Auto-merge requires green CI on `develop`'s protection rules.** If

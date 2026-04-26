@@ -2,10 +2,10 @@ name: review-fix-shipped
 
 on:
   # `pull_request_target` runs in the base-repo context with a write-
-  # capable GITHUB_TOKEN. We need that to PATCH the tracker comment on
-  # merges from fork PRs, where the standard `pull_request` event fires
-  # with a read-only token. This is safe because the workflow does NOT
-  # check out or execute any PR-supplied code — it only reads
+  # capable GITHUB_TOKEN. We need that to PATCH the tracker issue body
+  # on merges from fork PRs, where the standard `pull_request` event
+  # fires with a read-only token. This is safe because the workflow
+  # does NOT check out or execute any PR-supplied code — it only reads
   # `context.payload.pull_request.body` (already present in the event
   # payload) and calls the GitHub REST API.
   pull_request_target:
@@ -17,19 +17,20 @@ permissions:
 
 concurrency:
   # Global group across all PRs: every job in this workflow reads + rewrites
-  # the same tracker comment body. Keying by PR number would let two merged
-  # PRs run in parallel, both read a pre-flip body, and the later write
-  # would silently revert the earlier flip. cancel-in-progress: false
-  # preserves the earlier run; the later run queues until it finishes.
+  # a review-bot issue body. Keying by PR number would let two merged
+  # PRs targeting the same review-bot issue run in parallel, both read a
+  # pre-flip body, and the later write would silently revert the earlier
+  # flip. cancel-in-progress: false preserves the earlier run; the later
+  # run queues until it finishes.
   group: review-fix-shipped
   cancel-in-progress: false
 
 jobs:
   flip-tracker-checkbox:
-    # Only fire on PRs merged INTO develop. The tracker (#87
-    # "Daily code review — develop") is explicitly scoped to that
-    # branch. A hotfix-to-main or demo-promotion PR carrying a copied
-    # `Refs #87 finding:<id>` line would otherwise flip the tracker
+    # Only fire on PRs merged INTO develop. Each `review-bot`-labelled
+    # issue is scoped to that branch's review history. A hotfix-to-main
+    # or demo-promotion PR carrying a copied
+    # `Refs #<n> finding:<id>` line would otherwise flip a tracker
     # even though the fix never landed on develop, creating a false
     # shipped state.
     if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'develop'
@@ -54,9 +55,9 @@ jobs:
             // run fails at the end if any flip could not be persisted or
             // any non-404 API error masked a flip. Only "expected content
             // misses" stay soft:
-            //   - listComments 404 (target issue does not exist — PR-body
+            //   - issues.get 404 (target issue does not exist — PR-body
             //     content bug, not an automation problem),
-            //   - finding not present in the comment body,
+            //   - finding not present in the issue body,
             //   - line already shipped or shape unexpected.
             // Everything else (403/429/5xx/network on either read or write)
             // increments hardFailures and triggers core.setFailed at the end.
@@ -69,25 +70,16 @@ jobs:
               const marker = `<!-- f:${findingId} -->`;
 
               try {
-                core.info(`Looking for ${marker} in #${issueNumber} comments...`);
+                core.info(`Looking for ${marker} in #${issueNumber} body...`);
 
-                const iterator = github.paginate.iterator(
-                  github.rest.issues.listComments,
-                  {
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issueNumber,
-                    per_page: 100,
-                  },
-                );
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                });
 
-                let hit = null;
-                for await (const { data: page } of iterator) {
-                  hit = page.find((c) => c.body && c.body.includes(marker));
-                  if (hit) break;
-                }
-
-                if (!hit) {
+                const issueBody = issue.body || '';
+                if (!issueBody.includes(marker)) {
                   core.warning(`Finding ${findingId} not found in #${issueNumber}. Skipping.`);
                   continue;
                 }
@@ -95,11 +87,11 @@ jobs:
                 // Locate the line containing the marker by string ops (no
                 // regex escaping needed). Markers are unique per finding ID,
                 // so a single substring search is sufficient.
-                const markerIdx = hit.body.indexOf(marker);
-                const lineStart = hit.body.lastIndexOf('\n', markerIdx) + 1;
-                const lineEndRaw = hit.body.indexOf('\n', markerIdx);
-                const lineEnd = lineEndRaw === -1 ? hit.body.length : lineEndRaw;
-                const line = hit.body.slice(lineStart, lineEnd);
+                const markerIdx = issueBody.indexOf(marker);
+                const lineStart = issueBody.lastIndexOf('\n', markerIdx) + 1;
+                const lineEndRaw = issueBody.indexOf('\n', markerIdx);
+                const lineEnd = lineEndRaw === -1 ? issueBody.length : lineEndRaw;
+                const line = issueBody.slice(lineStart, lineEnd);
 
                 if (line.startsWith('- [x] ')) {
                   core.warning(`Finding ${findingId} already shipped. Skipping.`);
@@ -113,16 +105,16 @@ jobs:
                 const newLine = line
                   .replace('- [ ] ', '- [x] ')
                   .replace(` ${marker}`, ` (shipped in #${prNumber}) ${marker}`);
-                const newBody = hit.body.slice(0, lineStart) + newLine + hit.body.slice(lineEnd);
+                const newBody = issueBody.slice(0, lineStart) + newLine + issueBody.slice(lineEnd);
 
                 // Inner try/catch: write failures (missing perms, rate
                 // limit, 5xx) MUST surface as a failed run; otherwise
                 // shipped-state silently drifts.
                 try {
-                  await github.rest.issues.updateComment({
+                  await github.rest.issues.update({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    comment_id: hit.id,
+                    issue_number: issueNumber,
                     body: newBody,
                   });
                   core.info(`Flipped finding ${findingId} -> shipped in #${prNumber}.`);
@@ -131,7 +123,7 @@ jobs:
                   core.error(`Failed to write flip for ${findingId} in #${issueNumber}: ${writeErr.message}`);
                 }
               } catch (readErr) {
-                // 404 on listComments = "target issue does not exist" =
+                // 404 on issues.get = "target issue does not exist" =
                 // soft (PR-body content bug). Anything else (403, 429,
                 // 5xx, network) is a transient/permissions failure that
                 // would silently drop a valid flip — fail loudly.
@@ -139,11 +131,11 @@ jobs:
                   core.warning(`Issue #${issueNumber} not found (finding ${findingId}). Skipping.`);
                 } else {
                   hardFailures++;
-                  core.error(`Failed to read comments for #${issueNumber} (finding ${findingId}): ${readErr.message} (status ${readErr.status ?? 'n/a'})`);
+                  core.error(`Failed to read #${issueNumber} (finding ${findingId}): ${readErr.message} (status ${readErr.status ?? 'n/a'})`);
                 }
               }
             }
 
             if (hardFailures > 0) {
-              core.setFailed(`${hardFailures} flip(s) failed (read or write); tracker comment is out of sync. Review run logs and re-run after fixing the underlying issue.`);
+              core.setFailed(`${hardFailures} flip(s) failed (read or write); tracker issue is out of sync. Review run logs and re-run after fixing the underlying issue.`);
             }

@@ -1,53 +1,55 @@
 #!/usr/bin/env node
 /**
- * review-fix tracker comment parser.
+ * review-fix tracker parser.
  *
- * Reads the raw `gh api ... --paginate --slurp` output for issue #87
- * comments and emits a structured JSON description of either:
- *   - the most recent comment that contains finding markers (sweep
+ * Reads a JSON list of `review-bot`-labelled issues (one issue per
+ * scheduled bot run, findings live in the issue body) and emits a
+ * structured description of either:
+ *   - the most recent issue that contains finding markers (sweep
  *     mode, default), or
- *   - the comment that contains a specific finding ID (single mode,
- *     `--id <sha7>.<idx>`), searching the full comment history so
- *     backlog findings on older comments stay reachable.
+ *   - the issue whose body holds a specific finding ID (single mode,
+ *     `--id <sha7>.<idx>`), scanning every issue in the input so
+ *     backlog findings on older issues stay reachable.
+ *
+ * Input shape — array of GitHub issue objects:
+ *   [
+ *     { "number": 142, "body": "...", "url": "...", "createdAt": "ISO8601" },
+ *     { "number":  87, "body": "...", "url": "...", "createdAt": "ISO8601" },
+ *     ...
+ *   ]
+ *
+ * The caller fetches this via:
+ *   gh issue list --label review-bot --state all \
+ *     --json number,body,url,createdAt --limit 50 \
+ *     > .review-fix-cache/issues.json
+ *
+ * A single-issue object (no array wrapper) is also accepted for
+ * convenience — it is wrapped into a one-element list before parsing.
  *
  * Used by the `review-fix` skill to sidestep platform-specific shell
  * pitfalls:
  *   - Windows Git Bash maps `/tmp` to `D:\tmp` for native binaries,
  *     breaking Node `fs.readFileSync('/tmp/...')`.
- *   - `gh --paginate --slurp` rejects `--jq` / `--template` flags.
  *   - `jq` is not installed by default on Windows or many CI images.
  *
  * Node is a hard project requirement (TypeScript library, ESM, Node 22
  * per `.nvmrc`), so this script is the canonical parser the skill
  * shells out to.
  *
- * Usage:
- *   gh api "repos/<owner>/<repo>/issues/87/comments" --paginate --slurp \
- *     > .review-fix-cache/comments.json
- *
- *   # Sweep mode — newest comment with markers
- *   node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
- *     > .review-fix-cache/parsed.json
- *
- *   # Single mode — specific finding ID, any comment in history
- *   node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
- *     --id 682b557.3 \
- *     > .review-fix-cache/finding.json
- *
  * Sweep-mode output:
  *   {
- *     "commentId":  <number>,
- *     "commentUrl": <string>,
- *     "createdAt":  <iso8601>,
- *     "findings":   [Finding, ...]
+ *     "issueNumber": <number>,
+ *     "issueUrl":    <string>,
+ *     "createdAt":   <iso8601>,
+ *     "findings":    [Finding, ...]
  *   }
  *
  * Single-mode output:
  *   {
- *     "commentId":  <number>,
- *     "commentUrl": <string>,
- *     "createdAt":  <iso8601>,
- *     "finding":    Finding
+ *     "issueNumber": <number>,
+ *     "issueUrl":    <string>,
+ *     "createdAt":   <iso8601>,
+ *     "finding":     Finding
  *   }
  *
  * Finding shape:
@@ -63,7 +65,7 @@
  *
  * Exit codes:
  *   0  success
- *   1  no comment / no finding matched
+ *   1  no issue / no finding matched
  *   2  bad CLI arguments
  *   3  finding matched but already shipped (single mode only)
  */
@@ -82,7 +84,7 @@ for (let i = 1; i < args.length; i += 1) {
 }
 
 if (!inputPath) {
-  stderr.write('usage: review-fix-parse.mjs <comments.json> [--id <sha7>.<idx>]\n');
+  stderr.write('usage: review-fix-parse.mjs <issues.json> [--id <sha7>.<idx>]\n');
   exit(2);
 }
 if (targetId !== null && !/^[A-Za-z0-9]+\.[0-9]+$/.test(targetId)) {
@@ -91,48 +93,39 @@ if (targetId !== null && !/^[A-Za-z0-9]+\.[0-9]+$/.test(targetId)) {
 }
 
 const raw = JSON.parse(readFileSync(inputPath, 'utf8'));
-// `gh --paginate --slurp` returns an array of pages (one entry per
-// page), not a flat list of comments. Flatten one level so callers
-// can stay agnostic.
-const comments = (Array.isArray(raw) ? raw : [raw]).flat();
+// Accept either an array of issues or a single issue object.
+const issues = Array.isArray(raw) ? raw : [raw];
 
-// Filter by parsed checklist findings, NOT by raw `<!-- f:` substring.
-// A no-op summary comment may quote a previous finding's marker inside
-// its body or in a `<details>` block; if we keyed the sweep on
-// `body.includes('<!-- f:')` and the newest match happened to be such
-// a quote-only comment, sweep would emit an empty `findings: []` and
-// silently skip every older comment with real, actionable findings.
-// Pre-parsing here also lets us reuse the result downstream.
-const withFindings = comments
-  .filter((c) => typeof c.body === 'string')
-  .map((c) => ({ comment: c, findings: parseFindings(c.body) }))
-  .filter((c) => c.findings.length > 0)
-  .sort((a, b) => new Date(a.comment.created_at) - new Date(b.comment.created_at));
+// Pre-parse every issue body. Sort newest-first so sweep picks the
+// freshest tracker without another pass.
+const withFindings = issues
+  .filter((iss) => typeof iss.body === 'string')
+  .map((iss) => ({ issue: iss, findings: parseFindings(iss.body) }))
+  .filter((entry) => entry.findings.length > 0)
+  .sort((a, b) => new Date(b.issue.createdAt) - new Date(a.issue.createdAt));
 
 if (withFindings.length === 0) {
-  stderr.write('No comment on the tracker contains findings — nothing to sweep\n');
+  stderr.write('No review-bot issue contains findings — nothing to sweep\n');
   exit(1);
 }
 
 if (targetId === null) {
-  // Sweep: emit every finding from the newest comment that has any.
-  const newest = withFindings[withFindings.length - 1];
+  // Sweep: every finding from the newest issue that has any.
+  const newest = withFindings[0];
   emit({
-    commentId: newest.comment.id,
-    commentUrl: newest.comment.html_url,
-    createdAt: newest.comment.created_at,
+    issueNumber: newest.issue.number,
+    issueUrl: newest.issue.url,
+    createdAt: newest.issue.createdAt,
     findings: newest.findings,
   });
   exit(0);
 }
 
-// Single: scan the full history (newest first) for the target ID so a
-// backlog finding on an older comment stays reachable. The first
-// match wins; duplicate IDs across comments would only happen if the
-// review bot re-emitted an old finding, in which case the freshest
-// occurrence is what the user wants.
-for (let i = withFindings.length - 1; i >= 0; i -= 1) {
-  const { comment, findings } = withFindings[i];
+// Single: scan newest-first across every issue. The first match wins;
+// duplicate IDs across issues would only happen if the bot re-emitted
+// an old finding, in which case the freshest occurrence is what the
+// user wants.
+for (const { issue, findings } of withFindings) {
   const match = findings.find((f) => f.id === targetId);
   if (!match) continue;
   if (match.shipped) {
@@ -140,15 +133,15 @@ for (let i = withFindings.length - 1; i >= 0; i -= 1) {
     exit(3);
   }
   emit({
-    commentId: comment.id,
-    commentUrl: comment.html_url,
-    createdAt: comment.created_at,
+    issueNumber: issue.number,
+    issueUrl: issue.url,
+    createdAt: issue.createdAt,
     finding: match,
   });
   exit(0);
 }
 
-stderr.write(`Finding ${targetId} not found in any tracker comment\n`);
+stderr.write(`Finding ${targetId} not found in any review-bot issue\n`);
 exit(1);
 
 function emit(obj) {
@@ -156,7 +149,7 @@ function emit(obj) {
 }
 
 /**
- * Parses one comment body into individual finding entries.
+ * Parses one issue body into individual finding entries.
  *
  * A finding header is a top-level checklist line (no leading
  * whitespace) shaped like:
@@ -172,7 +165,7 @@ function emit(obj) {
  * Quoted finding-marker text inside a `<details>` body is ignored —
  * only top-level checklist lines mark finding boundaries. The body
  * for each finding is every line between its header and the next
- * header (or end-of-comment), with leading/trailing blank lines
+ * header (or end-of-issue), with leading/trailing blank lines
  * trimmed.
  */
 function parseFindings(body) {
@@ -190,10 +183,10 @@ function parseFindings(body) {
   return headers.map((h, idx) => {
     const nextIndex = headers[idx + 1]?.index ?? lines.length;
     const slice = lines.slice(h.index + 1, nextIndex);
-    // The last header's slice runs through the comment's trailing
+    // The last header's slice runs through the issue's trailing
     // summary (counter-arguments, "Reviewed range", footer). Cut at
     // the first standalone `---` so a finding body never absorbs
-    // metadata that belongs to the comment as a whole.
+    // metadata that belongs to the issue as a whole.
     const ruleAt = slice.findIndex((line) => /^---\s*$/.test(line));
     const bodyLines = ruleAt >= 0 ? slice.slice(0, ruleAt) : slice;
     while (bodyLines.length > 0 && bodyLines[0].trim() === '') {
