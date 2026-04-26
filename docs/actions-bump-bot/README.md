@@ -38,15 +38,28 @@ the run's artifact. Same convention as the refactored daily
 artifact here is a PR rather than an issue, because the routine's
 output is a code change rather than a triage report.
 
-**Failure issue, secondary sink (only on verify / actionlint
-failure):** if applying the bumps surfaces a verify failure, the
-routine reverts the bump edits locally, opens an issue titled
-`Action SHA bumps YYYY-MM-DD — <sha7>` under the `actions-bump-bot`
-label with the failure tail in the body, and exits 1. The owner
-triages from the `actions-bump-bot` label view and closes the issue
-manually once the underlying breakage is resolved. See the prompt's
+**Failure issues, secondary sink.** Four distinct issue title shapes
+under the `actions-bump-bot` label cover every failure path:
+
+- `Action SHA bumps YYYY-MM-DD — script error` — `scripts/bump-actions.mjs`
+  reported `ERROR` rows (auth / network / rate-limit / missing CLI).
+  Aborts the run.
+- `Divergent action pins: <owner>/<repo>` — one issue per divergent
+  action when the same action is pinned to multiple SHA/label tuples
+  across workflows. Filed alongside any bump PR, never in place of one.
+- `Unresolved action pins YYYY-MM-DD` — one issue per run grouping
+  every `no-releases` / `unresolved` row from the scan. Filed
+  alongside any bump PR.
+- `Action SHA bumps YYYY-MM-DD — <sha7>` — `actionlint` or
+  `npm run verify` failed after applying bumps. Bump branch is
+  reverted locally before the issue is filed.
+
+The owner triages from the `actions-bump-bot` label view and closes
+each issue manually once the underlying breakage is resolved. See
+the prompt's
+[Failure handling](./PROMPT.md#failure-handling) and
 [Failure-issue spec](./PROMPT.md#failure-issue-spec) for the exact
-shape.
+body shape of each.
 
 There is no per-PR or per-bump state to carry across runs (this
 routine opens at most one PR per run, against a fresh dated

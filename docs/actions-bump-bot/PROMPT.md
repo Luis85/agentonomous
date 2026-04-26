@@ -97,12 +97,21 @@ the status-table column 6 from the script's stdout to distinguish:
 node scripts/bump-actions.mjs > /tmp/bump-actions.out 2>&1
 SCRIPT_EXIT=$?
 
-# Strip the table to its 6th column (status) — skip the header line
-# (`action  pinned  sha  latest  sha  status`) and the dashed
-# separator. `awk` works because the script left-pads every column
-# with spaces so the last whitespace-delimited token on each row is
-# always the status.
-STATUSES="$(awk 'NR>2 && NF>0 && $0 !~ /^-+$/ {print $NF}' /tmp/bump-actions.out)"
+# Scope the parse to the data rows of the status table only — start
+# after the `action  pinned  sha  latest  sha  status` header, skip
+# the dashed separator, and stop at the first blank line so the
+# per-status detail sections that follow the table (`<N> pending
+# bump(s):`, the `gh api ...  # peel + verify, then edit <path>`
+# blocks, the divergent variant lists) cannot leak status-shaped
+# tokens into `$NF`. Inside the table, the script left-pads every
+# column with spaces so the last whitespace-delimited token on each
+# data row is always the status.
+STATUSES="$(awk '
+  /^action[[:space:]]+pinned[[:space:]]+sha/ { in_table = 1; next }
+  in_table && /^-+$/ { next }
+  in_table && NF == 0 { exit }
+  in_table { print $NF }
+' /tmp/bump-actions.out)"
 UNRESOLVED="$(printf '%s\n' "$STATUSES" | grep -E '^(no-releases|unresolved)$' || true)"
 
 if [ "$SCRIPT_EXIT" -eq 0 ] && [ -z "$UNRESOLVED" ]; then
@@ -136,6 +145,17 @@ opening a partial bump PR would hide the underlying break.
 [Failure handling](#failure-handling) but do NOT abort the run —
 processing of `PENDING` rows continues alongside.
 
+`no-releases` and `unresolved` rows are filed under a single triage
+issue per [Failure handling](#failure-handling) and also do NOT
+abort the run. Detect them by parsing column 6 of the status table
+per the awk pipeline in [No-op detection](#no-op-detection) — these
+statuses do not gate the script's exit code (`SCRIPT_EXIT == 1`
+when `PENDING` is present masks them), so the routine MUST scan the
+table directly even when the No-op detection branch does not fire.
+File the triage issue before processing any `PENDING` rows so the
+`actions-bump-bot` label view always shows the unresolved drift,
+even on runs that also open a bump PR.
+
 For each remaining `PENDING` row in scope:
 
 1. **Re-resolve every SHA fresh.** Never copy the script's `latest sha`
@@ -161,9 +181,9 @@ For each remaining `PENDING` row in scope:
    [Failure-issue spec](#failure-issue-spec) uses its 7-char prefix
    for issue titles since the bump commit (step 6) may not exist yet
    when actionlint or verify fails. The
-   [Dry-run mode](#dry-run-mode) contract requires zero filesystem
-   side effects — gate the actual `git switch -c` so a dry run on a
-   shared / persistent runner doesn't leave a stray
+   [Dry-run contract](#dry-run-contract) forbids new commits and
+   remote-side writes — gate the actual `git switch -c` so a dry
+   run on a shared / persistent runner doesn't leave a stray
    `chore/actions-bump-<date>` branch behind to contaminate later
    runs:
 
@@ -260,9 +280,11 @@ For each remaining `PENDING` row in scope:
    `develop` here. An unconditional `git commit` would commit the
    bump edits directly onto the local `develop` clone, contaminating
    subsequent runs. Skipping the commit (and step 8's push) keeps
-   the dry-run contract: zero filesystem side effects beyond the
-   workflow-file edits in [step 3](#process), which are reverted by
-   [Failure handling](#failure-handling) on any failure path.
+   the [Dry-run contract](#dry-run-contract): no commits, no
+   remote-side writes. Workflow-file edits made in [step 3](#process)
+   live in the working tree only; they are reverted before exit by
+   the [Dry-run mode](#dry-run-mode) cleanup on the success path,
+   or by [Failure handling](#failure-handling) on any failure path.
 
 7. **Write the PR body to the cache file (skipped in `DRY_RUN`).**
    The routine assembled `${BODY}` in memory while applying bumps
@@ -271,13 +293,13 @@ For each remaining `PENDING` row in scope:
    reference has something to read, AND so an `gh pr create` failure
    leaves a re-submit-by-hand artifact (per
    [Failure handling](#failure-handling)). The
-   [Dry-run mode](#dry-run-mode) contract requires zero filesystem
-   side effects from cache writes — gate this step:
+   [Dry-run contract](#dry-run-contract) forbids cache writes —
+   gate this step:
 
    ```bash
    BODY_FILE=".actions-bump-cache/pr-body-$(date -u +%F).md"
    if [ -n "${DRY_RUN:-}" ]; then
-     printf '[DRY_RUN] would write PR body to %q (skipped — zero filesystem side effects)\n' \
+     printf '[DRY_RUN] would write PR body to %q (skipped — dry-run forbids cache writes)\n' \
        "${BODY_FILE}"
    else
      mkdir -p .actions-bump-cache
@@ -396,14 +418,26 @@ comma-separated.
 artifact — applied bumps in the body table, verify status in the
 footer. There is no per-run issue when verify passes.
 
-**Secondary sink: failure issue under the `actions-bump-bot` label.**
-The routine opens a fresh issue per [Failure handling](#failure-handling)
-on every failure path the run can hit — `ERROR` rows from
-`scripts/bump-actions.mjs` (auth / network / rate-limit / missing CLI),
-`DIVERGENT` rows (filed alongside any bump PR, not in place of one),
-`actionlint` failures after applying bumps, and `npm run verify`
-failures after applying bumps. Each path uses its own issue title
-prefix; see [Failure handling](#failure-handling) for the exact specs.
+**Secondary sink: one issue per failure type under the
+`actions-bump-bot` label.** The routine opens a fresh issue per
+[Failure handling](#failure-handling) on every failure path the run
+can hit. Four distinct issue title shapes:
+
+- `Action SHA bumps YYYY-MM-DD — script error` — `ERROR` rows from
+  `scripts/bump-actions.mjs` (auth / network / rate-limit / missing
+  CLI). Aborts the run.
+- `Divergent action pins: <owner>/<repo>` — one issue per divergent
+  action, filed alongside any bump PR (not in place of one). Three
+  divergent actions in one scan = three issues.
+- `Unresolved action pins YYYY-MM-DD` — one issue per run grouping
+  every `no-releases` / `unresolved` row, filed alongside any bump
+  PR (not in place of one).
+- `Action SHA bumps YYYY-MM-DD — <sha7>` — `actionlint` failure
+  after applying bumps OR `npm run verify` failure after applying
+  bumps. Bump branch is reverted locally before the issue is filed.
+
+See [Failure handling](#failure-handling) for the exact body shape
+of each.
 
 **No-op runs leave no trace.** If `scripts/bump-actions.mjs` exits 0,
 exit cleanly without opening a PR or issue. An empty
@@ -563,14 +597,18 @@ re-derives idempotently. Exit 0 after dumping.
   Exit 1. The owner triages the underlying tooling failure before
   the next run.
 
-- **`scripts/bump-actions.mjs` reports `DIVERGENT` rows** → open a
-  fresh issue under the `actions-bump-bot` label titled
-  `Divergent action pins: <owner>/<repo>` with the variant list in
-  the body. Do **NOT** abort the run — continue processing whatever
-  `PENDING` rows the same scan returned (per [Process](#process)
-  pre-flight, only `ERROR` aborts; `DIVERGENT` files its own issue
-  alongside the bump PR). The divergent issue is filed regardless of
-  whether the run also opens a bump PR.
+- **`scripts/bump-actions.mjs` reports `DIVERGENT` rows** → open
+  **one issue per divergent `<owner>/<repo>`** under the
+  `actions-bump-bot` label titled
+  `Divergent action pins: <owner>/<repo>` with that action's variant
+  list in the body. Three divergent actions in one scan = three
+  issues; do NOT bundle them into a single combined issue (the
+  per-action title is what makes the label view scannable). Do
+  **NOT** abort the run — continue processing whatever `PENDING`
+  rows the same scan returned (per [Process](#process) pre-flight,
+  only `ERROR` aborts; `DIVERGENT` files its own issue alongside the
+  bump PR). The divergent issue(s) are filed regardless of whether
+  the run also opens a bump PR.
 
 - **`scripts/bump-actions.mjs` reports `no-releases` or `unresolved`
   rows** → open a fresh issue under the `actions-bump-bot` label
@@ -611,8 +649,9 @@ re-derives idempotently. Exit 0 after dumping.
   `.actions-bump-cache/FAILED-issue-body-<UTC-date>.md` and exit 1.
   The cache dir is gitignored (one-time setup, see README).
 
-- **In `DRY_RUN` mode**, do NOT write `FAILED-*.md` files. Dry runs
-  leave zero filesystem side effects.
+- **In `DRY_RUN` mode**, do NOT write `FAILED-*.md` files. Dry
+  runs leave no commits, no remote-side writes, and no cache files
+  (per the [Dry-run contract](#dry-run-contract)).
 
 ## Failure-issue spec
 
