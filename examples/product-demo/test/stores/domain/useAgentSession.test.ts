@@ -136,24 +136,24 @@ describe('useAgentSession', () => {
     expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 2);
   });
 
-  it('replayFromSnapshot(null) rebuilds a fresh agent reusing the persisted seed', () => {
+  it('replayFromSnapshot(null) rebuilds a fresh agent reusing the persisted seed', async () => {
     const session = useAgentSession();
     session.init({ seed: 'replay-seed' });
     const firstAgent = session.agent;
-    session.replayFromSnapshot(null);
+    await session.replayFromSnapshot(null);
     expect(session.agent).not.toBe(firstAgent);
     expect(session.seed).toBe('replay-seed');
     expect(session.running).toBe(true);
     expect(session.speedMultiplier).toBe(1);
   });
 
-  it('replayFromSnapshot(null) reapplies the species override that init received', () => {
+  it('replayFromSnapshot(null) reapplies the species override that init received', async () => {
     const session = useAgentSession();
     session.init({ seed: 'override-seed', speciesOverride: catSpecies });
     expect(session.lastSpeciesOverride?.id).toBe(catSpecies.id);
     const firstAgent = session.agent;
 
-    session.replayFromSnapshot(null);
+    await session.replayFromSnapshot(null);
     expect(session.agent).not.toBe(firstAgent);
     // Override is retained across rebuild — without this the rebuilt
     // agent would silently revert to the scenario default.
@@ -185,7 +185,7 @@ describe('useAgentSession', () => {
     const firstCount = ticked.length;
     expect(firstCount).toBeGreaterThan(0);
 
-    session.replayFromSnapshot(null);
+    await session.replayFromSnapshot(null);
     await session.tick(0.1);
     expect(ticked.length).toBeGreaterThan(firstCount);
 
@@ -195,9 +195,32 @@ describe('useAgentSession', () => {
     expect(ticked.length).toBe(afterUnsubCount);
   });
 
-  it('replayFromSnapshot(snapshot) is deferred to slice 1.2b and throws today', () => {
+  it('replayFromSnapshot(snapshot) restores the supplied agent state', async () => {
     const session = useAgentSession();
-    session.init({ seed: 'defer-seed' });
-    expect(() => session.replayFromSnapshot({ version: 1 })).toThrow(/slice 1\.2b/);
+    session.init({ seed: 'snap-seed' });
+    // Tick once so the snapshot's state diverges from a fresh build.
+    await session.tick(1);
+    const snap = session.agent!.snapshot();
+    const snapAge = snap.lifecycle?.ageSeconds ?? 0;
+
+    // Drift the live agent further so we can prove the restore won.
+    await session.tick(1);
+    await session.tick(1);
+
+    await session.replayFromSnapshot(snap);
+    // After restore, the agent reports the exact age stored in snap
+    // (no fast-forward — `catchUp: false`).
+    expect(session.agent!.getState().ageSeconds).toBeCloseTo(snapAge, 6);
+  });
+
+  it('AGENT_TICKED projections (tickIndex / lastTrace / lastTickNumber) update reactively', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'project-seed' });
+    expect(session.tickIndex).toBe(0);
+    expect(session.lastTrace).toBeNull();
+    await session.tick(0.1);
+    expect(session.tickIndex).toBeGreaterThan(0);
+    expect(session.lastTrace).not.toBeNull();
+    expect(session.lastTickNumber).toBeGreaterThan(0);
   });
 });

@@ -46,17 +46,13 @@ export default tseslint.config(
       'node_modules',
       'playwright-report',
       'test-results',
-      // Legacy vanilla-TS DOM mounts that Pillar 1 slice 1.2b ports into
-      // SFCs and deletes. Cognition switcher / loss sparkline / prediction
-      // strip / species config stay here until Pillar 2 slice 2.5 + Pillar
-      // 4 slice 4.3 port + delete them. The pure modules previously listed
-      // here (`species.ts`, `constants.ts`, `cognition/**`, `skills/**`)
-      // moved into `src/demo-domain/scenarios/petCare/` in slice 1.2a and
-      // are now lint-covered by the demo-domain block below.
-      'src/main.ts',
-      'src/seed.ts',
-      'src/ui.ts',
-      'src/traceView.ts',
+      // Legacy vanilla-TS DOM mounts surviving the Wave-0/1.2b transition.
+      // Cognition switcher / loss sparkline / prediction strip stay here
+      // until Pillar 2 slice 2.5 ports + deletes them; species config
+      // stays until Pillar 4 slice 4.3 relocates its pure logic. The
+      // 1.2b-deleted files (`main.ts`, `ui.ts`, `traceView.ts`,
+      // `seed.ts`) no longer need entries — their logic now lives in
+      // SFCs + Pinia stores under `src/{app,components,views,stores}/`.
       'src/lossSparkline.ts',
       'src/predictionStrip.ts',
       'src/speciesConfig.ts',
@@ -109,7 +105,10 @@ export default tseslint.config(
   },
 
   // Presentation layer (components / views): must NOT touch agentonomous
-  // or demo-domain directly — go through stores/domain.
+  // or demo-domain directly — go through stores/domain. Type-only imports
+  // are allowed (erased at runtime) so components can name shared
+  // contracts like `AgentState`, `SelectorHandle`, `WalkthroughStep`
+  // without taking a runtime dep on the lower layers.
   {
     files: ['src/components/**/*.{ts,vue}', 'src/views/**/*.{ts,vue}'],
     rules: {
@@ -121,6 +120,7 @@ export default tseslint.config(
               name: 'agentonomous',
               message:
                 'Presentation (components/views) must not import agentonomous directly — go through stores/domain.',
+              allowTypeImports: true,
             },
           ],
           patterns: [
@@ -128,6 +128,7 @@ export default tseslint.config(
               group: ['agentonomous/*'],
               message:
                 'Presentation (components/views) must not import agentonomous directly — go through stores/domain.',
+              allowTypeImports: true,
             },
             {
               group: [
@@ -137,7 +138,8 @@ export default tseslint.config(
                 '../../../demo-domain/**',
               ],
               message:
-                'Presentation (components/views) must not import demo-domain/* directly — go through stores/domain.',
+                'Presentation (components/views) must not import demo-domain/* directly — go through stores/domain. `import type` is allowed for cross-pillar contract types.',
+              allowTypeImports: true,
             },
           ],
         },
@@ -146,6 +148,10 @@ export default tseslint.config(
   },
 
   // View stores hold UI-only state — read from domain stores only.
+  // Type-only imports from demo-domain are permitted (erased at runtime),
+  // so view stores can name the cross-pillar contracts (`WalkthroughStep`,
+  // `WalkthroughStepId`, `TourCtx`) without taking a runtime dep on the
+  // domain layer. Runtime values flow through composables / domain stores.
   {
     files: ['src/stores/view/**/*.ts'],
     rules: {
@@ -157,6 +163,7 @@ export default tseslint.config(
               name: 'agentonomous',
               message:
                 'View stores hold UI-only state — read from domain stores, not from agentonomous.',
+              allowTypeImports: true,
             },
           ],
           patterns: [
@@ -164,6 +171,7 @@ export default tseslint.config(
               group: ['agentonomous/*'],
               message:
                 'View stores hold UI-only state — read from domain stores, not from agentonomous.',
+              allowTypeImports: true,
             },
             {
               group: [
@@ -173,7 +181,8 @@ export default tseslint.config(
                 '../../../demo-domain/**',
               ],
               message:
-                'View stores must not import demo-domain/* — domain stores own that boundary.',
+                'View stores must not take a runtime import on demo-domain/* — go through a composable. `import type` is allowed for the cross-pillar contracts.',
+              allowTypeImports: true,
             },
           ],
         },

@@ -18,7 +18,23 @@ import {
   setLearningAgent,
   SOFTMAX_SKILL_IDS,
 } from '../../examples/product-demo/src/demo-domain/scenarios/petCare/cognition/learning.js';
-import { mountResetButton } from '../../examples/product-demo/src/ui.js';
+// `mountResetButton` lived in `examples/product-demo/src/ui.ts`, deleted by
+// Pillar 1 slice 1.2b. The test still needs a click handler that clears the
+// per-agent tfjs-network key (the only behaviour this file asserted), so it
+// inlines the minimal moral equivalent below — the new `<ResetButton>` SFC
+// owns the same concept against the Pinia store and is exercised in its own
+// component test under `examples/product-demo/test/components/`.
+function attachResetHandler(agentId: string): void {
+  const btn = document.getElementById('reset-button');
+  if (btn === null) return;
+  btn.addEventListener('click', () => {
+    try {
+      globalThis.localStorage?.removeItem(`agentonomous/${agentId}/tfjs-network`);
+    } catch {
+      // localStorage unavailable — nothing to clean up.
+    }
+  });
+}
 import { TEST_BACKEND } from '../setup/tfjsBackend.js';
 
 type FakeAgent = {
@@ -123,7 +139,7 @@ async function mountDemo(opts: { agentId?: string } = {}): Promise<{
   };
   setLearningAgent(fakeAgent as never);
   mountCognitionSwitcher(fakeAgent as never, root);
-  mountResetButton(fakeAgent as never);
+  attachResetHandler(agentId);
   const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
   await waitForProbes(select);
 

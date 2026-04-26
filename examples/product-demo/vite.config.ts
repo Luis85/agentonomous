@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 import { copyFileSync, readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
 
@@ -72,7 +73,7 @@ const agentonomousAliases = [
 export default defineConfig({
   base,
   server: { port: 5173 },
-  plugins: [brandFaviconPlugin()],
+  plugins: [vue(), brandFaviconPlugin()],
   resolve: {
     alias: agentonomousAliases,
   },

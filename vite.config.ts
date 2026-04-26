@@ -3,6 +3,7 @@ import { relative, resolve } from 'node:path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import dts from 'vite-plugin-dts';
+import vue from '@vitejs/plugin-vue';
 
 import { COVERAGE_THRESHOLDS } from './scripts/coverageThresholds.mjs';
 
@@ -137,6 +138,21 @@ export default defineConfig({
     },
   },
   plugins: [
+    // `@vitejs/plugin-vue` is wired in for vitest so the demo's component
+    // tests under `examples/product-demo/test/components/**` can mount
+    // `*.vue` SFCs. The plugin only kicks in for `.vue` files; the
+    // library `lib` build above has no `.vue` sources, so this is a
+    // no-op for the published bundle.
+    //
+    // `isProduction: false` keeps the dev runtime active so:
+    //   - template static hoisting stays off (`@click="..."` handlers
+    //     still bind under Vue Test Utils' wrapper component);
+    //   - `withDirectives` and ref bindings emit the dev-mode warning
+    //     instead of silently dropping (which broke `<TracePanel>`'s
+    //     v-show toggle test).
+    // The browser bundle (built by `examples/product-demo/vite.config.ts`)
+    // still uses production mode — this only affects vitest.
+    vue({ isProduction: false }),
     dts({
       tsconfigPath: './tsconfig.build.json',
       entryRoot: 'src',
