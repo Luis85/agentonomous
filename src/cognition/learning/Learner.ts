@@ -38,6 +38,11 @@ export type LearningOutcome = {
    * `{ failed, code, message }` on failure, plus `preNeeds` (a
    * `Record<needId, level>` snapshot taken before the skill ran)
    * whenever a `Needs` subsystem is wired — see Stage 8 contract above.
+   *
+   * Also populated on every terminal branch: `preModifierCount` — the
+   * count of active modifiers captured before the skill ran (same
+   * timing as `preNeeds`). Include this in training features when the
+   * consumer models buff/debuff state.
    */
   details?: Record<string, unknown>;
 };
