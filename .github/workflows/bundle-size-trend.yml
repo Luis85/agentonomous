@@ -47,5 +47,20 @@ jobs:
           if [[ -n "$(git status --porcelain docs/metrics/bundle-trend.jsonl)" ]]; then
             git add docs/metrics/bundle-trend.jsonl
             git commit -m "chore(metrics): bundle-size snapshot $(date -u +%F)"
-            git push origin develop
+            # Rebase + retry: develop may have advanced while npm ci /
+            # build / size-limit ran. The JSONL is append-only and only
+            # this workflow writes it, so rebase conflicts are
+            # vanishingly rare; three attempts is plenty.
+            for attempt in 1 2 3; do
+              git fetch origin develop
+              git pull --rebase --autostash origin develop
+              if git push origin develop; then
+                exit 0
+              fi
+              if [[ "${attempt}" == "3" ]]; then
+                echo "::error::push failed after 3 rebase attempts"
+                exit 1
+              fi
+              sleep 5
+            done
           fi
