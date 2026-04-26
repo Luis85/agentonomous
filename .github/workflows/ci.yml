@@ -323,24 +323,30 @@ jobs:
           name: coverage-summary
           path: coverage
       # Best-effort base-branch coverage. Iterate this workflow's most
-      # recent SUCCESSFUL base-branch runs and pick the first one that
-      # has a non-expired `coverage-summary` artifact. This converges
-      # on the right baseline even in awkward cases:
+      # recent push-triggered, SUCCESSFUL base-branch runs and pick
+      # the first one that has a non-expired `coverage-summary`
+      # artifact. The combined filter set converges on the right
+      # baseline through several awkward cases:
       #   - The artifact upload runs `if: always()` so a failing
-      #     develop run still ships its summary; without a success
-      #     filter we could pick a flaky/failed run and produce a
-      #     misleading delta. Filter on `status=success` to be the
-      #     baseline a reviewer expects.
-      #   - A successful docs-only run skips `test-core` (gated on
-      #     `changes.outputs.code`) and therefore has no artifact;
-      #     iterating runs lets us walk past it without giving up.
-      #   - The org-wide `/actions/artifacts` endpoint isn't scoped
-      #     by branch, so an older base artifact can fall off the
-      #     page entirely even if it exists. Scoping by branch via
-      #     `/actions/workflows/ci.yml/runs?branch=…&status=success`
-      #     and probing per-run artifacts makes the search converge.
-      # Capped at 100 base-branch successful runs (5 pages × 20). At
-      # ~1 develop run per code merge, this covers months of activity.
+      #     develop run still ships its summary; `status=success`
+      #     keeps us off flaky/failed runs that would mis-represent
+      #     baseline coverage.
+      #   - The runs endpoint includes `pull_request`-event runs by
+      #     default. A PR base-merge run can have its head branch
+      #     equal to ${BASE_REF} but the artifact reflects the PR
+      #     code, not the base tip. `event=push` restricts to runs
+      #     triggered by direct branch pushes (i.e. merges to
+      #     develop), which is the actual baseline.
+      #   - A push-triggered docs-only run can succeed without
+      #     producing the artifact (its `test-core` job is gated on
+      #     `changes.outputs.code`); per-run artifact probing walks
+      #     past those without giving up.
+      # API calls are individually guarded with `|| ...` fallbacks so
+      # a transient `gh api` failure (rate limit, restricted token
+      # scope on some PR contexts) degrades to deltas-omitted rather
+      # than aborting the whole comment job under `pipefail`.
+      # Capped at 100 base-branch runs (5 pages × 20). At ~1 develop
+      # merge per code change this covers months of activity.
       - name: Download base-branch coverage summary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -350,14 +356,16 @@ jobs:
           mkdir -p base-coverage
           BASE_RUN_ID=""
           for PAGE in 1 2 3 4 5; do
+            RUNS=""
             RUNS="$(gh api \
-              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=${BASE_REF}&status=success&per_page=20&page=${PAGE}" \
-              --jq '.workflow_runs[].id')"
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=${BASE_REF}&status=success&event=push&per_page=20&page=${PAGE}" \
+              --jq '.workflow_runs[].id' 2>/dev/null)" || RUNS=""
             if [ -z "${RUNS}" ]; then break; fi
             for RUN_ID in ${RUNS}; do
+              HAS_ART="0"
               HAS_ART="$(gh api \
                 "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
-                --jq '[.artifacts[] | select(.name == "coverage-summary" and .expired == false)] | length')"
+                --jq '[.artifacts[] | select(.name == "coverage-summary" and .expired == false)] | length' 2>/dev/null)" || HAS_ART="0"
               if [ "${HAS_ART}" -gt 0 ]; then
                 BASE_RUN_ID="${RUN_ID}"
                 break 2
@@ -365,7 +373,7 @@ jobs:
             done
           done
           if [ -z "${BASE_RUN_ID}" ]; then
-            echo "No coverage-summary artifact found on a successful ${BASE_REF} run (last 100 scanned). Deltas will be omitted."
+            echo "No coverage-summary artifact found on a push-triggered successful ${BASE_REF} run (last 100 scanned). Deltas will be omitted."
             exit 0
           fi
           if ! gh run download "${BASE_RUN_ID}" \
