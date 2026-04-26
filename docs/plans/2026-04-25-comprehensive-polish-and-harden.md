@@ -149,7 +149,9 @@ live in `package.json#size-limit`) → `docs` (typedoc, 0 errors).
 Five tracks. CI hardening lands first (cheap, tightens loop). Docs
 cleanup next (drift compounds). Ratchet third (no surprises post-
 ratchet because A1 caps are already there). Demo + library seams
-land in parallel batches. Tooling closes out.
+land row-by-row across sessions (one PR per session — parallelism
+across sessions / agents, not within one session). Tooling closes
+out.
 
 | #   | Track    | Branch                                              | Scope                                                                            | Cost  | Bump  |
 | --- | -------- | --------------------------------------------------- | -------------------------------------------------------------------------------- | ----- | ----- |
@@ -813,45 +815,63 @@ Metadata-only change; pre-1.0 has no consumers, so no changeset.
 
 ---
 
-## Workflow — independent PRs, batch open, multi-pass Codex resolution
+## Workflow — one PR per session, full Codex iteration in same session
 
-1. **Independent branches.** Each row's branch is cut fresh from
-   `develop`. Never stack. If two rows touch the same file (rare),
-   still cut them separately and rebase the second after the first
+Updated 2026-04-26. Previously this section recommended batching
+multiple PRs per session and sweeping Codex review-by-review. That
+pattern is **retired** — owner observed it muddied context and
+degraded both solution quality and speed. New rule: one PR per
+session, end-to-end. See `MEMORY.md →
+feedback_one_pr_per_session.md` for the headline rule and
+`feedback_pr_workflow.md` for the full loop.
+
+1. **One row, one branch, one PR.** Each session picks exactly one
+   row from this plan and ships it end-to-end. Branch cut fresh
+   from `develop`, worktree under `.worktrees/<slug>`. Never
+   stack. If two rows touch the same file (rare), they go in
+   separate sessions; the second rebases / merges after the first
    merges.
-2. **Batch execution, batch open.** A session can ship multiple PRs
-   in one go — implement each in turn, push, open PR. Do NOT wait
-   serially for Codex on each before starting the next. Open all the
-   independent PRs the session covers, THEN switch into review mode.
-3. **Multi-pass Codex resolution.** Once PRs are open, sweep them PR
-   by PR:
+2. **Implement → verify → push → open PR.** `npm run verify`
+   green first. PR body with Summary / Test plan / Notes-for-
+   review sections.
+3. **Codex iteration in this same session.** Auto-arm the `loop`
+   skill (5m poll) per `feedback_pr_codex_polling.md`. When
+   findings land:
    - `gh pr view <num> --comments` +
      `gh api repos/<org>/<repo>/pulls/<num>/comments` to read line
      comments.
    - Address real findings with a follow-up commit on the same
      branch. Push (don't rebase mid-review — line anchors break).
    - Repeat until Codex posts a 👍 reaction. Codex docs: "If Codex
-     has suggestions, it will comment; otherwise it will react with
-     👍."
-   - **Skip literal re-flags** of comments you've already addressed.
-     Note false-positives in the PR description so reviewers see the
-     rationale.
+     has suggestions, it will comment; otherwise it will react
+     with 👍."
+   - **Skip literal re-flags** of comments already addressed.
+     Note false-positives in the PR description.
 4. **Resolve threads.** Once Codex 👍s, mark each conversation as
-   resolved. The bot keeps re-pinging open threads otherwise. Use the
-   GitHub UI or `gh api graphql`.
-5. **Owner merges.** Don't merge your own PRs. After merge: `git
-switch develop && git pull --ff-only origin develop && git fetch
---prune origin && git branch -d <topic>`.
-6. **Plan + docs ride with the PR.** When a PR completes a row in
+   resolved. Codex re-pings open threads otherwise.
+5. **Merge.** In autonomous runs, self-merge once Codex 👍 + CI
+   green + `mergeStateStatus = CLEAN` per
+   `feedback_autonomous_merge_after_codex.md`. Otherwise wait for
+   the maintainer. After merge: `git switch develop && git pull
+--ff-only origin develop && git fetch --prune origin && git
+branch -d <topic>`. Prune the worktree.
+6. **Stop.** Session is done — do **not** start a second PR in
+   the same context. If more rows need to ship, the user starts a
+   fresh session (or dispatches a parallel Claude instance in a
+   separate worktree).
+7. **Plan + docs ride with the PR.** When a PR completes a row in
    this plan, mark it shipped (or move it under "What's already
-   shipped") IN THE SAME PR. When the PR changes user-visible surface
-   (`README.md`, `STYLE_GUIDE.md`, `PUBLISHING.md`, the matching
-   spec), update those docs in the same diff. No "docs catch-up"
-   follow-up PRs — stale plans force a second review cycle and
-   degrade Codex review quality. Captured in `MEMORY.md →
-   feedback_docs_alongside_pr.md`.
+   shipped") IN THE SAME PR. When the PR changes user-visible
+   surface (`README.md`, `STYLE_GUIDE.md`, `PUBLISHING.md`, the
+   matching spec), update those docs in the same diff. No "docs
+   catch-up" follow-up PRs — stale plans force a second review
+   cycle and degrade Codex review quality. Captured in `MEMORY.md
+→ feedback_docs_alongside_pr.md`.
 
-The full loop is captured in `MEMORY.md → feedback_pr_workflow.md`.
+**Cross-session parallelism is still fine.** The user can dispatch
+multiple Claude sessions / agents in separate worktrees, each
+shipping its own row's PR. Just not multiple PRs inside a single
+session's context.
 
 **Pre-1.0 reminder.** No shipped consumers exist. Don't ship
 migration / compat layers for prior pre-release shapes. Clean breaks
@@ -864,11 +884,11 @@ defending against a v1 layout that didn't exist.
 ## How to pick this up next session
 
 1. Read this file + `MEMORY.md` (auto-loaded).
-2. Pick the next row by sequencing recommendation. Cut a fresh
-   branch from `develop`.
+2. Pick **one** next row by sequencing recommendation. Cut a fresh
+   branch from `develop` in a fresh worktree.
 3. Implement; `npm run verify` green; push; open PR with
-   Summary / Test plan / Notes for review sections per
+   Summary / Test plan / Notes-for-review sections per
    `feedback_pr_workflow.md`.
-4. Open all the independent PRs the session covers, then sweep
-   Codex.
-5. Owner merges.
+4. Ride Codex iteration to 👍 in this same session.
+5. Merge (autonomous self-merge or maintainer per the rule above),
+   clean up, stop. Next row → next session.

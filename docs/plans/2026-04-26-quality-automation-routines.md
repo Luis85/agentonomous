@@ -155,10 +155,12 @@ issues stay groupable and discoverable:
 > this plan bundled all eight rows on a single branch (#130). After
 > three Codex passes the surface had grown to ~1390 lines and review
 > latency was the dominant cost. Splitting into eight chunk plans:
-> (a) lets independent agents work rows in parallel, (b) keeps each
-> Codex review pass narrowly scoped, (c) bounds the blast radius if
-> any single row needs revert. The tracker stays open so the parent
-> intent is still visible across rows.
+> (a) lets independent **sessions / agents** work rows in parallel
+> (one PR per session — see `MEMORY.md →
+> feedback_one_pr_per_session.md`), (b) keeps each Codex review
+> pass narrowly scoped, (c) bounds the blast radius if any single
+> row needs revert. The tracker stays open so the parent intent
+> is still visible across rows.
 
 ---
 
