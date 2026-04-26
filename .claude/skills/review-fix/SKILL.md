@@ -111,12 +111,16 @@ The recipe below dodges four real footguns:
    sure the JSON shape is the issue list output (objects with
    `number`, `body`, `url`, `createdAt`), not the PR list.
 
-Fetch every open review-bot issue once into the project-local cache:
+Fetch every open review-bot issue once into the project-local cache.
+The `--limit 1000` is gh's effective cap; one issue per scheduled run
+makes this several years of headroom. If the repo ever gets close
+to this number it's a process signal (close stale tracker issues),
+not a parser one — there is no pagination fallback by design.
 
 ```bash
 mkdir -p .review-fix-cache
 gh issue list --label review-bot --state open \
-  --json number,body,url,createdAt --limit 50 \
+  --json number,body,url,createdAt --limit 1000 \
   > .review-fix-cache/issues.json
 ```
 

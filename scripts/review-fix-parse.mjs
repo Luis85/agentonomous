@@ -20,7 +20,7 @@
  *
  * The caller fetches this via:
  *   gh issue list --label review-bot --state open \
- *     --json number,body,url,createdAt --limit 50 \
+ *     --json number,body,url,createdAt --limit 1000 \
  *     > .review-fix-cache/issues.json
  *
  * A single-issue object (no array wrapper) is also accepted for
