@@ -47,10 +47,23 @@ jobs:
       - name: Append snapshot row
         env:
           GITHUB_SHA: ${{ steps.head.outputs.sha }}
+        # `npx size-limit --json` exits non-zero when ANY configured
+        # budget is exceeded — but it still emits a complete JSON
+        # status payload to stdout. Default Actions bash sets
+        # pipefail, so a piped invocation would fail the step in
+        # exactly the weeks the trend matters most (over-budget
+        # weeks). Capture stdout, tolerate the non-zero exit, fail
+        # only if size-limit produced no JSON at all (genuine
+        # tooling failure).
         run: |
-          npx size-limit --json | \
-            node scripts/append-size-snapshot.mjs \
-              --target docs/metrics/bundle-trend.jsonl
+          set +o pipefail
+          out="$(npx size-limit --json || true)"
+          if [[ -z "${out}" ]]; then
+            echo "::error::size-limit produced no JSON output"
+            exit 1
+          fi
+          printf '%s' "${out}" | node scripts/append-size-snapshot.mjs \
+            --target docs/metrics/bundle-trend.jsonl
       - name: Commit + push if changed
         run: |
           git config user.name "github-actions[bot]"
