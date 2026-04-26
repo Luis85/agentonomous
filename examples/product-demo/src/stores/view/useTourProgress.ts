@@ -82,9 +82,18 @@ export const useTourProgress = defineStore('tourProgress', () => {
   const route = useRoute();
 
   const persisted = readPersisted();
-  const lastStep = ref<WalkthroughStepId>(
-    (persisted?.lastStep as WalkthroughStepId | undefined) ?? graph.firstStepId,
-  );
+  // Validate the persisted cursor against the active graph. A renamed /
+  // removed step id (or any garbage in `demo.v2.tour.progress`) used to
+  // leave `currentStep === null` while `completedAt` stayed null,
+  // which froze `next()` / `skip()` and stopped the tour from rendering
+  // — users had to clear localStorage by hand to recover. Falling back
+  // to `firstStepId` keeps the guided flow recoverable across
+  // step-id renames between releases.
+  const restoredStep: WalkthroughStepId =
+    persisted !== null && graph.stepsById.has(persisted.lastStep as WalkthroughStepId)
+      ? (persisted.lastStep as WalkthroughStepId)
+      : graph.firstStepId;
+  const lastStep = ref<WalkthroughStepId>(restoredStep);
   const completedAt = ref<number | null>(persisted?.completedAt ?? null);
   const skipped = ref<WalkthroughStepId[]>((persisted?.skipped ?? []) as WalkthroughStepId[]);
 

@@ -127,4 +127,25 @@ describe('useTourProgress', () => {
     expect(tour.lastStep).toBe(STEP_ID_AUTONOMY);
     expect(globalThis.localStorage.getItem(PROGRESS_KEY)).toBeNull();
   });
+
+  it('falls back to firstStepId when the persisted lastStep is not in the active graph', async () => {
+    // Simulate a stale localStorage payload — a step id that was renamed
+    // or removed in a later release. Without validation the cursor would
+    // resolve to `currentStep === null` while `completedAt === null`,
+    // stranding the user with no overlay and no `next()` recovery.
+    globalThis.localStorage.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({
+        lastStep: 'tour.removed-in-future-release',
+        completedAt: null,
+        skipped: [],
+      }),
+    );
+
+    const wrapper = await mountWithStores();
+    const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
+    expect(tour.lastStep).toBe(STEP_ID_AUTONOMY);
+    expect(tour.completedAt).toBeNull();
+    expect(tour.currentStep?.id).toBe(STEP_ID_AUTONOMY);
+  });
 });
