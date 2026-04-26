@@ -73,7 +73,7 @@
     "demo:install": "npm install && npm run build && cd examples/product-demo && npm install",
     "demo:dev": "cd examples/product-demo && npm run dev",
     "demo:build": "npm run build && cd examples/product-demo && npm run build",
-    "e2e": "npm --prefix examples/product-demo run e2e",
+    "e2e": "npm --prefix examples/product-demo install --no-audit --no-fund && npm --prefix examples/product-demo run e2e",
     "seed:learning-network": "node --experimental-strip-types scripts/seed-learning-network.ts"
   },
   "publishConfig": {
