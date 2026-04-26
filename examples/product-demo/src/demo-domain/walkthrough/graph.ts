@@ -35,6 +35,36 @@ export class WalkthroughGraphError extends Error {
 }
 
 /**
+ * Wraps a built `Map` in a frozen read-only facade. The native `Map` type
+ * has `set` / `delete` / `clear` mutators that bypass `Object.freeze` on
+ * the enclosing object, so exposing the live map would let a JS caller —
+ * or a TS caller using a cast — mutate the graph after construction and
+ * invalidate the one-time validation. The facade re-exposes only the
+ * methods declared by `ReadonlyMap<K, V>` and is itself frozen.
+ *
+ * `size` is captured at facade-construction time. The source map is fully
+ * built before this helper runs and never mutated afterwards, so the
+ * snapshot value never drifts.
+ */
+function freezeMapView<K, V>(source: ReadonlyMap<K, V>): ReadonlyMap<K, V> {
+  const facade: ReadonlyMap<K, V> = {
+    size: source.size,
+    get: (key) => source.get(key),
+    has: (key) => source.has(key),
+    keys: () => source.keys(),
+    values: () => source.values(),
+    entries: () => source.entries(),
+    forEach: (callbackfn, thisArg) => {
+      source.forEach((v, k) => {
+        callbackfn.call(thisArg, v, k, facade);
+      });
+    },
+    [Symbol.iterator]: () => source.entries(),
+  };
+  return Object.freeze(facade);
+}
+
+/**
  * Build a frozen graph from `steps`. Validates:
  *
  *  1. `steps` is non-empty.
@@ -136,8 +166,8 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
 
   return Object.freeze({
     steps: Object.freeze(frozenSteps),
-    stepsById,
-    chapters: frozenChapters,
+    stepsById: freezeMapView(stepsById),
+    chapters: freezeMapView(frozenChapters),
     firstStepId: firstStep.id,
   });
 }

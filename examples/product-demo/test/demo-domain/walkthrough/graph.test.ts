@@ -159,6 +159,29 @@ describe('defineWalkthroughGraph', () => {
     expect(stored).toBeDefined();
     expect(Object.isFrozen(stored)).toBe(true);
   });
+
+  it('exposes stepsById as a frozen read-only facade (no Map mutators)', () => {
+    const graph = defineWalkthroughGraph([step('a', 1, TOUR_END)]);
+    expect(Object.isFrozen(graph.stepsById)).toBe(true);
+    // The native Map mutators must NOT exist on the facade.
+    expect((graph.stepsById as { set?: unknown }).set).toBeUndefined();
+    expect((graph.stepsById as { delete?: unknown }).delete).toBeUndefined();
+    expect((graph.stepsById as { clear?: unknown }).clear).toBeUndefined();
+    // Read methods still work + iteration yields the entries.
+    expect(graph.stepsById.size).toBe(1);
+    expect(graph.stepsById.has(walkthroughStepId('a'))).toBe(true);
+    expect([...graph.stepsById.keys()].map(String)).toEqual(['a']);
+    expect([...graph.stepsById].map(([k]) => String(k))).toEqual(['a']);
+  });
+
+  it('exposes chapters as a frozen read-only facade (no Map mutators)', () => {
+    const graph = defineWalkthroughGraph([step('1.a', 1, '1.b'), step('1.b', 1, TOUR_END)]);
+    expect(Object.isFrozen(graph.chapters)).toBe(true);
+    expect((graph.chapters as { set?: unknown }).set).toBeUndefined();
+    expect((graph.chapters as { delete?: unknown }).delete).toBeUndefined();
+    expect((graph.chapters as { clear?: unknown }).clear).toBeUndefined();
+    expect(graph.chapters.get(1)).toHaveLength(2);
+  });
 });
 
 describe('getStepById', () => {
