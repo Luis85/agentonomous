@@ -96,9 +96,18 @@ const raw = JSON.parse(readFileSync(inputPath, 'utf8'));
 // can stay agnostic.
 const comments = (Array.isArray(raw) ? raw : [raw]).flat();
 
+// Filter by parsed checklist findings, NOT by raw `<!-- f:` substring.
+// A no-op summary comment may quote a previous finding's marker inside
+// its body or in a `<details>` block; if we keyed the sweep on
+// `body.includes('<!-- f:')` and the newest match happened to be such
+// a quote-only comment, sweep would emit an empty `findings: []` and
+// silently skip every older comment with real, actionable findings.
+// Pre-parsing here also lets us reuse the result downstream.
 const withFindings = comments
-  .filter((c) => typeof c.body === 'string' && c.body.includes('<!-- f:'))
-  .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  .filter((c) => typeof c.body === 'string')
+  .map((c) => ({ comment: c, findings: parseFindings(c.body) }))
+  .filter((c) => c.findings.length > 0)
+  .sort((a, b) => new Date(a.comment.created_at) - new Date(b.comment.created_at));
 
 if (withFindings.length === 0) {
   stderr.write('No comment on the tracker contains findings — nothing to sweep\n');
@@ -109,24 +118,22 @@ if (targetId === null) {
   // Sweep: emit every finding from the newest comment that has any.
   const newest = withFindings[withFindings.length - 1];
   emit({
-    commentId: newest.id,
-    commentUrl: newest.html_url,
-    createdAt: newest.created_at,
-    findings: parseFindings(newest.body),
+    commentId: newest.comment.id,
+    commentUrl: newest.comment.html_url,
+    createdAt: newest.comment.created_at,
+    findings: newest.findings,
   });
   exit(0);
 }
 
-// Single: scan the full history (newest first) for the marker so a
+// Single: scan the full history (newest first) for the target ID so a
 // backlog finding on an older comment stays reachable. The first
 // match wins; duplicate IDs across comments would only happen if the
 // review bot re-emitted an old finding, in which case the freshest
 // occurrence is what the user wants.
-const marker = `<!-- f:${targetId} -->`;
 for (let i = withFindings.length - 1; i >= 0; i -= 1) {
-  const comment = withFindings[i];
-  if (!comment.body.includes(marker)) continue;
-  const match = parseFindings(comment.body).find((f) => f.id === targetId);
+  const { comment, findings } = withFindings[i];
+  const match = findings.find((f) => f.id === targetId);
   if (!match) continue;
   if (match.shipped) {
     stderr.write(`Finding ${targetId} already shipped in #${match.shippedPr ?? '?'}\n`);
@@ -154,7 +161,13 @@ function emit(obj) {
  * A finding header is a top-level checklist line (no leading
  * whitespace) shaped like:
  *
- *   - [ ] **[SEVERITY]** `path` — title <!-- f:<sha7>.<idx> --> [(shipped in #N)]
+ *   - [ ] **[SEVERITY]** `path` — title <!-- f:<sha7>.<idx> -->
+ *   - [x] **[SEVERITY]** `path` — title (shipped in #N) <!-- f:<sha7>.<idx> -->
+ *
+ * The `review-fix-shipped` Action inserts ` (shipped in #N)` between
+ * the title and the marker (NOT after the marker), so the shipped-PR
+ * extraction must run against the matched `title` group and the
+ * suffix must be stripped before storing.
  *
  * Quoted finding-marker text inside a `<details>` body is ignored —
  * only top-level checklist lines mark finding boundaries. The body
@@ -165,7 +178,8 @@ function emit(obj) {
 function parseFindings(body) {
   const lines = body.split(/\r?\n/);
   const headerRe =
-    /^- \[(?<box>[ x])\] \*\*\[(?<sev>BLOCKER|MAJOR|MINOR|NIT)\]\*\* `(?<path>[^`]+)` — (?<title>.*?) <!-- f:(?<id>[A-Za-z0-9]+\.[0-9]+) -->(?<trail>.*)$/;
+    /^- \[(?<box>[ x])\] \*\*\[(?<sev>BLOCKER|MAJOR|MINOR|NIT)\]\*\* `(?<path>[^`]+)` — (?<title>.*?) <!-- f:(?<id>[A-Za-z0-9]+\.[0-9]+) -->/;
+  const shippedSuffixRe = /\s*\(shipped in #(\d+)\)\s*$/;
 
   const headers = [];
   for (let i = 0; i < lines.length; i += 1) {
@@ -189,14 +203,15 @@ function parseFindings(body) {
       bodyLines.pop();
     }
 
-    const shippedMatch = /\(shipped in #(\d+)\)/.exec(h.trail ?? '');
+    const shippedMatch = shippedSuffixRe.exec(h.title);
+    const cleanTitle = h.title.replace(shippedSuffixRe, '').trim();
     return {
       id: h.id,
       shipped: h.box === 'x',
       shippedPr: shippedMatch ? Number(shippedMatch[1]) : null,
       severity: h.sev,
       path: h.path,
-      title: h.title.trim(),
+      title: cleanTitle,
       body: bodyLines.join('\n'),
     };
   });
