@@ -158,12 +158,26 @@ Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
    (`format:check && lint && typecheck && test && build`). If it
    fails, jump to [Failure handling](#failure-handling).
 
-6. **Commit every applied bump in a single commit.** The bumps live
-   only in the working tree until this step — push without committing
-   would publish an empty branch and `gh pr create` would fail with
-   no diff:
+6. **Commit every applied bump in a single commit (skip cleanly when
+   nothing changed).** The bumps live only in the working tree until
+   this step. Two cases to handle:
+
+   - **At least one bump applied** → stage + commit. Push without
+     committing would publish an empty branch and `gh pr create`
+     would fail with no diff.
+   - **Zero bumps applied** (every `PENDING` row was skipped by
+     policy — e.g. all updates are majors that escalate via the
+     `actions-bump-bot` label per [Hard rules](#hard-rules) /
+     [Failure handling](#failure-handling)) → exit 0 cleanly. The
+     major-bump issue(s) are the run's only artifact in this case;
+     opening a bump PR with no diff would error out and pollute the
+     run.
 
    ```bash
+   if git diff --quiet -- .github/workflows/; then
+     echo "No bumps applied (all PENDING rows skipped by policy). Exiting cleanly."
+     exit 0
+   fi
    git add .github/workflows/*.yml
    git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
    ```
@@ -320,36 +334,39 @@ artifacts beyond that.
 # Idempotency
 
 A scheduled run could fire twice in a week (manual trigger, retry
-after transient infra failure, etc). The check is a PR search bounded
-to the current ISO-week:
+after transient infra failure, etc). The check is a PR search for
+**any** still-open bump PR — not just this week's. An older
+`chore/actions-bump-*` PR that the owner hasn't merged yet must
+also block a new run, otherwise the routine stacks duplicate bump
+PRs on top of an unmerged backlog:
 
 ```bash
 : "${ROUTINE_GH_LOGIN:?ROUTINE_GH_LOGIN must be set to the GitHub login the routine posts as}"
-WEEK_START="$(date -u -d 'last Monday' +%F 2>/dev/null || date -u -v-Mon +%F)"
 EXISTING="$(gh pr list \
   --base develop \
   --state open \
-  --search "author:${ROUTINE_GH_LOGIN} created:>=${WEEK_START}" \
+  --search "author:${ROUTINE_GH_LOGIN}" \
   --json number,title,headRefName,headRefOid \
   --jq '[.[] | select(.headRefName | startswith("chore/actions-bump-"))][0]')"
 if [ -n "${EXISTING}" ] && [ "${EXISTING}" != "null" ]; then
-  echo "Skip — bump PR already open this week: ${EXISTING}"
+  echo "Skip — bump PR already open: ${EXISTING}"
   exit 0
 fi
 ```
 
-If a `chore/actions-bump-*` PR is already open against `develop`
-this ISO-week (Monday 00:00 UTC → next Monday 00:00 UTC) AND its
-author matches `ROUTINE_GH_LOGIN`, exit 0 silently. Two re-runs in
-the same week shouldn't open a duplicate bump branch.
+If **any** `chore/actions-bump-*` PR is already open against `develop`
+AND its author matches `ROUTINE_GH_LOGIN`, exit 0 silently. The owner
+merges the queued PR first; the next run picks up whatever's still
+pending. No week filter — older un-merged PRs must still block, or
+the routine stacks duplicates.
 
 > The dated identifier lives on the **branch name**
 > (`chore/actions-bump-YYYY-MM-DD`), not the PR title (which is
 > `chore: bump pinned action SHAs (YYYY-MM-DD)`). GitHub PR search's
 > `in:title` qualifier matches title text only, so filtering by
 > `headRefName` via `jq startswith` is the robust check. The
-> `--search` clause narrows the candidate set by author + week; the
-> jq filter then enforces the `chore/actions-bump-` branch prefix.
+> `--search` clause narrows the candidate set by author; the jq
+> filter then enforces the `chore/actions-bump-` branch prefix.
 
 ## Trust boundary — `ROUTINE_GH_LOGIN`
 
