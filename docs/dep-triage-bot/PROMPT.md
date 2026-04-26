@@ -331,15 +331,21 @@ the org's automation account). The check fails loudly if it is not
 set so a misconfigured run cannot accidentally trust unsigned
 markers.
 
+`gh api` accepts only `--jq <string>` for filtering — it does not
+forward jq CLI flags such as `--arg`. Pipe the raw response to a
+standalone `jq` invocation so SHA + bot-login values can be passed
+in via `--arg` (which jq escapes safely, avoiding shell-quoting
+pitfalls in the filter string).
+
 ```bash
 : "${ROUTINE_BOT_LOGIN:?ROUTINE_BOT_LOGIN must be set to the bot account login the routine posts as}"
 HEAD_SHA7="$(gh pr view <pr> --json headRefOid --jq '.headRefOid[0:7]')"
 SKIP="$(gh api "repos/<owner>/<repo>/issues/<pr>/comments" \
-  --jq --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_BOT_LOGIN}" \
-  '.[]
-   | select(.user.type == "Bot" and .user.login == $login)
-   | select(.body | startswith("<!-- dep-triaged:" + $sha + ":"))
-   | .body' \
+  | jq -r --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_BOT_LOGIN}" \
+    '.[]
+     | select(.user.type == "Bot" and .user.login == $login)
+     | select(.body | startswith("<!-- dep-triaged:" + $sha + ":"))
+     | .body' \
   | head -n1)"
 if [ -n "${SKIP}" ]; then
   echo "Skip #<pr> — already triaged at ${HEAD_SHA7}: ${SKIP}"
