@@ -557,6 +557,16 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
     const requestedBackend = opts.backend ?? 'cpu';
     if (tf.getBackend() !== requestedBackend) {
       try {
+        // Side-effect-import the backend package FIRST so its
+        // `tf.registerBackend(...)` runs and the factory is in
+        // `tf.engine().registryFactory` before `tf.setBackend` queries
+        // it. Consumers who pull in only `@tensorflow/tfjs-core` +
+        // `@tensorflow/tfjs-layers` (transitive deps of `agentonomous`)
+        // never trigger that registration on their own — without this
+        // load step, `setBackend` returns false and `fromJSON` rejects
+        // even when the package is installed. Mirrors the
+        // `loadBackendModule → setBackend` order in `detectBestBackend`.
+        await loadBackendModule(requestedBackend);
         const ok = await tf.setBackend(requestedBackend);
         if (!ok) throw new TfjsBackendNotRegisteredError(requestedBackend);
       } catch (err) {

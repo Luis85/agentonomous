@@ -527,6 +527,57 @@ describe('TfjsReasoner — bundled demo baseline', () => {
   });
 });
 
+describe('TfjsReasoner — fromJSON backend module loading', () => {
+  // Test infra side-effect-imports only the matrix-selected backend
+  // (`tests/setup/tfjsBackendSetup.ts`), so the OTHER backend's factory
+  // starts out absent from the tfjs registry. This mirrors a real
+  // consumer who pulls in `@tensorflow/tfjs-core` + `@tensorflow/tfjs-layers`
+  // (transitive deps of `agentonomous`) but never side-effect-imports
+  // the `tfjs-backend-*` package matching `opts.backend`. The bug under
+  // test: `fromJSON` previously called `tf.setBackend(opts.backend)`
+  // without first loading the backend module, so the factory wasn't in
+  // the registry → setBackend returned false → it threw
+  // `TfjsBackendNotRegisteredError` even when the package was installed.
+  //
+  // Placed BEFORE the `backend detection` describe so the tests in this
+  // block see the pristine "other backend factory absent" state. The
+  // backend-detection block intentionally probes wasm/webgl/cpu and
+  // would pollute the registry if it ran first.
+
+  afterEach(async () => {
+    if (tf.getBackend() !== TEST_BACKEND) {
+      await tf.setBackend(TEST_BACKEND);
+      await tf.ready();
+    }
+  });
+
+  it('fromJSON({backend: nonactive}) loads the backend package side-effect before tf.setBackend', async () => {
+    const otherBackend: 'cpu' | 'wasm' = TEST_BACKEND === 'cpu' ? 'wasm' : 'cpu';
+
+    const model = makeLinearModel();
+    const r = newReasoner({ model, featuresOf: () => [0, 0], interpret: () => null });
+    const snapshot = r.toJSON();
+    r.dispose();
+
+    // Whether `fromJSON` ultimately resolves or rejects depends on the
+    // backend's runtime activation (wasm in headless node may decline,
+    // cpu always succeeds). The contract under exercise is
+    // "loadBackendModule runs before setBackend", verifiable via
+    // `findBackendFactory(otherBackend) !== null` after the call —
+    // which holds regardless of activation outcome.
+    await TfjsReasoner.fromJSON(snapshot, {
+      featuresOf: () => [0, 0],
+      interpret: () => null,
+      backend: otherBackend,
+    }).catch(() => {
+      // Swallow — first-use activation may throw in node for wasm; the
+      // factory-registration assertion below is the real signal.
+    });
+
+    expect(tf.findBackendFactory(otherBackend)).not.toBeNull();
+  });
+});
+
 describe('TfjsReasoner — backend detection', () => {
   // `detectBestBackend` walks the chain via `tf.setBackend` and
   // commits the first that activates — this can flip the active tfjs
