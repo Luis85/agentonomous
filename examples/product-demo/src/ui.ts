@@ -1,5 +1,5 @@
 import type { Agent, AgentState } from 'agentonomous';
-import { NEEDS } from './constants.js';
+import { NEEDS } from './demo-domain/scenarios/petCare/constants.js';
 
 const INTERACTION_BUTTONS: { verb: string; label: string }[] = [
   { verb: 'feed', label: '🍖 Feed' },
