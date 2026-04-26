@@ -252,7 +252,11 @@ export const useTourProgress = defineStore('tourProgress', () => {
     if (next === null) return;
     const here = router.currentRoute.value.fullPath;
     if (here === next) return;
-    if (!here.startsWith('/tour/')) return;
+    // The route is declared as `/tour/:step?` so the bare `/tour`
+    // (bookmarked / hand-typed) is also a tour entry. Match both
+    // `/tour` and any `/tour/<step>` variant before pushing — only
+    // bail on truly non-tour routes (e.g. `/play`).
+    if (here !== '/tour' && !here.startsWith('/tour/')) return;
     await router.push(next);
   }
 

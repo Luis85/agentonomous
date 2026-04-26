@@ -298,6 +298,18 @@ describe('useTourProgress', () => {
     expect(router.currentRoute.value.path).toBe('/play');
   });
 
+  it('syncRoute pushes /tour/<step-id> from the bare /tour route too', async () => {
+    // The route is declared `/tour/:step?` so a bookmarked / manual
+    // entry can land on `/tour` (no step). syncRoute must still
+    // upgrade the URL to the concrete step path so deep-link
+    // resume + share works.
+    const { wrapper, router } = await mountAtPath('/tour');
+    const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
+    expect(tour.currentStepRoutePath).toBe(`/tour/${STEP_ID_AUTONOMY}`);
+    await tour.syncRoute(router);
+    expect(router.currentRoute.value.path).toBe(`/tour/${STEP_ID_AUTONOMY}`);
+  });
+
   it('resumeFromRoute fast-forwards to a downstream step id', async () => {
     const wrapper = await mountWithStores();
     const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
