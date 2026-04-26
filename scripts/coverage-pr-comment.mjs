@@ -129,8 +129,25 @@ async function ghJson(path, init = {}) {
   return res.json();
 }
 
+async function listAllComments(repo, pr) {
+  // Page through all issue comments. PRs accumulate review threads,
+  // bot comments, and back-and-forth quickly — single 100-comment
+  // pages can miss the bot's sticky after long discussions, leading
+  // to repeated `POST` instead of `PATCH` and a wall of duplicate
+  // coverage tables. Cap at 50 pages (5000 comments) — more than
+  // any sane PR — to bound the work.
+  const out = [];
+  for (let page = 1; page <= 50; page += 1) {
+    const batch = await ghJson(`/repos/${repo}/issues/${pr}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    out.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return out;
+}
+
 async function upsertStickyComment({ repo, pr, body }) {
-  const existing = await ghJson(`/repos/${repo}/issues/${pr}/comments?per_page=100`);
+  const existing = await listAllComments(repo, pr);
   // Match the marker AND require a bot-authored comment. A user could
   // legitimately quote the marker text in a review comment (e.g. while
   // discussing the script's behavior); without the bot filter we'd

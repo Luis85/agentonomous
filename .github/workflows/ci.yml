@@ -322,16 +322,22 @@ jobs:
         with:
           name: coverage-summary
           path: coverage
-      # Best-effort base-branch coverage. Query the artifacts API by
-      # name + base branch directly (rather than `gh run list
-      # --status success`) — a successful docs-only run skips
-      # `test-core` (gated on `changes.outputs.code`) and therefore
-      # never produces `coverage-summary`, so picking "latest
-      # successful base run" can land on a run with no artifact and
-      # silently lose deltas after every docs merge until another
-      # code-changing run lands. Filtering by artifact name +
-      # non-expired + base branch picks the most recent run that
-      # ACTUALLY has coverage data.
+      # Best-effort base-branch coverage. Iterate the workflow's most
+      # recent base-branch runs and pick the first one that has a
+      # non-expired `coverage-summary` artifact. This handles two
+      # awkward cases at once:
+      #   - A docs-only run succeeds without producing the artifact
+      #     (its `test-core` job is gated on `changes.outputs.code`),
+      #     so picking "latest successful run" can land on an
+      #     artifact-less run.
+      #   - The org-wide `/actions/artifacts` endpoint isn't scoped
+      #     to a branch, so a base artifact older than the most
+      #     recent N global artifacts can fall off the page entirely
+      #     even if it still exists. Scoping by branch via
+      #     `/actions/runs?branch=…` and probing per-run artifacts
+      #     makes the search converge.
+      # Capped at 100 base-branch runs (5 pages of 20). At ~1 develop
+      # run per code merge, this covers months of activity.
       - name: Download base-branch coverage summary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -339,15 +345,24 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p base-coverage
-          BASE_RUN_ID="$(gh api \
-            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=coverage-summary&per_page=50" \
-            --jq ".artifacts
-                  | map(select(.expired == false and .workflow_run.head_branch == \"${BASE_REF}\"))
-                  | sort_by(.created_at)
-                  | reverse
-                  | .[0].workflow_run.id // empty")"
+          BASE_RUN_ID=""
+          for PAGE in 1 2 3 4 5; do
+            RUNS="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/runs?branch=${BASE_REF}&per_page=20&page=${PAGE}" \
+              --jq '.workflow_runs[].id')"
+            if [ -z "${RUNS}" ]; then break; fi
+            for RUN_ID in ${RUNS}; do
+              HAS_ART="$(gh api \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+                --jq '[.artifacts[] | select(.name == "coverage-summary" and .expired == false)] | length')"
+              if [ "${HAS_ART}" -gt 0 ]; then
+                BASE_RUN_ID="${RUN_ID}"
+                break 2
+              fi
+            done
+          done
           if [ -z "${BASE_RUN_ID}" ]; then
-            echo "No coverage-summary artifact found on ${BASE_REF}. Deltas will be omitted."
+            echo "No coverage-summary artifact found on ${BASE_REF} (last 100 runs scanned). Deltas will be omitted."
             exit 0
           fi
           if ! gh run download "${BASE_RUN_ID}" \
