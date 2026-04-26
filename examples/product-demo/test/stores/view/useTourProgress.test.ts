@@ -207,6 +207,30 @@ describe('useTourProgress', () => {
     expect(tour.baselineTickIndex).toBe(0);
   });
 
+  it('clamps a restored baselineTickIndex against the current session.tickIndex on store init', async () => {
+    // Simulate a hard reload mid-tour: persisted progress points at a
+    // post-init step with a high baseline (15), but `session.tickIndex`
+    // has just been reset to 0 by the fresh agent. Without clamping,
+    // chapter 2-5 predicates compare events at tick 0 against
+    // baseline=15 and stall.
+    globalThis.localStorage.setItem(
+      PROGRESS_KEY,
+      JSON.stringify({
+        lastStep: STEP_ID_TRACE_OPEN,
+        completedAt: null,
+        skipped: [],
+        baselineTickIndex: 15,
+      }),
+    );
+
+    const wrapper = await mountWithStores();
+    const session = (wrapper.vm as unknown as { session: ReturnType<typeof useAgentSession> })
+      .session;
+    const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
+    expect(session.tickIndex).toBe(0);
+    expect(tour.baselineTickIndex).toBe(0);
+  });
+
   it('persists the rebased baselineTickIndex so a reload picks it up', async () => {
     const wrapper = await mountWithStores();
     const session = (wrapper.vm as unknown as { session: ReturnType<typeof useAgentSession> })
@@ -228,7 +252,7 @@ describe('useTourProgress', () => {
     expect(parsed.baselineTickIndex).toBe(0);
   });
 
-  it('persists baselineTickIndex and restores it on remount', async () => {
+  it('persists baselineTickIndex and restores it (clamped to session.tickIndex) on remount', async () => {
     const wrapper = await mountWithStores();
     const session = (wrapper.vm as unknown as { session: ReturnType<typeof useAgentSession> })
       .session;
@@ -248,7 +272,12 @@ describe('useTourProgress', () => {
     wrapper.unmount();
     const wrapper2 = await mountWithStores();
     const tour2 = (wrapper2.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
-    expect(tour2.baselineTickIndex).toBe(persistedBaseline);
+    // On remount the new session has tickIndex=0 (Pinia setup happens
+    // before any session.init), so the persisted baseline (5) is
+    // clamped down to keep predicates evaluable. The assertion above
+    // confirms localStorage still carries the original value; the
+    // clamp is an in-memory correction.
+    expect(tour2.baselineTickIndex).toBe(0);
   });
 
   it('syncRoute pushes /tour/<step-id> when the user is already on a tour route', async () => {

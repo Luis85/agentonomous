@@ -139,6 +139,12 @@ export const useAgentSession = defineStore('agentSession', () => {
   // current. Stored separately from user `subscribers` so it survives
   // agent rebuilds via the same rebind path.
   let internalDetach: () => void = () => {};
+  // Monotonic token for stale-completion detection in async cognition
+  // swaps. Bumped on every agent rebuild + at the start of each
+  // `setCognitionMode` so an in-flight probe/construct that resolves
+  // after a rebuild or a competing swap drops its result instead of
+  // overwriting newer state.
+  let cognitionToken = 0;
 
   function attachInternalListener(target: Agent): void {
     internalDetach();
@@ -215,6 +221,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     attachInternalListener(fresh);
     rebindSubscribers(fresh);
     running.value = true;
+    cognitionToken += 1;
     writePersistedSeed(resolvedScenario, resolvedSeed);
   }
 
@@ -281,16 +288,28 @@ export const useAgentSession = defineStore('agentSession', () => {
    * Slice 1.3 wires this so chapter 3's predicate can observe a real
    * swap; the full per-mode UI (loss sparkline, prediction strip,
    * train button) is Pillar-2's slice 2.5.
+   *
+   * Stale-completion guard: `probe()` and `construct()` are async
+   * (peer-dep modes do dynamic imports), so a parallel `init()` /
+   * `replayFromSnapshot()` / second `setCognitionMode()` can land
+   * before this call's awaits resolve. The token bumped here +
+   * stamped on every agent rebuild means a stale completion drops
+   * its result on the floor instead of overwriting the newer state
+   * (and silently emitting a misleading `CognitionModeChanged`).
    */
   async function setCognitionMode(modeId: CognitionModeSpec['id']): Promise<void> {
     const mode = COGNITION_MODES.find((m) => m.id === modeId);
     if (mode === undefined) {
       throw new Error(`useAgentSession.setCognitionMode: unknown mode "${String(modeId)}".`);
     }
-    if (agent.value === null) {
+    const targetAgent = agent.value;
+    if (targetAgent === null) {
       throw new Error('useAgentSession.setCognitionMode: no live agent (call init() first).');
     }
+    cognitionToken += 1;
+    const myToken = cognitionToken;
     const available = await mode.probe();
+    if (myToken !== cognitionToken || agent.value !== targetAgent) return;
     if (!available) {
       const hint =
         mode.peerName === null
@@ -299,7 +318,8 @@ export const useAgentSession = defineStore('agentSession', () => {
       throw new Error(`useAgentSession.setCognitionMode: ${hint}`);
     }
     const reasoner = await mode.construct();
-    agent.value.setReasoner(reasoner);
+    if (myToken !== cognitionToken || agent.value !== targetAgent) return;
+    targetAgent.setReasoner(reasoner);
     cognitionModeId.value = modeId;
     recordUiEvent('CognitionModeChanged');
   }
@@ -387,6 +407,9 @@ export const useAgentSession = defineStore('agentSession', () => {
     // the readout (and chapter-3 predicate) so a previously-selected
     // mode doesn't ghost across a reset / import.
     cognitionModeId.value = 'heuristic';
+    // Drop any in-flight `setCognitionMode` request — its `setReasoner`
+    // call would land on the new agent under the old user's intent.
+    cognitionToken += 1;
   }
 
   /**

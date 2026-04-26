@@ -105,7 +105,15 @@ export const useTourProgress = defineStore('tourProgress', () => {
   // fired before the user reached the step. Persisted alongside the
   // cursor so a reload mid-step doesn't reset the baseline (which
   // would make e.g. "wait 3 ticks" succeed instantly on resume).
-  const baselineTickIndex = ref<number>(persisted?.baselineTickIndex ?? 0);
+  //
+  // On a hard reload `PlayView` calls `session.init(...)` which sets
+  // `session.tickIndex` back to 0, but the persisted baseline still
+  // reflects the pre-reload tick counter. Clamp the restored value
+  // to the current session tick so chapters 2-5 don't reject valid
+  // post-reload events while waiting for the counter to catch up to
+  // a stale baseline.
+  const restoredBaseline = persisted?.baselineTickIndex ?? 0;
+  const baselineTickIndex = ref<number>(Math.min(restoredBaseline, session.tickIndex));
 
   // `useAgentSession.replayFromSnapshot` resets `tickIndex` to 0 and
   // wipes `recentEvents`. After that, every event in the buffer carries

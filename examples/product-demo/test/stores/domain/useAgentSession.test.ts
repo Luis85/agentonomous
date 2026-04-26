@@ -331,6 +331,35 @@ describe('useAgentSession', () => {
     expect(session.cognitionModeId).toBe('heuristic');
   });
 
+  it('setCognitionMode drops stale completions when init() rebuilds the agent mid-flight', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-stale-seed-1' });
+    const firstAgent = session.agent;
+    expect(firstAgent).not.toBeNull();
+
+    // Heuristic mode is always available (no peer dep). The await on
+    // `mode.probe()` still yields a microtask, which is enough room
+    // for a parallel `init()` to invalidate the in-flight swap. Spy
+    // BEFORE the race so the stale completion's setReasoner call
+    // (if any) shows up here.
+    const setReasonerSpy = vi.spyOn(firstAgent!, 'setReasoner');
+    const swap = session.setCognitionMode('heuristic');
+    // Synchronously rebuild the agent — the in-flight swap captured
+    // `firstAgent` and its token before this; both checks should
+    // reject the late completion.
+    session.init({ seed: 'cognition-stale-seed-2' });
+    expect(session.agent).not.toBe(firstAgent);
+    await swap;
+
+    // The stale completion must NOT have called setReasoner on the
+    // (now-stale) firstAgent.
+    expect(setReasonerSpy).not.toHaveBeenCalled();
+    // And the second init() reset cognitionModeId to heuristic;
+    // the stale swap must not re-emit `CognitionModeChanged` against
+    // that fresh state.
+    expect(session.cognitionModeId).toBe('heuristic');
+  });
+
   it('recordUiEvent bumps recentEventsVersion every push, even past the ring-buffer cap', async () => {
     const session = useAgentSession();
     session.init({ seed: 'recent-events-version-seed' });
