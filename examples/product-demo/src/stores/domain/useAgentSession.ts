@@ -114,6 +114,13 @@ export const useAgentSession = defineStore('agentSession', () => {
   // step. Both reset on `init` / `replayFromSnapshot`.
   const tickIndex = ref<number>(0);
   const recentEvents = ref<SessionEvent[]>([]);
+  // Monotonic write counter for `recentEvents`. The buffer is capped at
+  // `RECENT_EVENT_LIMIT` and trimmed on every push past the cap, so
+  // `recentEvents.length` saturates and stops changing — watchers keyed
+  // on the length silently miss UI events once the buffer is full.
+  // Subscribers (`<TourOverlay>`'s predicate re-evaluator) watch this
+  // counter instead so every push is visible regardless of trim.
+  const recentEventsVersion = ref<number>(0);
   const cognitionModeId = ref<string>('heuristic');
   // Reactive last-tick projection for `<TracePanel>`. Updated inside the
   // internal AGENT_TICKED listener so the panel never needs its own
@@ -153,6 +160,7 @@ export const useAgentSession = defineStore('agentSession', () => {
       if (recentEvents.value.length > RECENT_EVENT_LIMIT) {
         recentEvents.value.splice(0, recentEvents.value.length - RECENT_EVENT_LIMIT);
       }
+      recentEventsVersion.value += 1;
     });
   }
 
@@ -181,6 +189,13 @@ export const useAgentSession = defineStore('agentSession', () => {
     recentEvents.value = [];
     lastTrace.value = null;
     lastTickNumber.value = 0;
+    // `buildAgent` returns a fresh agent on the default heuristic
+    // reasoner. Without resetting `cognitionModeId` here, a previously-
+    // selected mode (e.g. `'bt'`) would persist on the new agent's HUD
+    // readout and silently auto-fire chapter-3's
+    // `not(cognitionModeIs('heuristic'))` predicate after a reset/
+    // import, advancing the tour without a real swap.
+    cognitionModeId.value = 'heuristic';
     lastSpeciesOverride.value = options.speciesOverride;
     const fresh = markRaw(
       buildAgent({
@@ -254,6 +269,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     if (recentEvents.value.length > RECENT_EVENT_LIMIT) {
       recentEvents.value.splice(0, recentEvents.value.length - RECENT_EVENT_LIMIT);
     }
+    recentEventsVersion.value += 1;
   }
 
   /**
@@ -367,6 +383,10 @@ export const useAgentSession = defineStore('agentSession', () => {
     recentEvents.value = [];
     lastTrace.value = null;
     lastTickNumber.value = 0;
+    // The fresh agent boots on the default heuristic reasoner; sync
+    // the readout (and chapter-3 predicate) so a previously-selected
+    // mode doesn't ghost across a reset / import.
+    cognitionModeId.value = 'heuristic';
   }
 
   /**
@@ -413,6 +433,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     running,
     tickIndex,
     recentEvents,
+    recentEventsVersion,
     cognitionModeId,
     lastTrace,
     lastTickNumber,

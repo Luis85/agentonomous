@@ -310,4 +310,40 @@ describe('useAgentSession', () => {
     await session.step(1);
     expect(session.tickIndex).toBe(beforeIndex + 1);
   });
+
+  it('init() resets cognitionModeId to the default heuristic on agent rebuild', () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-reset-init-seed' });
+    // Pretend the user previously selected BT (without exercising the
+    // async swap path). Re-init must clobber that back to 'heuristic'
+    // so chapter-3's `not(cognitionModeIs('heuristic'))` predicate
+    // doesn't auto-fire on a fresh agent.
+    session.cognitionModeId = 'bt';
+    session.init({ seed: 'cognition-reset-init-seed-2' });
+    expect(session.cognitionModeId).toBe('heuristic');
+  });
+
+  it('replayFromSnapshot(null) resets cognitionModeId to the default heuristic', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-reset-replay-seed' });
+    session.cognitionModeId = 'bt';
+    await session.replayFromSnapshot(null);
+    expect(session.cognitionModeId).toBe('heuristic');
+  });
+
+  it('recordUiEvent bumps recentEventsVersion every push, even past the ring-buffer cap', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'recent-events-version-seed' });
+    // Drive the agent so the buffer fills past `RECENT_EVENT_LIMIT` (50).
+    for (let i = 0; i < 60; i += 1) await session.tick(0.1);
+    expect(session.recentEvents.length).toBeLessThanOrEqual(50);
+    const versionAfterFill = session.recentEventsVersion;
+
+    session.recordUiEvent('TestUiEvent');
+    expect(session.recentEventsVersion).toBe(versionAfterFill + 1);
+    // recentEvents.length stays saturated so a length-only watcher
+    // would not have fired here — version watcher must.
+    session.recordUiEvent('TestUiEvent2');
+    expect(session.recentEventsVersion).toBe(versionAfterFill + 2);
+  });
 });

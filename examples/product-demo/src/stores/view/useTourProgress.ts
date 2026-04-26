@@ -111,11 +111,17 @@ export const useTourProgress = defineStore('tourProgress', () => {
   // wipes `recentEvents`. After that, every event in the buffer carries
   // a tickIndex < the pre-reset baseline, so chapter-5 step "replay-import"
   // would never fire on `eventEmittedSinceStep('SnapshotImported')`.
-  // Detect the reset (tickIndex falling) and rebase the baseline.
+  // Detect the reset (tickIndex falling) and rebase the baseline. The
+  // rebase is persisted immediately so a page reload before the next
+  // explicit advance/skip/restart doesn't restore the stale pre-reset
+  // baseline from `demo.v2.tour.progress`.
   watch(
     () => session.tickIndex,
     (next, prev) => {
-      if (next < prev) baselineTickIndex.value = next;
+      if (next < prev) {
+        baselineTickIndex.value = next;
+        persist();
+      }
     },
   );
 

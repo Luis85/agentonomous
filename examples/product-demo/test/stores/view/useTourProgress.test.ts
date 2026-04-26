@@ -207,6 +207,27 @@ describe('useTourProgress', () => {
     expect(tour.baselineTickIndex).toBe(0);
   });
 
+  it('persists the rebased baselineTickIndex so a reload picks it up', async () => {
+    const wrapper = await mountWithStores();
+    const session = (wrapper.vm as unknown as { session: ReturnType<typeof useAgentSession> })
+      .session;
+    const tour = (wrapper.vm as unknown as { tour: ReturnType<typeof useTourProgress> }).tour;
+    session.init({ seed: 'tour-baseline-persist-after-rebase-seed' });
+    for (let i = 0; i < 4; i += 1) await session.tick(0.1);
+    await nextTick();
+    tour.skip();
+    expect(tour.baselineTickIndex).toBeGreaterThan(0);
+
+    await session.replayFromSnapshot(null);
+    await nextTick();
+    // The rebase MUST be persisted immediately — without persist,
+    // a hard reload here would restore the pre-reset baseline.
+    const raw = globalThis.localStorage.getItem(PROGRESS_KEY);
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!) as { baselineTickIndex: number };
+    expect(parsed.baselineTickIndex).toBe(0);
+  });
+
   it('persists baselineTickIndex and restores it on remount', async () => {
     const wrapper = await mountWithStores();
     const session = (wrapper.vm as unknown as { session: ReturnType<typeof useAgentSession> })

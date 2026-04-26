@@ -12,10 +12,13 @@ const step = computed(() => tour.currentStep);
 // Re-evaluate the active step's predicate when either the agent ticks
 // OR a UI event lands in the recent-events ring buffer (e.g. chapter-2
 // `TracePanelOpened`, chapter-3 `CognitionModeChanged`, chapter-5
-// `SnapshotImported`). Watching both sources keeps the overlay
-// responsive to user actions without requiring per-event imperative
-// `tour.next()` calls from each component.
-watch([() => session.tickIndex, () => session.recentEvents.length], () => {
+// `SnapshotImported`). The buffer is capped at `RECENT_EVENT_LIMIT`
+// and trimmed on every overflow push, so `recentEvents.length`
+// saturates and stops changing — watch the monotonic
+// `recentEventsVersion` counter so every push fires the predicate
+// re-evaluator regardless of trim. This also keeps event-driven
+// progression alive while the simulation is paused.
+watch([() => session.tickIndex, () => session.recentEventsVersion], () => {
   tour.next();
 });
 
