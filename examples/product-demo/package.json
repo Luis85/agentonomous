@@ -29,5 +29,14 @@
     "vite": "^8.0.8",
     "vue": "^3.5.0",
     "vue-router": "^4.5.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,vue,mjs,cjs,d.mts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,html,css}": [
+      "prettier --write"
+    ]
   }
 }
