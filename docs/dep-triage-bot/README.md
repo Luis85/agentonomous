@@ -24,40 +24,43 @@ routine drains the **Dependabot PR pile**.
 
 ## Output sink
 
-**Single rolling issue** titled `Dependency triage — develop`, label
-`dep-triage-bot`. New comment per run; the issue body holds the
-canonical `Last triaged SHAs: …` mapping so the next run knows which
-PR head SHAs to skip.
+**One fresh issue per run.** Title `Dependency triage — YYYY-MM-DD`,
+label `dep-triage-bot`. The issue **body** holds the full per-run
+output: action counts, per-PR table, run footer. There is no rolling
+tracker; each run's issue is a self-contained punch list the owner
+closes manually once every blocked / major / approval-only row is
+resolved.
 
-Same shape as the daily `review-bot` rolling issue (`#87`) — long-
-lived, append-only, body holds canonical resume state. Different from
-`docs-review-bot` (which opens one issue per run).
+Same pattern as the refactored daily `review-bot` (issue per run,
+body holds findings) and `docs-review-bot` (issue per run, body
+holds drift checklist) — long-lived per-run archives, no append-to-
+shared-tracker step.
 
-If a run finds zero open Dependabot PRs, the routine appends a one-
-line `YYYY-MM-DD — no-op (no open Dependabot PRs)` comment to the
-rolling tracker and exits cleanly. Silence is the desired state.
+Per-PR triage state lives on the **Dependabot PR itself** as an HTML
+comment marker `<!-- dep-triaged:<head-sha7>:<action> -->` embedded
+at the top of the routine's per-PR comment body. The routine reads
+that marker on the next run to skip already-triaged PRs unless their
+head SHA has changed (e.g. via `@dependabot rebase`). See the
+prompt's [Idempotency](./PROMPT.md#idempotency) section for the
+exact skip-check shell snippet.
+
+If a run finds zero open Dependabot PRs, the routine does NOT open
+an issue. Quiet runs leave no trace — same convention as the daily
+code-review bot.
 
 ## Setup checklist (one-time)
 
-- [ ] Create the rolling issue `Dependency triage — develop`. Add
-      label `dep-triage-bot`. Seed the body with:
-
-      ```
-      Rolling tracker for the weekly `dep-triage-bot` cloud routine.
-
-      Last triaged SHAs: <none>
-      ```
-
-      (The prompt re-creates the label on first run if missing — this
-      just avoids the create call racing with the issue-open call.)
 - [ ] Add the `dep-triage-bot` label to the repo:
       ```bash
       gh label create dep-triage-bot --color FBCA04 \
         --description "Findings from the weekly dep-triage cloud routine"
       ```
+      (The prompt re-creates the label on first run if missing —
+      this just avoids the create call racing with the issue-open
+      call.)
 - [ ] Add `.dep-triage-cache/` to `.gitignore` (one line). The
-      routine writes a FAILED-comment body file there if the rolling
-      tracker comment-append fails so you can re-submit by hand.
+      routine writes a FAILED-issue-body file there if `gh issue
+      create` fails so you can re-submit by hand.
 - [ ] Enable auto-merge on the repo
       (`Settings → General → Pull Requests → Allow auto-merge`). The
       routine uses `gh pr merge --auto --squash` for the dev-deps
@@ -65,9 +68,10 @@ rolling tracker and exits cleanly. Silence is the desired state.
       approval-comment for every PR (still safe, just slower drain).
 - [ ] Verify the routine has the right GitHub token scopes:
       `pull-requests:write` (comment, merge --auto, label),
-      `issues:write` (rolling tracker comments + body edit), and
-      `contents:read` (clone + checkout PR branches). No
-      `contents:write` — the routine never pushes a branch.
+      `issues:write` (open per-run issue, edit on same-date
+      delta-append), and `contents:read` (clone + checkout PR
+      branches). No `contents:write` — the routine never pushes a
+      branch.
 - [ ] Confirm Dependabot is configured to group npm minor + patch
       updates per the `npm-non-major` blocks on both npm entries in
       [`.github/dependabot.yml`](../../.github/dependabot.yml).
@@ -76,12 +80,11 @@ rolling tracker and exits cleanly. Silence is the desired state.
       most of its value.
 - [ ] Dry-run once with `DRY_RUN=1` set in the routine's env. The
       prompt's Dry-run section guards every `gh pr merge`,
-      `gh pr comment`, `gh issue comment`, `gh issue edit`,
-      `gh issue create`, and `gh label create` call behind a
-      `DRY_RUN` check; in dry-run mode each is replaced by a stdout
-      dump of the would-be call + body. The `npm ci && npm run
-      verify` step still runs locally so verify-pass / verify-fail
-      signals are realistic.
+      `gh pr comment`, `gh issue create`, `gh issue edit`, and
+      `gh label create` call behind a `DRY_RUN` check; in dry-run
+      mode each is replaced by a stdout dump of the would-be call +
+      body. The `npm ci && npm run verify` step still runs locally
+      so verify-pass / verify-fail signals are realistic.
 
 ## Routine wrapper prompt (paste into the routine)
 
@@ -102,10 +105,11 @@ user message):
 >    to triage, the action policy table, hard rules, output format,
 >    persistence, and dry-run rules. Do not re-derive any of that
 >    from this message.
-> 3. After draining the queue and appending the per-run comment to
->    the rolling tracker (or posting the no-op comment), exit
->    cleanly. Do NOT open a PR. Do NOT push to any branch. Do NOT
->    edit any code, manifests, or lockfiles directly.
+> 3. After draining the queue and opening the per-run
+>    `dep-triage-bot` issue (or recognizing a no-op run with zero
+>    open Dependabot PRs and exiting cleanly without opening an
+>    issue), exit cleanly. Do NOT open a PR. Do NOT push to any
+>    branch. Do NOT edit any code, manifests, or lockfiles directly.
 >
 > If `docs/dep-triage-bot/PROMPT.md` does not exist on `develop` for
 > some reason, abort with a clear error — do not improvise a triage
@@ -127,11 +131,11 @@ reasonable cron in UTC:
   hour after Dependabot fires. Gives Dependabot time to actually
   finish opening PRs before the routine scans for them.
 
-The routine no-ops cleanly when there are no open Dependabot PRs, so
-over-scheduling is non-destructive — just noisy in the rolling
-tracker. If the queue stays empty for several weeks (Dependabot
-finds nothing to bump), the routine's runs are a one-line `no-op`
-comment per run; that's the desired silence.
+The routine no-ops cleanly when there are no open Dependabot PRs:
+no issue is opened, no marker comment is left, no PR is touched. If
+the queue stays empty for several weeks (Dependabot finds nothing
+to bump), the `dep-triage-bot` label view simply shows nothing new
+landing — that's the desired silence.
 
 ## Iteration workflow (changing the prompt)
 
@@ -174,15 +178,36 @@ rules, or output-format pain. To change it:
   prompt's [Triage policy](./PROMPT.md#triage-policy).
 - **Verify failures block silently from a CI perspective.** A
   blocked PR sits open with a comment; nothing flags the queue
-  health. Mitigation: weekly run footers always report `Blocked: N`
-  — non-zero N is the signal to triage manually.
+  health. Mitigation: every per-run issue's footer reports
+  `Blocked: N` — non-zero N is the signal to triage manually. The
+  `dep-triage-bot` label view groups every run's issues so the
+  backlog is one click away.
+- **Issue list grows over time.** Each run opens an issue. Close
+  each issue once every blocked / major / approval-only row it
+  carries is resolved. Closed issues drop out of the
+  `dep-triage-bot` label view automatically.
+
+## Bot label convention
+
+Each scheduled cloud routine in this repo owns a dedicated GitHub
+label so its issues group cleanly under one filter:
+
+| Routine                  | Label             |
+| ------------------------ | ----------------- |
+| `docs/review-bot/`       | `review-bot`      |
+| `docs/docs-review-bot/`  | `docs-review`     |
+| `docs/dep-triage-bot/`   | `dep-triage-bot`  |
+
+Each per-run issue carries exactly its routine's label — no
+cross-labelling, no shared `automation` umbrella label. Filter the
+issue list by label to see one routine's full history.
 
 ## Related
 
 - Sibling routines: `docs/review-bot/` (daily code review of
-  `develop` commits, dual sink: rolling issue `#87` + committed
-  daily docs), `docs/docs-review-bot/` (weekly docs-drift audit,
-  fresh issue per run).
+  `develop` commits, dual sink: per-run issue + committed daily
+  docs), `docs/docs-review-bot/` (weekly docs-drift audit, fresh
+  issue per run).
 - Dependabot config: [`.github/dependabot.yml`](../../.github/dependabot.yml)
   — the `npm-non-major` group blocks are what make this routine
   tractable. Without grouping, the queue is N PRs/week.

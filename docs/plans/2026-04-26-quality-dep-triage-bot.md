@@ -41,7 +41,7 @@ separate ones.
 
 ```yaml
 # Example shape — adapt to existing keys verbatim. Apply to BOTH the
-# root `npm` entry and the `examples/nurture-pet` entry if both exist.
+# root `npm` entry and the `examples/product-demo` entry if both exist.
 - package-ecosystem: "npm"
   directory: "/"
   schedule:

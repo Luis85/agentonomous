@@ -59,14 +59,18 @@ Sections:
 3. **Hard rules** — never delete plan content; only `git mv`.
    Preserve the date prefix. Never archive a plan that has open rows
    or whose tracker issue is still labelled `in-progress`.
-4. **Output** — open one PR per run with archive moves, body lists
-   each `(plan, last shipped row, archive reason)`. No moves needed:
-   open a fresh tracker issue
-   `Plan reconciliation YYYY-MM-DD — <sha7>` (label
-   `plan-recon-bot`) noting the no-op, then exit.
-5. **Failure handling** — same pattern as the other routines (one
-   issue per run, never push direct to `develop`, body notes the
-   failure).
+4. **Output** — primary sink is one PR per run with archive moves,
+   body lists each `(plan, last shipped row, archive reason)`. **No
+   moves needed → no PR, no issue, exit cleanly.** Same "quiet runs
+   leave no trace" convention as the refactored review-bot,
+   docs-review-bot, and dep-triage-bot.
+5. **Failure handling** — `git mv` fails / verify fails / archive
+   parse breaks → open a fresh
+   `Plan reconciliation YYYY-MM-DD — <sha7>` issue (label
+   `plan-recon-bot`) with the failure tail in the body. Never push
+   direct to `develop`. Failure issues are the only ones this
+   routine opens — they group under the dedicated label so a
+   non-empty label view is always a real signal.
 
 - [ ] **Step 3: Write `docs/plan-recon-bot/README.md`**
 

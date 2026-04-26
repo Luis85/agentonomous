@@ -16,53 +16,40 @@ catches runtime regressions that typecheck + bundle don't (tfjs
 backend probe, `base` URL handling, vite HTML transform regressions
 — see `MEMORY.md → feedback_vite_html_transform`).
 
-## Coordination with PR #129 (demo rename)
+## Coordination with PR #129 (demo rename) — RESOLVED
 
-> **Demo path:** every `examples/nurture-pet/...` reference below
-> uses the pre-rename name. If Wave 0 of PR
-> [#129](https://github.com/Luis85/agentonomous/pull/129) has merged
-> into `develop` before this row starts, swap to
-> `examples/product-demo/...` everywhere (file paths, `cd` targets,
-> `working-directory` keys, `.gitignore` entries, `git add` lines).
-> See [Coordination with PR #129](./2026-04-26-quality-automation-routines.md#coordination-with-pr-129-demo-rename)
-> in the umbrella plan for the full decision rule.
+> Wave 0 of PR #129 merged as
+> [#134](https://github.com/Luis85/agentonomous/pull/134) on
+> 2026-04-26; the demo lives at `examples/product-demo/` on
+> `develop`. Every path below is the post-rename name verbatim — no
+> conditional sequencing remains. The umbrella's
+> [Coordination section](./2026-04-26-quality-automation-routines.md#coordination-with-pr-129-demo-rename--resolved)
+> is the historical reference.
 
 ## Files
 
-- Create: `examples/nurture-pet/playwright.config.ts`
-- Create: `examples/nurture-pet/tests/smoke/golden-path.spec.ts`
+- Create: `examples/product-demo/playwright.config.ts`
+- Create: `examples/product-demo/tests/smoke/golden-path.spec.ts`
 - Create: `.github/workflows/demo-smoke.yml`
-- Modify: `examples/nurture-pet/package.json` — devDep + script
+- Modify: `examples/product-demo/package.json` — devDep + script
 - Modify: `.gitignore`
 
 ## Steps
 
-- [ ] **Step 0: Decide demo path before doing anything else**
-
-```bash
-git fetch origin
-git ls-tree --name-only origin/develop examples/ | sort
-```
-
-If the listing contains `product-demo` (and not `nurture-pet`),
-Wave 0 has landed — substitute the path everywhere in this row
-before running any subsequent step. If the listing still contains
-`nurture-pet`, proceed verbatim and ping the Wave 0 PR when it opens.
-
 - [ ] **Step 1: Add Playwright to the demo**
 
 ```bash
-cd examples/nurture-pet
+cd examples/product-demo
 npm install --save-dev --save-exact @playwright/test@latest
 npx playwright install --with-deps chromium
 cd -
 ```
 
-Pin `@playwright/test` in `examples/nurture-pet/package.json`. Do
+Pin `@playwright/test` in `examples/product-demo/package.json`. Do
 NOT add it to the root `package.json` — the demo manages its own
 deps (`MEMORY.md` notes the `file:../..` EISDIR pitfall on Windows).
 
-- [ ] **Step 2: `examples/nurture-pet/playwright.config.ts`**
+- [ ] **Step 2: `examples/product-demo/playwright.config.ts`**
 
 ```ts
 import { defineConfig, devices } from '@playwright/test';
@@ -136,7 +123,7 @@ Just build the demo synchronously first, then hand control to
 playwright:
 
 ```bash
-cd examples/nurture-pet
+cd examples/product-demo
 npm run build
 npx playwright test --headed --project=chromium
 cd -
@@ -153,7 +140,7 @@ Iterate on selectors until the spec passes. **If the demo lacks
 stable testids on the HUD, add them in this same row** (not a
 separate PR; the smoke depends on them).
 
-- [ ] **Step 5: Add script to `examples/nurture-pet/package.json`**
+- [ ] **Step 5: Add script to `examples/product-demo/package.json`**
 
 ```json
 "smoke": "playwright test"
@@ -162,8 +149,8 @@ separate PR; the smoke depends on them).
 - [ ] **Step 6: Update `.gitignore`**
 
 ```
-examples/nurture-pet/playwright-report/
-examples/nurture-pet/test-results/
+examples/product-demo/playwright-report/
+examples/product-demo/test-results/
 ```
 
 - [ ] **Step 7: Workflow**
@@ -179,7 +166,7 @@ on:
     - cron: '30 3 * * *'   # Daily 03:30 UTC
   pull_request:
     paths:
-      - 'examples/nurture-pet/**'
+      - 'examples/product-demo/**'
       - 'src/**'           # library changes can break demo at runtime
       - '.github/workflows/demo-smoke.yml'
   workflow_dispatch:
@@ -198,22 +185,22 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Install demo deps
-        working-directory: examples/nurture-pet
+        working-directory: examples/product-demo
         run: npm ci --no-audit --no-fund
       - name: Install Playwright browsers
-        working-directory: examples/nurture-pet
+        working-directory: examples/product-demo
         run: npx playwright install --with-deps chromium
       - name: Build demo
-        working-directory: examples/nurture-pet
+        working-directory: examples/product-demo
         run: npm run build
       - name: Smoke (Playwright)
-        working-directory: examples/nurture-pet
+        working-directory: examples/product-demo
         run: npm run smoke
       - uses: actions/upload-artifact@<sha> # v5.0.0
         if: failure()
         with:
           name: playwright-report
-          path: examples/nurture-pet/playwright-report/
+          path: examples/product-demo/playwright-report/
           retention-days: 14
 ```
 
@@ -222,16 +209,16 @@ jobs:
 ```bash
 docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest -color .github/workflows/demo-smoke.yml
 npm run verify
-( cd examples/nurture-pet && npm run smoke )
+( cd examples/product-demo && npm run smoke )
 ```
 
 - [ ] **Step 9: Commit + push + open PR**
 
 ```bash
-git add examples/nurture-pet/playwright.config.ts \
-        examples/nurture-pet/tests/ \
-        examples/nurture-pet/package.json \
-        examples/nurture-pet/package-lock.json \
+git add examples/product-demo/playwright.config.ts \
+        examples/product-demo/tests/ \
+        examples/product-demo/package.json \
+        examples/product-demo/package-lock.json \
         .github/workflows/demo-smoke.yml \
         .gitignore
 git commit -m "test(demo): nightly Playwright smoke on golden path"
@@ -243,7 +230,7 @@ Tracks: #131
 
 Adds Playwright headless smoke against the built demo: feed → pet →
 sleep, asserts HUD updates and zero console errors. Runs nightly at
-03:30 UTC + on PRs that touch examples/nurture-pet/, src/, or this
+03:30 UTC + on PRs that touch examples/product-demo/, src/, or this
 workflow file. Failed runs upload the playwright-report artifact.
 
 Ticks row 8 of the umbrella tracker."
@@ -258,20 +245,14 @@ Ticks row 8 of the umbrella tracker."
 
 ## Acceptance criteria
 
-- `npm run smoke` (from `examples/nurture-pet/`) passes locally.
+- `npm run smoke` (from `examples/product-demo/`) passes locally.
 - The CI smoke run on PR open is green.
 - `.github/workflows/demo-smoke.yml` is actionlint-clean.
 - Tracker row 8 is `[x]`.
 
-## Rename-coordination follow-up
+## Rename-coordination — RESOLVED
 
-If Wave 0 of PR #129 has NOT yet merged when this PR opens:
-
-1. Add a comment on the Wave 0 PR (whichever PR is the live rename
-   PR at that time) listing the new `examples/nurture-pet/` paths
-   this PR introduces, so the rename PR's sweep covers them.
-2. After Wave 0 merges, do not open a follow-up PR to rename — the
-   Wave 0 PR is responsible.
-
-If Wave 0 has already merged before this PR opens, this PR uses
-`examples/product-demo/` from the start and there is no follow-up.
+Wave 0 of PR #129 merged as
+[#134](https://github.com/Luis85/agentonomous/pull/134) on
+2026-04-26. This row uses `examples/product-demo/` paths verbatim;
+no follow-up rename PR is needed.
