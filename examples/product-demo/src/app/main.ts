@@ -25,10 +25,14 @@ const PURGE_NAMESPACE_GUARD = 'demo.v2.';
 
 function purgeLegacyDemoKeys(): readonly string[] {
   const purged: string[] = [];
-  const storage = globalThis.localStorage;
-  if (!storage) return purged;
 
+  // Reading `globalThis.localStorage` itself can throw `SecurityError` in
+  // privacy-restricted browsers and sandboxed iframes — guard the access
+  // inside the try so the bootstrap never crashes before main.ts loads.
   try {
+    const storage = globalThis.localStorage;
+    if (!storage) return purged;
+
     const matches: string[] = [];
     for (let i = 0; i < storage.length; i += 1) {
       const key = storage.key(i);
@@ -46,7 +50,8 @@ function purgeLegacyDemoKeys(): readonly string[] {
       purged.push(key);
     }
   } catch {
-    // localStorage unavailable (private mode, quota) — treat as no-op.
+    // localStorage unavailable or access blocked (private mode, quota,
+    // SecurityError in sandboxed iframes) — treat as no-op.
   }
   return purged;
 }
