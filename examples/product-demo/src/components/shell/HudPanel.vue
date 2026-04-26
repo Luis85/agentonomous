@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, onMounted, onUnmounted, ref } from 'vue';
+import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { AgentState } from 'agentonomous';
 import { useAgentSession } from '../../stores/domain/useAgentSession.js';
 import { useSelectorRegistry } from '../../stores/view/useSelectorRegistry.js';
@@ -115,6 +115,25 @@ function tally(eventType: string, evt: Record<string, unknown>): void {
   }
 }
 
+function clearLifetimeStats(): void {
+  counters.value = { ateCount: 0, scoldedCount: 0, illnessCount: 0, petCount: 0 };
+  lifeSummary.value = null;
+}
+
+// Reset HUD-local lifetime stats whenever the session swaps in a fresh
+// agent (Reset button → `replayFromSnapshot(null)` / "New pet" button /
+// any future scenario switch). Without this the next death summary
+// leaks counters from the previous pet, contradicting Reset's
+// "lifetime stats … will be lost" confirmation. The watcher fires
+// post-mount with its first non-null value, but counters already start
+// at zero so re-zeroing is a no-op then.
+watch(
+  () => session.agent,
+  (next, prev) => {
+    if (next !== prev) clearLifetimeStats();
+  },
+);
+
 onMounted(() => {
   refreshFromAgent();
   const root = instance?.proxy?.$el as HTMLElement | undefined;
@@ -176,9 +195,9 @@ function dismissLifeSummary(): void {
 }
 
 function newPet(): void {
-  lifeSummary.value = null;
+  // The session.agent watcher above clears `counters` + `lifeSummary`
+  // once the rebuild swaps the agent ref — no need to duplicate it here.
   void session.replayFromSnapshot(null);
-  counters.value = { ateCount: 0, scoldedCount: 0, illnessCount: 0, petCount: 0 };
 }
 
 function formatAge(seconds: number): string {

@@ -223,4 +223,26 @@ describe('useAgentSession', () => {
     expect(session.lastTrace).not.toBeNull();
     expect(session.lastTickNumber).toBeGreaterThan(0);
   });
+
+  it('tickIndex stays frozen on paused (virtualDtSeconds === 0) ticks but advances on step()', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'pause-progress-seed' });
+    expect(session.tickIndex).toBe(0);
+
+    // Pause the agent: setTimeScale(0). Subsequent tick(dt) calls still
+    // emit AGENT_TICKED (so trace panels stay live) but with
+    // virtualDtSeconds === 0 — the chapter-1 `tickAtLeast(N)` predicate
+    // must NOT count these or paused playback auto-completes the tour.
+    session.pause();
+    const beforeIndex = session.tickIndex;
+    await session.tick(0.1);
+    await session.tick(0.1);
+    expect(session.tickIndex).toBe(beforeIndex);
+    expect(session.lastTickNumber).toBeGreaterThan(0); // trace still updates
+
+    // step() temporarily unpauses, ticks once with virtual time, then
+    // re-pauses — that one tick must count.
+    await session.step(1);
+    expect(session.tickIndex).toBe(beforeIndex + 1);
+  });
 });

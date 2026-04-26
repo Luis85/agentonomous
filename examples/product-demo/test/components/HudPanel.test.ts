@@ -59,4 +59,35 @@ describe('<HudPanel>', () => {
     wrapper.unmount();
     expect(registry.resolve(handle)).toBeNull();
   });
+
+  it('clears HUD lifetime counters when the session swaps in a fresh agent', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'hud-reset-seed' });
+    const wrapper = mount(HudPanel);
+    await nextTick();
+
+    // Reach into <script setup> state to seed non-zero lifetime counters
+    // and a stale life-summary banner — the same shape `tally()` /
+    // `AgentDied` would produce. The watcher under test must reset both
+    // when ResetButton's `replayFromSnapshot(null)` swaps the agent ref.
+    // Vue's setupState proxy auto-unwraps refs on read AND auto-routes
+    // writes back into `.value`, so plain property assignment is
+    // sufficient; trying `setupState[k].value = ...` blows up because
+    // the read has already been unwrapped by the proxy.
+    const setupState = (wrapper.vm.$ as unknown as { setupState: Record<string, unknown> })
+      .setupState;
+    setupState['counters'] = { ateCount: 5, scoldedCount: 2, illnessCount: 1, petCount: 3 };
+    setupState['lifeSummary'] = { name: 'old-pet', diedAtMs: 0 };
+
+    await session.replayFromSnapshot(null);
+    await nextTick();
+
+    expect(setupState['counters']).toEqual({
+      ateCount: 0,
+      scoldedCount: 0,
+      illnessCount: 0,
+      petCount: 0,
+    });
+    expect(setupState['lifeSummary']).toBeNull();
+  });
 });

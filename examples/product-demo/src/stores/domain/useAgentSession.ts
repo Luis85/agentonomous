@@ -133,8 +133,14 @@ export const useAgentSession = defineStore('agentSession', () => {
     internalDetach();
     internalDetach = target.subscribe((event) => {
       if (event.type === AGENT_TICKED) {
-        tickIndex.value += 1;
         const ticked = event as AgentTickedEvent;
+        // Gate `tickIndex` on real virtual-time advancement: `Agent.tick`
+        // still publishes AGENT_TICKED at `timeScale === 0` so the trace
+        // panel and event ring buffer keep observing the paused frame,
+        // but a frozen frame must NOT count toward tour-progression
+        // predicates like chapter-1's `tickAtLeast(N)` — otherwise
+        // pause-then-wait silently auto-completes the tour.
+        if (ticked.virtualDtSeconds > 0) tickIndex.value += 1;
         lastTrace.value = ticked.trace;
         lastTickNumber.value = ticked.tickNumber;
       }
