@@ -6,6 +6,8 @@ import type { Learner, LearningOutcome } from '../../../src/cognition/learning/L
 import { InMemoryEventBus } from '../../../src/events/InMemoryEventBus.js';
 import { DirectBehaviorRunner } from '../../../src/cognition/behavior/DirectBehaviorRunner.js';
 import { INTERACTION_REQUESTED } from '../../../src/interaction/InteractionRequestedEvent.js';
+import { AgeModel } from '../../../src/lifecycle/AgeModel.js';
+import type { StageCapabilityMap } from '../../../src/lifecycle/StageCapabilities.js';
 import { Needs } from '../../../src/needs/Needs.js';
 import { ManualClock } from '../../../src/ports/ManualClock.js';
 import { SeededRng } from '../../../src/ports/SeededRng.js';
@@ -174,6 +176,42 @@ describe('Stage 8 (score) on SkillFailed branches', () => {
     // Pre-skill hunger ≈ 0.2 (initial level); post-skill would be 0.7.
     // Tolerate tiny float drift; the key claim is "pre, not post".
     expect(details.preNeeds!.hunger).toBeCloseTo(0.2, 5);
+  });
+
+  it('scores an outcome when a skill is blocked by life stage', async () => {
+    // The stage-capability gate fires BEFORE the registry lookup, so it
+    // is structurally distinct from the `not-registered` / `err(...)` /
+    // throws branches even though all four flow into `scoreFailure`.
+    // Without a direct test, a refactor could drop or mis-shape the
+    // `scoreFailure` call inside the gate without a single assertion
+    // catching it.
+    const blocked: Skill = {
+      id: 'blocked',
+      label: 'Blocked',
+      baseEffectiveness: 1,
+      execute() {
+        return Promise.resolve(ok({ effectiveness: 1 }));
+      },
+    };
+    const learner = recordingLearner();
+    // 'baby' stage explicitly only allows 'allowed' — 'blocked' falls
+    // through the allow-list check and gets denied.
+    const stageCapabilities: StageCapabilityMap = {
+      baby: { allow: ['allowed'] },
+    };
+    const ageModel = new AgeModel({
+      bornAt: 0,
+      schedule: [{ stage: 'baby', atSeconds: 0 }],
+    });
+    const agent = agentWithSkill(blocked, learner, { ageModel, stageCapabilities });
+    agent.interact('blocked');
+    await agent.tick(0.016);
+
+    expect(learner.calls).toHaveLength(1);
+    expect(learner.calls[0]).toMatchObject({
+      intention: { kind: 'satisfy', type: 'blocked' },
+      details: { failed: true, code: 'stage-blocked' },
+    });
   });
 
   it('omits preNeeds when the agent has no Needs subsystem', async () => {
