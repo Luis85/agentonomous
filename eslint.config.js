@@ -45,6 +45,7 @@ export default tseslint.config(
             'vite.config.ts',
             '*.config.ts',
             'scripts/*.mjs',
+            'scripts/*.d.mts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
@@ -284,6 +285,7 @@ export default tseslint.config(
       globals: {
         console: 'readonly',
         process: 'readonly',
+        fetch: 'readonly',
       },
     },
     rules: {
