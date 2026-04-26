@@ -1,6 +1,6 @@
 # agentonomous — MVP demo spec
 
-> Companion to [`docs/specs/vision.md`](./vision.md).
+> Companion to [`docs/PRODUCT_VISION.md`](../PRODUCT_VISION.md).
 > This document defines the public MVP demo scope: what we show, what we skip,
 > and how we keep the story clear. Draft — iterated on throughout Phase A.
 >
