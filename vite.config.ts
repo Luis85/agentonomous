@@ -121,6 +121,19 @@ export default defineConfig({
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
       },
+      // `vite-plugin-dts` runs the TypeScript compiler to emit
+      // declarations and is intrinsically the slowest part of the
+      // build (~3s of a ~4s wall time). The levers we can pull are
+      // already tightened — `tsconfig.build.json` excludes tests,
+      // `skipLibCheck` is inherited from the base config,
+      // `rollupTypes: false` keeps us off the slow bundle-types
+      // path, and we are already pinned to the latest
+      // `vite-plugin-dts`. Rolldown's `pluginTimings` check is
+      // informational only; suppress it so the warning stops
+      // cluttering build output without misleading future
+      // contributors into chasing an actionable fix that does not
+      // exist.
+      checks: { pluginTimings: false },
     },
   },
   plugins: [
