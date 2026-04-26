@@ -503,10 +503,16 @@ PRs on top of an unmerged backlog:
 EXISTING="$(gh pr list \
   --base develop \
   --state open \
-  --limit 200 \
+  --limit 1000 \
   --search "author:${ROUTINE_GH_LOGIN}" \
   --json number,title,headRefName,headRefOid \
   --jq '[.[] | select(.headRefName | startswith("chore/actions-bump-"))][0]')"
+# `--limit 1000` is gh's hard cap per page — sufficient because the
+# `--search "author:..."` clause already scopes to a single login's
+# open PRs in this repo, which in practice is bounded well below
+# 1000. Without `--limit`, gh defaults to 30 and would silently miss
+# older open `chore/actions-bump-*` PRs once the per-author backlog
+# grows past 30, allowing the routine to open a duplicate.
 if [ -n "${EXISTING}" ] && [ "${EXISTING}" != "null" ]; then
   echo "Skip — bump PR already open: ${EXISTING}"
   exit 0

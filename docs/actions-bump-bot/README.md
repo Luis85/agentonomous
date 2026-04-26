@@ -70,10 +70,15 @@ Idempotency is bounded by a search for **any** still-open
 unmerged bump PRs also block a new run, not just this week's. See
 the prompt's [Idempotency](./PROMPT.md#idempotency) section.
 
-If a run finds no `PENDING` rows (`scripts/bump-actions.mjs` exits
-0), the routine does NOT open a PR or an issue. Quiet runs leave
-no trace — same convention as the daily `review-bot` and the
-weekly `dep-triage-bot`.
+A run is a true no-op only when `scripts/bump-actions.mjs` exits 0
+**and** the column-6 status scan finds zero `no-releases` /
+`unresolved` rows. In that case the routine opens no PR and no
+issue — quiet runs leave no trace, same convention as the daily
+`review-bot` and the weekly `dep-triage-bot`. Exit 0 with
+`no-releases` / `unresolved` rows present is **not** a no-op:
+the routine still files an `Unresolved action pins YYYY-MM-DD`
+triage issue per the prompt's
+[Failure handling](./PROMPT.md#failure-handling) and exits 0.
 
 ## Setup checklist (one-time)
 
