@@ -18,6 +18,14 @@ and degrades when the plan disagrees with the diff.
 - When implementing a row from `docs/plans/YYYY-MM-DD-<slug>.md`, edit
   the plan in the same PR — mark the row "Shipped (PR #N)" or move it
   under a "What's already shipped" heading.
+- **Tracker-table flips ride with the same PR.** Don't land work with
+  the row at "in review" and chase it with a one-line `docs: flip row
+to ✅` follow-up — that pollutes git history. Instead: open the PR
+  (the GH-assigned number is known immediately), edit the planning doc
+  to set the row to `✅ shipped` with `[#NNN](url)` linked, push the
+  same branch, then squash-merge. The row briefly reads "shipped" while
+  the PR is still open; that is fine — it reflects intent and CI gates
+  prevent a broken merge from leaving the row stale.
 - When a PR changes user-visible surface (new option on a public
   helper, new event on the agent bus, new public type, new export),
   update the relevant doc (`README.md`, `STYLE_GUIDE.md`,

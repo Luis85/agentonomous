@@ -27,7 +27,7 @@ The doc set originally landed via [PR #129](https://github.com/Luis85/agentonomo
 Every downstream PR cut from this plan must:
 
 - include the body line `Tracks: #132`,
-- tick its row in the [Tracker table](#tracker-table) in the same diff (per the project rule that plan + doc updates ride with their PR),
+- flip its row in the [Tracker table](#tracker-table) to `✅ shipped` with `[#NNN](url)` **in the same PR** (use the GH-assigned PR number — it is known the moment the PR is opened, before merge). Do NOT land at "in review" and chase with a `docs: flip row` follow-up — those pollute history. The row briefly reads "shipped" while the PR is still open; CI gates prevent a broken merge from leaving the row stale,
 - get added as a row to the GitHub tasklist on issue #132's body so completion auto-flips on merge.
 
 ---
@@ -334,7 +334,7 @@ Canonical status. Update the **Status** and **PR** cells in the same diff that s
 
 | Wave | Pillar | Plan | Status | PR |
 |---|---|---|---|---|
-| 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | in review | _Wave-0 PR_ |
+| 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | ✅ shipped | [#134](https://github.com/Luis85/agentonomous/pull/134) |
 | A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | not started | — |
 | A | Cognition diff panel | [`cognition-diff-panel`](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md) | not started | — |
 | A | Determinism fingerprint | [`determinism-fingerprint`](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md) | not started | — |

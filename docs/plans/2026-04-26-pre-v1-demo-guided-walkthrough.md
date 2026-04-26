@@ -73,7 +73,10 @@ external narration.
 
 - Spec criteria P1-AC-1 through P1-AC-5 all met.
 - Planning-doc tracker table row for "Guided walkthrough" set to ✅
-  with every merged PR linked.
+  shipped with every PR linked **in the same PR that ships each row**
+  (use the GH-assigned PR number; never chase with a `docs: flip row`
+  follow-up — see CLAUDE.md "Plan + doc updates ride with the PR that
+  lands the work").
 - Issue #132 GH tasklist entries for slices 1.1 - 1.4 ticked.
 
 ## Done log
