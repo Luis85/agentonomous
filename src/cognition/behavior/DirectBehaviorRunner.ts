@@ -19,7 +19,7 @@ export type DirectBehaviorRunnerOptions = {
 
 /**
  * Phase A default behavior runner. Lookup-table translation from intention
- * to invoke-skill actions. Keeps the MVP nurture-pet's mental model
+ * to invoke-skill actions. Keeps the MVP product demo's mental model
  * straightforward: "satisfy-need:hunger" → invoke "feed-self"; consumers
  * declare whatever mappings they need in their species module.
  */

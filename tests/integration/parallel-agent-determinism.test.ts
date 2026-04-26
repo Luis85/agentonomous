@@ -18,8 +18,9 @@ import {
 /**
  * D2 — parallel-agent determinism proof.
  *
- * The existing `nurture-pet-deterministic` suite verifies that running
- * the same scenario twice yields byte-identical output. This suite
+ * The existing pet-care deterministic-replay suite (in
+ * `nurture-pet-deterministic.test.ts`) verifies that running the same
+ * scenario twice yields byte-identical output. This suite
  * tightens the claim: two agents constructed from the same seed and
  * stepped in interleaved lock-step produce byte-identical
  * `DecisionTrace` sequences. That catches a distinct class of bugs —

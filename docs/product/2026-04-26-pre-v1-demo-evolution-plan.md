@@ -68,7 +68,7 @@ The **current `examples/product-demo` demo is the shippable product demo baselin
 
 For this pre-v1 evolution, we are not replacing it with a different demo concept; we are expanding it into an **interactive website experience** that covers the demo intent end-to-end and showcases the library’s capabilities in a way that is explorable by first-time visitors.
 
-This means roadmap work should upgrade and productize the existing nurture-pet surface (guided flow, explainability, determinism proof, cognition contrast, scenario breadth, integration story), then package that as a coherent interactive site experience.
+This means roadmap work should upgrade and productize the existing pet-care surface (guided flow, explainability, determinism proof, cognition contrast, scenario breadth, integration story), then package that as a coherent interactive site experience.
 
 ---
 
@@ -121,6 +121,46 @@ This increment is intentionally **pre-v1**. We optimize for a clean architecture
 - No requirement to preserve previous local storage key shapes.
 - No requirement to keep transitional APIs if a cleaner API exists.
 - Determinism and testability remain non-negotiable; compatibility is negotiable.
+
+## Legacy code recycling (cross-cutting)
+
+"Pre-v1" does **not** mean "rewrite everything from scratch". The legacy
+vanilla-TS demo on `develop` (post-Wave-0) contains a substantial body
+of pure domain logic — species descriptor, cognition mode probes +
+reasoner constructors + softmax helpers, skill, random-event defs,
+config validator, SVG renderers — that is fully reusable under the new
+Vue/Pinia/Router shell.
+
+**Pillar-1 slice 1.2a** does the bulk of the salvage via `git mv`
+(history preserved): `species.ts`, `constants.ts`, `cognition/**`,
+`skills/**` move into `examples/product-demo/src/demo-domain/scenarios/petCare/`,
+and a new `buildAgent.ts` factory extracts the random-event +
+agent-construction recipe from the legacy `main.ts` verbatim.
+
+**Pillar-1 slice 1.2b** ports the DOM-mount UI (`mountHud`,
+`mountTraceView`) into Vue SFCs that reuse the legacy data tables
+(`INTERACTION_BUTTONS`, `STAGE_LABELS`, `LIFETIME_COUNTERS`, per-need
+bar markup) verbatim, then deletes the now-orphaned legacy mount files.
+
+**Pillar 2** ports `cognitionSwitcher.ts` (46 KB) into
+`<CognitionSwitcher>` + `useAgentSession.setMode()`, and the pure SVG
+renderers (`lossSparkline.ts`, `predictionStrip.ts`) into thin Vue SFCs
+that consume compute helpers extracted into `demo-domain/scenarios/petCare/cognition/`.
+
+**Pillar 4** ports `speciesConfig.ts`'s `EditableSpeciesConfig` +
+`validateEditableConfig` + `applyOverride` into
+`demo-domain/scenarios/petCare/config/` (validator + apply rules
+verbatim), and the `mountConfigPanel` mount becomes the `<JsonEditor>`
+SFC family.
+
+**Pillar 5 slice 5.2** is much lighter than originally scoped: the
+pet-care modules already live under `demo-domain/scenarios/petCare/`
+thanks to slice 1.2a, so 5.2 just wraps them in the design's
+`Scenario` contract rather than relocating them.
+
+The full per-module recycle map (with destination paths and timing)
+lives in the design doc under `Legacy code recycling`; per-pillar
+plans repeat the relevant rows in their `Pre-flight` and slice notes.
 
 ## 1) Guided walkthrough mode (from optional docs flow to in-product flow)
 
@@ -335,7 +375,7 @@ Canonical status. Update the **Status** and **PR** cells in the same diff that s
 | Wave | Pillar | Plan | Status | PR |
 |---|---|---|---|---|
 | 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | ✅ shipped | [#134](https://github.com/Luis85/agentonomous/pull/134) |
-| A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | not started | — |
+| A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | in progress | [#140](https://github.com/Luis85/agentonomous/pull/140) (slice 1.1) |
 | A | Cognition diff panel | [`cognition-diff-panel`](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md) | not started | — |
 | A | Determinism fingerprint | [`determinism-fingerprint`](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md) | not started | — |
 | B | JSON preview / commit | [`json-preview-commit`](../plans/2026-04-26-pre-v1-demo-json-preview-commit.md) | not started | — |

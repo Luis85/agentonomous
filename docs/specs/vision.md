@@ -303,7 +303,7 @@ How do we know we're building the right thing?
 - A Pinia user can bind an agent to their store in three lines.
 - A consumer who doesn't care about LLMs never sees an LLM
   dependency.
-- A nurture-pet demo runs at 60fps in Chrome on a five-year-old
+- A pet-care demo runs at 60fps in Chrome on a five-year-old
   Android phone.
 - Shutting the tab and reopening it restores the pet exactly where it
   was — including elapsed virtual time, modifiers that should have

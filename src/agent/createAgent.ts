@@ -135,7 +135,7 @@ export type CreateAgentConfig = {
    * Persistence config. Pass `false` to disable auto-save entirely.
    * When omitted, `pickDefaultSnapshotStore()` auto-selects
    * `LocalStorageSnapshotStore` in the browser and `InMemorySnapshotStore`
-   * in Node — the MVP nurture-pet demo's "zero-config persistence" story.
+   * in Node — the MVP product demo's "zero-config persistence" story.
    */
   persistence?:
     | false

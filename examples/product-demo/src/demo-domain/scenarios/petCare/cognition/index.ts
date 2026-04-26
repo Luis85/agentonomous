@@ -5,7 +5,7 @@ import { heuristicMode } from './heuristic.js';
 import { learningMode } from './learning.js';
 
 /**
- * Describes one cognition mode offered by the nurture-pet demo's
+ * Describes one cognition mode offered by the product demo's
  * dropdown switcher.
  *
  * The registry is consumed by `cognitionSwitcher.ts` to render the

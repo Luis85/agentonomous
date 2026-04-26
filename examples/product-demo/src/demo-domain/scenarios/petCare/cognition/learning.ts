@@ -717,7 +717,6 @@ export async function buildLearningLearner(
     },
     batchSize: LEARNER_BATCH_SIZE,
     onTrainError: (err) => {
-      // eslint-disable-next-line no-console -- background-train diagnostics.
       console.warn('learning: background train failed', err);
     },
   });

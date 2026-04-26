@@ -36,7 +36,7 @@ export default tseslint.config(
     // `examples/product-demo/eslint.config.js`, which scopes the design's
     // DDD forbidden-import + determinism rules (spec NFR-D-1, design's
     // forbidden-import table) to the layered subpaths. The root config
-    // intentionally ignores `examples/` so the legacy nurture-pet baseline
+    // intentionally ignores `examples/` so the legacy product-demo baseline
     // doesn't fire type-aware rules until pillar 5.2 refactors it.
     ignores: ['dist', 'node_modules', 'coverage', 'docs', 'examples', 'schema'],
   },
@@ -53,6 +53,13 @@ export default tseslint.config(
             'scripts/*.mjs',
             'scripts/*.d.mts',
           ],
+          // The default cap of 8 fires once `scripts/` grows past a
+          // handful of one-shot helpers. None of these files are part
+          // of the lib's tsconfig project — type-aware rules are
+          // already turned off for them — so the "this will slow down
+          // linting" warning does not apply. Bump the cap so adding a
+          // new helper does not require editing eslint.config.js.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
       },

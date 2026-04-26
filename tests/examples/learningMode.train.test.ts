@@ -17,7 +17,7 @@ import {
   interpretSoftmax,
   setLearningAgent,
   SOFTMAX_SKILL_IDS,
-} from '../../examples/product-demo/src/cognition/learning.js';
+} from '../../examples/product-demo/src/demo-domain/scenarios/petCare/cognition/learning.js';
 import { mountResetButton } from '../../examples/product-demo/src/ui.js';
 import { TEST_BACKEND } from '../setup/tfjsBackend.js';
 

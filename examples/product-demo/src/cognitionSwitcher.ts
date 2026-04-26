@@ -1,6 +1,9 @@
 import type { Agent, Learner, Reasoner } from 'agentonomous';
 import { NoopLearner } from 'agentonomous';
-import { COGNITION_MODES, type CognitionModeSpec } from './cognition/index.js';
+import {
+  COGNITION_MODES,
+  type CognitionModeSpec,
+} from './demo-domain/scenarios/petCare/cognition/index.js';
 import {
   buildLearningLearner,
   getIdleThreshold,
@@ -9,7 +12,7 @@ import {
   serializeTfActivation,
   setLearningBackend,
   SOFTMAX_SKILL_IDS,
-} from './cognition/learning.js';
+} from './demo-domain/scenarios/petCare/cognition/learning.js';
 import { clearLossSparkline, renderLossSparkline } from './lossSparkline.js';
 import { clearPredictionStrip, renderPredictionStrip } from './predictionStrip.js';
 
