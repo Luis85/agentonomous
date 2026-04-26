@@ -99,18 +99,22 @@ Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
 `ERROR` per [Hard rules](#hard-rules)):
 
 1. **Re-resolve every SHA fresh.** Never copy the script's `latest sha`
-   column directly into a workflow edit — re-run the peel via either:
+   column directly into a workflow edit — re-run the peel via the
+   umbrella's
+   [`resolve_action_sha` Bash helper](../plans/2026-04-26-quality-automation-routines.md#resolve-an-action-tag--commit-sha-peel-aware-helper).
+   The helper handles annotated tags by following
+   `object.type == "tag"` through a `git/tags/<sha>` dereference. A
+   naive `gh api repos/<o>/<r>/git/ref/tags/<tag> --jq '.object.sha'`
+   will return the tag-object SHA on annotated tags, which is
+   unresolvable when pinned in `uses:`. **Never trust** that shortcut.
 
-   - the script's own `tagToCommitSha` helper (load the module and
-     call it directly), or
-   - the umbrella's
-     [`resolve_action_sha` Bash helper](../plans/2026-04-26-quality-automation-routines.md#resolve-an-action-tag--commit-sha-peel-aware-helper).
-
-   Both paths handle annotated tags by following `object.type == "tag"`
-   through a `git/tags/<sha>` dereference. A naive
-   `gh api repos/<o>/<r>/git/ref/tags/<tag> --jq '.object.sha'` will
-   return the tag-object SHA on annotated tags, which is unresolvable
-   when pinned in `uses:`. **Never trust** that shortcut.
+   > `scripts/bump-actions.mjs` itself implements the same peel logic
+   > in its internal `tagToCommitSha` function, but the file is a CLI
+   > entry point with no exports and a top-level `process.exit(...)`.
+   > Do **not** try to import it from another module — the import
+   > would terminate execution before any bumps are applied. Use the
+   > Bash helper above (or shell out to `node scripts/bump-actions.mjs`
+   > and parse its stdout) for any scripted access.
 
 2. **Cut the bump branch off `develop`:**
 
@@ -280,9 +284,9 @@ WEEK_START="$(date -u -d 'last Monday' +%F 2>/dev/null || date -u -v-Mon +%F)"
 EXISTING="$(gh pr list \
   --base develop \
   --state open \
-  --search "author:${ROUTINE_GH_LOGIN} chore/actions-bump in:title created:>=${WEEK_START}" \
+  --search "author:${ROUTINE_GH_LOGIN} created:>=${WEEK_START}" \
   --json number,title,headRefName,headRefOid \
-  --jq '.[0]')"
+  --jq '[.[] | select(.headRefName | startswith("chore/actions-bump-"))][0]')"
 if [ -n "${EXISTING}" ] && [ "${EXISTING}" != "null" ]; then
   echo "Skip — bump PR already open this week: ${EXISTING}"
   exit 0
@@ -293,6 +297,14 @@ If a `chore/actions-bump-*` PR is already open against `develop`
 this ISO-week (Monday 00:00 UTC → next Monday 00:00 UTC) AND its
 author matches `ROUTINE_GH_LOGIN`, exit 0 silently. Two re-runs in
 the same week shouldn't open a duplicate bump branch.
+
+> The dated identifier lives on the **branch name**
+> (`chore/actions-bump-YYYY-MM-DD`), not the PR title (which is
+> `chore: bump pinned action SHAs (YYYY-MM-DD)`). GitHub PR search's
+> `in:title` qualifier matches title text only, so filtering by
+> `headRefName` via `jq startswith` is the robust check. The
+> `--search` clause narrows the candidate set by author + week; the
+> jq filter then enforces the `chore/actions-bump-` branch prefix.
 
 ## Trust boundary — `ROUTINE_GH_LOGIN`
 
