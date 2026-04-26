@@ -23,8 +23,13 @@ updates:
       prefix-development: chore(deps-dev)
       include: scope
     groups:
-      dev-dependencies:
-        dependency-type: development
+      # Bundle every minor + patch update (runtime + dev) into one
+      # weekly PR so the `dep-triage-bot` cloud routine sees one
+      # tractable PR per ecosystem-week instead of N. Major bumps
+      # stay ungrouped (one PR each, owner-reviewed).
+      npm-non-major:
+        patterns:
+          - '*'
         update-types:
           - minor
           - patch
@@ -45,6 +50,15 @@ updates:
     commit-message:
       prefix: chore(demo-deps)
       include: scope
+    groups:
+      # Same grouping policy as the root npm entry — one weekly bundled
+      # PR for minor + patch updates; major bumps remain individual.
+      npm-non-major:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
 
   # GitHub Actions — batched so a runner-deprecation sweep (e.g. Node 20
   # → 24) lands as one PR, not one-per-workflow.

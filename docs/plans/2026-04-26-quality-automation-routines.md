@@ -108,7 +108,7 @@ merges.
 | #   | Chunk plan | Scope (one-line) | Cadence | Touches `src/`? | Status |
 | --- | --- | --- | --- | --- | --- |
 | 1   | [quality-codeql.md](./2026-04-26-quality-codeql.md) | Weekly + push CodeQL JS/TS scan, `security-and-quality` query suite | weekly + push | no | - [x] shipped |
-| 2   | [quality-dep-triage-bot.md](./2026-04-26-quality-dep-triage-bot.md) | Cloud routine prompt + `dependabot.yml` grouping for weekly Dependabot triage | weekly | no | - [ ] not started |
+| 2   | [quality-dep-triage-bot.md](./2026-04-26-quality-dep-triage-bot.md) | Cloud routine prompt + `dependabot.yml` grouping for weekly Dependabot triage | weekly | no | - [x] shipped |
 | 3   | [quality-actions-bump-bot.md](./2026-04-26-quality-actions-bump-bot.md) | Cloud routine prompt that runs `scripts/bump-actions.mjs` weekly + opens a bump PR | weekly | no | - [ ] not started |
 | 4   | [quality-plan-recon-bot.md](./2026-04-26-quality-plan-recon-bot.md) | Cloud routine prompt that archives shipped plans monthly | monthly | no | - [ ] not started |
 | 5   | [quality-bundle-trend.md](./2026-04-26-quality-bundle-trend.md) | Weekly snapshot of `npx size-limit --json` to a committed JSONL trend file | weekly | no | - [ ] not started |
