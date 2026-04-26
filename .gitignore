@@ -12,6 +12,7 @@ docs/api
 examples/**/dist
 examples/**/node_modules
 .worktrees
+.review-fix-cache
 .claude/settings.local.json
 .claude/.last-run
 
