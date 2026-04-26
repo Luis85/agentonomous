@@ -20,5 +20,10 @@
       "agentonomous/cognition/adapters/tfjs": ["../../src/cognition/adapters/tfjs/index.ts"]
     }
   },
-  "include": ["src/**/*", "tests/**/*.ts", "../../src/cognition/adapters/js-son/js-son-agent.d.ts"]
+  "include": [
+    "src/**/*",
+    "test/**/*.ts",
+    "tests/**/*.ts",
+    "../../src/cognition/adapters/js-son/js-son-agent.d.ts"
+  ]
 }
