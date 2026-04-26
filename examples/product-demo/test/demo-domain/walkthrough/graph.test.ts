@@ -128,6 +128,37 @@ describe('defineWalkthroughGraph', () => {
     ]);
     expect(graph.steps).toHaveLength(3);
   });
+
+  it('snapshots steps so caller mutations cannot break the graph', () => {
+    // Mutable object literal that satisfies `WalkthroughStep` structurally.
+    const original: WalkthroughStep = {
+      id: walkthroughStepId('a'),
+      chapter: 1,
+      title: 'Original',
+      hint: 'h',
+      highlight: selectorHandle('handle:a'),
+      completionPredicate: ALWAYS,
+      nextOnComplete: TOUR_END,
+    };
+    const graph = defineWalkthroughGraph([original]);
+
+    // Mutating the caller's object MUST NOT propagate into the graph.
+    (original as { title: string }).title = 'Hacked';
+    (original as { nextOnComplete: 'end' | typeof walkthroughStepId }).nextOnComplete =
+      walkthroughStepId('missing') as never;
+
+    const stored = getStepById(graph, walkthroughStepId('a'));
+    expect(stored?.title).toBe('Original');
+    expect(stored?.nextOnComplete).toBe(TOUR_END);
+    expect(getNextStep(graph, walkthroughStepId('a'), makeCtx())).toBe(TOUR_END);
+  });
+
+  it('freezes stored step objects so direct mutation also fails', () => {
+    const graph = defineWalkthroughGraph([step('a', 1, TOUR_END)]);
+    const stored = getStepById(graph, walkthroughStepId('a'));
+    expect(stored).toBeDefined();
+    expect(Object.isFrozen(stored)).toBe(true);
+  });
 });
 
 describe('getStepById', () => {

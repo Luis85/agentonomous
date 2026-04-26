@@ -48,8 +48,17 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
     throw new WalkthroughGraphError('walkthrough graph must contain at least one step');
   }
 
+  // Snapshot every caller-supplied step into a frozen shallow clone before
+  // storing it on the graph. The `WalkthroughStep` type is `readonly`-shaped,
+  // but TypeScript's structural typing lets a caller pass a mutable object
+  // literal that satisfies the shape and then mutate it after construction
+  // — which would invalidate the one-time validation below (e.g. flipping a
+  // `nextOnComplete` to an unknown id, making `getNextStep` throw despite
+  // a successful build). The frozen clone is the durable graph contract.
+  const frozenSteps: WalkthroughStep[] = steps.map((step) => Object.freeze({ ...step }));
+
   const stepsById = new Map<WalkthroughStepId, WalkthroughStep>();
-  for (const step of steps) {
+  for (const step of frozenSteps) {
     // The literal string `TOUR_END` ('end') is the terminal sentinel returned
     // by `getNextStep` / `getSkipTarget`. A step authored with `id === 'end'`
     // would silently shadow the sentinel — every transition meant to land on
@@ -66,7 +75,7 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
     stepsById.set(step.id, step);
   }
 
-  for (const step of steps) {
+  for (const step of frozenSteps) {
     if (step.nextOnComplete === TOUR_END) continue;
     if (!stepsById.has(step.nextOnComplete)) {
       throw new WalkthroughGraphError(
@@ -106,7 +115,7 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
   }
 
   const chapters = new Map<ChapterId, WalkthroughStep[]>();
-  for (const step of steps) {
+  for (const step of frozenSteps) {
     const bucket = chapters.get(step.chapter) ?? [];
     bucket.push(step);
     chapters.set(step.chapter, bucket);
@@ -120,13 +129,13 @@ export function defineWalkthroughGraph(steps: ReadonlyArray<WalkthroughStep>): W
 
   // The first declared step is the cold-start cursor (spec P1-FR-1, P1-FR-6).
   // We assert non-undefined because we already checked `steps.length > 0` above.
-  const firstStep = steps[0];
+  const firstStep = frozenSteps[0];
   if (firstStep === undefined) {
     throw new WalkthroughGraphError('walkthrough graph must contain at least one step');
   }
 
   return Object.freeze({
-    steps: Object.freeze([...steps]),
+    steps: Object.freeze(frozenSteps),
     stepsById,
     chapters: frozenChapters,
     firstStepId: firstStep.id,
