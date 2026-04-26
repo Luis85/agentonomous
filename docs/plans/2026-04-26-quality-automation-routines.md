@@ -68,13 +68,12 @@ three cloud-routine prompts).
 | `docs/plan-recon-bot/PROMPT.md` | System prompt for the monthly plan-vs-shipped reconciliation routine. |
 | `docs/plan-recon-bot/README.md` | Same shape as above. |
 | `scripts/append-size-snapshot.mjs` | Read `npx size-limit --json` stdin, append a row to `docs/metrics/bundle-trend.jsonl`. |
-| `scripts/run-determinism-replay.mjs` | CLI wrapper that runs `tests/determinism/replay.ts` for the workflow + diffs vs baseline; non-zero exit on mismatch. |
 
 ### Modified files
 
 | Path | Change |
 | --- | --- |
-| `package.json` | Add devDeps: `@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `@playwright/test`. Add scripts: `mutation`, `mutation:report`, `determinism:replay`, `determinism:baseline`. |
+| `package.json` | Add devDeps: `@stryker-mutator/core`, `@stryker-mutator/vitest-runner`. Add scripts: `mutation`, `mutation:report`, `determinism:replay`, `determinism:baseline`. |
 | `examples/nurture-pet/package.json` | Add devDep `@playwright/test`; script `smoke`. |
 | `.gitignore` | Ignore `reports/mutation/`, `playwright-report/`, `examples/nurture-pet/playwright-report/`, `examples/nurture-pet/test-results/`. |
 | `.github/dependabot.yml` | Group npm minor + patch updates so the triage routine sees one PR per ecosystem-week, not N. |
@@ -111,11 +110,58 @@ docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest -color
 …or push the commit and watch the existing `Lint workflows (actionlint)`
 job. New action references must use full 40-char SHAs with a trailing
 `# vX.Y.Z` comment (per the supply-chain rule in the existing CI
-header). Resolve a SHA via:
+header).
+
+### Resolve an action tag → commit SHA (peel-aware)
+
+> **Why a helper, not just `gh api .../commits/<tag>`?** Many actions
+> publish **annotated tags**. `gh api .../git/refs/tags/<tag>` on an
+> annotated tag returns the tag-object SHA, not the underlying commit.
+> Pinning that tag-object SHA in `uses:` produces a non-resolvable
+> reference. The repo's own `scripts/bump-actions.mjs` already handles
+> this via `object.type` + a `git/tags/<sha>` dereference (see lines
+> 142–195 of that script). Use the helper below for every SHA-resolve
+> step in this plan.
+
+Drop this Bash function into your shell (or a scratch file you
+`source`) before working any row that needs SHAs:
 
 ```bash
-gh api repos/<owner>/<repo>/commits/<tag-or-branch> --jq '.sha'
+# Resolve <owner>/<repo>@<tag> → 40-char commit SHA. Peels annotated
+# tags. Echoes the SHA on stdout; non-zero exit on missing/unsupported.
+resolve_action_sha() {
+  local owner="$1" repo="$2" tag="$3"
+  if [[ -z "$owner" || -z "$repo" || -z "$tag" ]]; then
+    printf 'usage: resolve_action_sha <owner> <repo> <tag>\n' >&2
+    return 2
+  fi
+  local payload kind sha
+  payload="$(gh api "repos/${owner}/${repo}/git/ref/tags/${tag}")" || return 1
+  kind="$(jq -r '.object.type' <<<"${payload}")"
+  sha="$(jq -r '.object.sha'  <<<"${payload}")"
+  case "${kind}" in
+    commit) printf '%s\n' "${sha}" ;;
+    tag)    gh api "repos/${owner}/${repo}/git/tags/${sha}" --jq '.object.sha' ;;
+    *)      printf 'unsupported ref type %s for %s/%s@%s\n' \
+              "${kind}" "${owner}" "${repo}" "${tag}" >&2; return 1 ;;
+  esac
+}
 ```
+
+Sanity check the helper against a known-annotated tag and a known-
+lightweight tag before relying on it:
+
+```bash
+resolve_action_sha actions checkout v6.0.2
+resolve_action_sha actions setup-node v6.4.0
+```
+
+Both must echo a 40-char hex string. Anything else → fix the helper
+before continuing.
+
+> **Lazier alternative.** `node scripts/bump-actions.mjs --help` does
+> not yet expose a one-shot `--resolve` mode (see the row 7 follow-up
+> in `MEMORY.md` if it lands). Until it does, use this helper.
 
 ---
 
@@ -165,13 +211,22 @@ possible win.
 - [ ] **Step 1.1: Resolve SHAs for `actions/checkout@v6` and
   `github/codeql-action/{init,analyze}@v4`** (or current major)
 
+Using the peel-aware `resolve_action_sha` helper defined in the
+verification-gate section above:
+
 ```bash
-gh api repos/actions/checkout/git/refs/tags/v6.0.2 --jq '.object.sha'
-gh api repos/github/codeql-action/git/refs/tags/v4 --jq '.object.sha'
+resolve_action_sha actions checkout v6.0.2
+resolve_action_sha github  codeql-action v4
+# codeql-action ships init + analyze from the same repo at the same
+# tag, so one resolve covers both `uses:` lines.
 ```
 
-Capture the SHAs; use them verbatim in the YAML below with a trailing
-`# v6.0.2` / `# v4` comment.
+> **Do NOT use `gh api .../git/refs/tags/<tag> --jq '.object.sha'`
+> directly** — annotated tags return the tag-object SHA, which makes
+> `uses: owner/repo@<sha>` invalid. The helper handles peeling.
+
+Capture each 40-char hex output; use it verbatim in the YAML below
+with a trailing `# v6.0.2` / `# v4` comment.
 
 - [ ] **Step 1.2: Write `.github/workflows/codeql.yml`**
 
@@ -615,10 +670,17 @@ inside a needs policy, etc.
 - Create: `tests/determinism/replay.bench.ts` *(actually a vitest
   test, not a bench — using `.bench.ts` would skew CI timing)*
 - Create: `tests/determinism/baseline.json`
-- Create: `scripts/run-determinism-replay.mjs`
 - Create: `.github/workflows/determinism.yml`
 - Modify: `package.json` — scripts `determinism:replay`,
   `determinism:baseline`.
+
+> **No `tsx` runtime, no extra script.** Earlier drafts of this row
+> shelled out via `node --import tsx scripts/run-determinism-replay.mjs`
+> to seed `baseline.json`. That required adding `tsx` as a devDep and
+> a separate harness file. Both are dropped — the same vitest file
+> handles assertion AND baseline-write modes, switched by an argv
+> flag passed through `npx vitest -- --write-baseline`. Vitest already
+> transpiles TS, so no extra runtime is needed.
 
 - [ ] **Step 6.1: Decide the seed set**
 
@@ -648,39 +710,75 @@ Pure function `replaySeed(seed: string): string` (sha256 hex). Inside:
 
 Use `crypto.createHash('sha256')` from `node:crypto`.
 
-- [ ] **Step 6.3: Write the assertion test (red)**
+- [ ] **Step 6.3: Write the dual-mode test file (red)**
+
+The same file serves two modes:
+
+- **Assertion mode** (default): each seed digest must equal the
+  committed baseline.
+- **Write mode** (when `--write-baseline` is passed via vitest argv):
+  recompute every digest and overwrite `baseline.json`. No assertions
+  — the goal is to capture a new ground truth after a deliberate
+  library change.
 
 ```ts
 // tests/determinism/replay.bench.ts
 import { test, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { REPLAY_SEEDS, replaySeed } from './replay.js';
 
-const baseline = JSON.parse(readFileSync(
-  new URL('./baseline.json', import.meta.url), 'utf8'
-)) as Record<string, string>;
+const baselinePath = new URL('./baseline.json', import.meta.url);
+const writeMode = process.argv.includes('--write-baseline');
 
-test.each(REPLAY_SEEDS)('replay matches baseline: %s', (seed) => {
-  expect(replaySeed(seed)).toBe(baseline[seed]);
-});
+if (writeMode) {
+  test('write baseline.json from current replay digests', () => {
+    const map: Record<string, string> = {};
+    for (const seed of REPLAY_SEEDS) map[seed] = replaySeed(seed);
+    writeFileSync(baselinePath, `${JSON.stringify(map, null, 2)}\n`);
+  });
+} else {
+  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8')) as Record<
+    string,
+    string
+  >;
+  test.each(REPLAY_SEEDS)('replay matches baseline: %s', (seed) => {
+    expect(replaySeed(seed)).toBe(baseline[seed]);
+  });
+}
 ```
 
-- [ ] **Step 6.4: Run the test (red)**
+> **Why argv, not an env var?** `npm run` on Windows uses `cmd.exe` by
+> default, which does not respect a `WRITE_BASELINE=1 prefix` shell
+> idiom. Vitest passes everything after `--` through to
+> `process.argv`, so an argv flag is portable without bringing in
+> `cross-env`.
+
+- [ ] **Step 6.4: Run the assertion mode (red)**
 
 ```bash
 npx vitest run tests/determinism/replay.bench.ts
 ```
 
-Expected: FAIL — `baseline.json` does not exist yet.
+Expected: FAIL — `baseline.json` does not exist yet, so the
+`readFileSync` call throws `ENOENT` before any test runs.
 
-- [ ] **Step 6.5: Generate `baseline.json` once**
+- [ ] **Step 6.5: Generate `baseline.json` once via the same file in
+  write mode**
 
 ```bash
-node --import tsx scripts/run-determinism-replay.mjs --write-baseline
+npx vitest run tests/determinism/replay.bench.ts -- --write-baseline
 ```
 
-The script imports `replaySeed` + `REPLAY_SEEDS`, computes one digest
-per seed, writes the map to `tests/determinism/baseline.json`.
+Vitest transpiles `replay.ts` + `replay.bench.ts` itself, so no `tsx`
+or extra harness script is needed. The `--write-baseline` token
+arrives in `process.argv`, the test file flips into write mode, and
+`baseline.json` is created. Inspect the result:
+
+```bash
+cat tests/determinism/baseline.json
+```
+
+Expected: an 8-key JSON object, each value a 64-char hex digest.
 
 - [ ] **Step 6.6: Re-run the test (green)**
 
@@ -704,8 +802,12 @@ deterministic — fix `replay.ts` rather than weakening the assertion.
 ```json
 // package.json — add to "scripts":
 "determinism:replay": "vitest run tests/determinism/replay.bench.ts",
-"determinism:baseline": "node --import tsx scripts/run-determinism-replay.mjs --write-baseline"
+"determinism:baseline": "vitest run tests/determinism/replay.bench.ts -- --write-baseline"
 ```
+
+Both scripts are pure `vitest run` invocations — no `tsx`, no
+`cross-env`, no separate harness. The argv flag is the only mode
+switch.
 
 - [ ] **Step 6.9: Workflow**
 
@@ -747,7 +849,7 @@ npm run verify
 - [ ] **Step 6.11: Commit**
 
 ```bash
-git add tests/determinism/ scripts/run-determinism-replay.mjs \
+git add tests/determinism/ \
         .github/workflows/determinism.yml package.json
 git commit -m "test(determinism): hash-pinned replay across 8 seeds"
 ```
@@ -1160,9 +1262,10 @@ findings come back, address per
 - **Determinism baseline drift.** Any legitimate library change that
   alters trace contents (new event type, reordered tick stage)
   invalidates `baseline.json`. Treat that as an explicit re-baseline
-  step in the same PR that changes behavior — never bypass the
-  assertion. Add a `determinism:baseline` script comment in
-  `package.json` calling this out.
+  step in the same PR that changes behavior (run `npm run
+  determinism:baseline`, inspect the diff, commit it alongside the
+  trace-changing code) — never bypass the assertion or weaken it to
+  match the new digests silently.
 - **Playwright flake.** The demo loads tfjs which probes WebGL → WASM →
   CPU on startup. In CI on Ubuntu, expect WASM. Allow `retries: 1`
   but never higher; >1 retries hides real flakes.
