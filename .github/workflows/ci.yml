@@ -95,8 +95,13 @@ jobs:
           cache: npm
       - name: Install dependencies (npm ci)
         run: npm ci
-      - name: Run ESLint
+      - name: Run ESLint (root)
         run: npm run lint
+      - name: Install demo workspace dependencies
+        working-directory: examples/product-demo
+        run: npm ci --no-audit --no-fund
+      - name: Run ESLint (demo workspace — DDD + determinism rules)
+        run: npm run lint:demo
 
   typecheck:
     name: Typecheck (tsc --noEmit)
