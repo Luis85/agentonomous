@@ -24,7 +24,7 @@ import type { ModifierEffect } from './ModifierEffect.js';
  * agent.applyModifier(wellFed.instantiate(clock.now()));
  * ```
  */
-export interface ModifierTemplate {
+export type ModifierTemplate = {
   id: string;
   source: string;
   stack: ModifierStackPolicy;
@@ -32,15 +32,15 @@ export interface ModifierTemplate {
   visual?: Modifier['visual'];
   /** If set, the modifier expires `durationSeconds` after application. */
   durationSeconds?: number;
-}
+};
 
-export interface ModifierBlueprint extends ModifierTemplate {
+export type ModifierBlueprint = ModifierTemplate & {
   /**
    * Stamp out a concrete `Modifier` with `appliedAt = at` and
    * `expiresAt = at + durationSeconds * 1000` when `durationSeconds` is set.
    */
   instantiate(at: number, overrides?: Partial<Modifier>): Modifier;
-}
+};
 
 export function defineModifier(template: ModifierTemplate): ModifierBlueprint {
   return {

@@ -3,11 +3,11 @@
  * numbers — no math libraries, no physics. Renderers and hosts can interpret
  * units however they like (pixels, world-units, tiles).
  */
-export interface Vector3Like {
+export type Vector3Like = {
   x: number;
   y: number;
   z: number;
-}
+};
 
 /**
  * Spatial pose of an embodied agent.
@@ -16,11 +16,11 @@ export interface Vector3Like {
  * - `rotation` — Euler angles in radians (x, y, z order is host-defined).
  * - `scale`    — per-axis scale factors; `1` means "natural size".
  */
-export interface Transform {
+export type Transform = {
   position: Vector3Like;
   rotation: Vector3Like;
   scale: Vector3Like;
-}
+};
 
 /** Zero position, zero rotation, unit scale. Always returns a fresh object. */
 export function identityTransform(): Transform {

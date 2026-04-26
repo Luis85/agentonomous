@@ -9,10 +9,10 @@ import type { LifeStage } from './LifeStage.js';
  *
  * Missing stage entries mean "no restrictions" for that stage.
  */
-export interface StageCapabilityRule {
+export type StageCapabilityRule = {
   allow?: readonly string[];
   deny?: readonly string[];
-}
+};
 
 export type StageCapabilityMap = Readonly<Partial<Record<LifeStage, StageCapabilityRule>>>;
 
@@ -26,6 +26,6 @@ export function stageAllowsSkill(
   const rule = caps[stage];
   if (!rule) return true;
   if (rule.allow && !rule.allow.includes(skillId)) return false;
-  if (rule.deny && rule.deny.includes(skillId)) return false;
+  if (rule.deny?.includes(skillId)) return false;
   return true;
 }

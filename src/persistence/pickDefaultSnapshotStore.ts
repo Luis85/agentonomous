@@ -30,6 +30,15 @@ export function pickDefaultSnapshotStore(): SnapshotStorePort {
 
 function hasBrowserLocalStorage(): boolean {
   if (typeof globalThis === 'undefined') return false;
-  const g = globalThis as { localStorage?: unknown };
-  return typeof g.localStorage === 'object' && g.localStorage !== null;
+  // Some browser environments install a throwing getter for `localStorage`
+  // (e.g. sandboxed third-party iframes blocked by SecurityError, or
+  // strict private-browsing modes). Reading the property throws; guard
+  // so the caller can still fall back to `InMemorySnapshotStore` instead
+  // of crashing before store selection finishes.
+  try {
+    const g = globalThis as { localStorage?: unknown };
+    return typeof g.localStorage === 'object' && g.localStorage !== null;
+  } catch {
+    return false;
+  }
 }

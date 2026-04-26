@@ -12,18 +12,18 @@ import { OFFLINE_CATCHUP_DEFAULTS } from '../cognition/tuning.js';
  * Works for any subsystem that respects determinism — a fixed seed + a
  * fixed chunk size produce byte-identical traces.
  */
-export interface CatchUpOptions {
+export type CatchUpOptions = {
   /** Fixed chunk size in virtual seconds. Default: 0.5. */
   chunkVirtualSeconds?: number;
   /** Hard cap on chunks processed per call — guards against pathological deltas. */
   maxChunks?: number;
-}
+};
 
-export interface CatchUpResult {
+export type CatchUpResult = {
   chunksProcessed: number;
   totalVirtualSeconds: number;
   truncated: boolean;
-}
+};
 
 /**
  * Split `totalVirtualDtSeconds` into fixed chunks and invoke `step` for each.
@@ -38,6 +38,17 @@ export async function runCatchUp(
 ): Promise<CatchUpResult> {
   const chunkSize = opts.chunkVirtualSeconds ?? OFFLINE_CATCHUP_DEFAULTS.chunkVirtualSeconds;
   const maxChunks = opts.maxChunks ?? OFFLINE_CATCHUP_DEFAULTS.maxChunks;
+
+  if (!Number.isFinite(chunkSize) || chunkSize <= 0) {
+    throw new RangeError(
+      `runCatchUp: chunkVirtualSeconds must be a positive finite number, got ${String(chunkSize)}`,
+    );
+  }
+  if (!Number.isInteger(maxChunks) || maxChunks <= 0) {
+    throw new RangeError(
+      `runCatchUp: maxChunks must be a positive integer, got ${String(maxChunks)}`,
+    );
+  }
 
   if (!(totalVirtualDtSeconds > 0)) {
     return { chunksProcessed: 0, totalVirtualSeconds: 0, truncated: false };

@@ -4,10 +4,15 @@ Autonomous agent library for TypeScript simulations. Engine-agnostic, fully
 testable, designed to nurture an agent from birth to death in the browser with
 zero configuration.
 
-**Status:** pre-release (`0.1.0`). The Phase A MVP — a virtual-pet nurture demo
-— ships in `examples/nurture-pet`.
+**Status:** pre-release (`0.0.0` per `package.json`). The Phase A MVP — a
+virtual-pet nurture demo — ships in `examples/nurture-pet`.
 
 **Demo:** https://luis85.github.io/agentonomous/
+
+> **Pre-v1 — not yet on npm.** The package is not published. To evaluate
+> locally, clone this repo and resolve `agentonomous` via a `file:` or
+> `link:` dependency in your consuming project. The `npm install agentonomous`
+> snippet below describes the post-publish flow.
 
 ## What you get
 
@@ -31,8 +36,9 @@ zero configuration.
 - **Cognition** — `UrgencyReasoner` default picks the highest-scored intention;
   `DirectBehaviorRunner` maps intentions to skill invocations;
   `Expressive` / `Active` / `Composed` needs policies.
-- **Skills** — typed `Skill` + `SkillRegistry` + 10 default skills
-  (feed/clean/play/rest/pet/scold/medicate + express-meow/sad/sleepy).
+- **Skills** — typed `Skill` + `SkillRegistry` + a default bundle
+  (feed / clean / play / rest / pet / scold / medicate + a few
+  expressive reactions). Easy to extend with custom skills.
 - **Animation state machine** driven by mood + active skill + modifiers.
 - **Control modes** — autonomous / scripted / remote. Works as NPC, bot, or
   player-proxy.
@@ -179,8 +185,13 @@ the throw and the next tick, so replay stays deterministic.
 
 ### Running the example
 
-The `examples/nurture-pet` demo consumes the library via a workspace-local
-build. You must build the library before the example resolves it:
+The `examples/nurture-pet` demo resolves `agentonomous` (and its
+`cognition/adapters/*` subpaths) via Vite + tsconfig aliases that point at
+the library's built `dist/` — not via an npm dependency. That keeps the
+demo import shape identical to a real consumer while sidestepping npm's
+self-nested-junction failure on Windows when a `file:../..` dep points at
+its own ancestor. You must build the library before the example resolves
+it:
 
 ```bash
 # From the repo root.
@@ -272,6 +283,40 @@ The listener fires synchronously on every event and receives the current
 `getState()` slice (`id`, `stage`, `needs`, `modifiers`, `mood`,
 `animation`, `halted`, `ageSeconds`). Call `unsubscribe()` to detach.
 
+## LLM provider port (preview)
+
+Agent reasoning can be backed by an LLM via the `LlmProviderPort`
+contract. v1.0 ships the completion-only surface (one
+`complete(messages, opts)` call → one `LlmCompletion`); streaming +
+tool-use land in Phase B as additive methods on the same port —
+existing adapters keep working unchanged.
+
+The library ships **`MockLlmProvider`** for deterministic playback in
+tests and golden-trace replays. Concrete `AnthropicLlmProvider` /
+`OpenAiLlmProvider` adapters are deferred to Phase B; for now consumers
+either wrap their own provider against the port or run against the
+mock.
+
+```ts
+import { MockLlmProvider, type LlmProviderPort } from 'agentonomous';
+
+const provider: LlmProviderPort = new MockLlmProvider({
+  defaultModel: 'mock-llm-1',
+  scripts: [{ text: 'feed' }, { text: 'rest' }, { text: 'noop' }],
+});
+
+const completion = await provider.complete([
+  { role: 'system', content: 'You are a pet care assistant. Reply with one verb.' },
+  { role: 'user', content: 'What should the pet do next?' },
+]);
+// completion.text === 'feed'
+```
+
+A full end-to-end runnable example — `MockLlmProvider` →
+`LlmReasoner` → `createAgent` under `SeededRng` + `ManualClock`,
+asserting byte-identical traces across two runs — lives in
+[`examples/llm-mock/`](./examples/llm-mock/README.md).
+
 ## Development
 
 ```bash
@@ -287,16 +332,20 @@ npm run analyze       # build + list the 20 largest dist/*.js files by bytes
 
 ### Bundle-size budget
 
-The library's core bundle (everything re-exported from
-`agentonomous`) targets ~80 KB unminified ESM. The
+The library's core bundle and each adapter subpath have a per-entry
+size budget enforced via `size-limit` (see the `size-limit` field in
+`package.json` for the current caps; CI rejects regressions). The
 `agentonomous/integrations/excalibur` subpath is a separate entry so
 consumers who don't use Excalibur don't pay for it. Run
 `npm run analyze` after meaningful changes; a significant regression is a
 signal to check for accidentally-bundled adapters or heavy deps.
 
-Phase A milestones (M0–M15) are all green. Phase B (sim-ecs adapter, LLM
-tool, Markdown memory, social/dialogue, possession/jobs, Mistreevous BTs,
-JS-son BDI, brain.js learning) lands post-V1.
+Phase A (the virtual-pet nurture MVP) is feature-complete and in the
+pre-1.0 polish + harden pass — see
+`docs/plans/2026-04-25-comprehensive-polish-and-harden.md`. Phase B
+(sim-ecs adapter, LLM tool-use, Markdown memory, social / dialogue,
+possession / jobs, Mistreevous BTs, JS-son BDI, expanded tfjs learning)
+lands post-1.0.
 
 ## Contributing
 

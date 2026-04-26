@@ -1,9 +1,16 @@
 # CI — runs on every push and PR to main, develop, and demo.
 #
-# Static checks (format, lint, typecheck, workflow lint) run in
-# parallel for fast feedback. Tests depend on all four passing. Build +
-# bundle-size budget runs last. Mirrors the `npm run verify` pre-PR
-# gate.
+# Static checks (format, lint, typecheck, workflow lint, audit) run in
+# parallel for fast feedback. Tests depend on the static gate passing.
+# Build + bundle-size budget runs last. Mirrors the `npm run verify`
+# pre-PR gate; `audit` blocks on `high`-severity vulnerabilities in
+# production deps to close the supply-chain hole.
+#
+# Action references are pinned to full 40-char commit SHAs with the
+# human-readable version as a trailing comment (supply-chain hardening
+# per `docs/plans/2026-04-25-comprehensive-polish-and-harden.md` row 3).
+# Run `node scripts/bump-actions.mjs` to print pending bumps; never edit
+# the SHA without re-resolving via `gh api`.
 
 name: CI
 
@@ -17,15 +24,54 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      # Inline path filter via the GitHub API. Replaces
+      # `dorny/paths-filter@v3` (still pinned to Node 20 — emits a
+      # deprecation annotation on every run with no Node 24 release
+      # available). For non-PR events (push to main/develop/demo) we
+      # always treat the change as code-touching and run the full gate.
+      - name: Filter paths (code vs docs-only)
+        id: filter
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "Non-PR event ($GITHUB_EVENT_NAME) — defaulting code=true."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pr_number="${{ github.event.pull_request.number }}"
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr_number/files" --jq '.[].filename')
+          echo "Changed files in PR #$pr_number:"
+          printf '%s\n' "$changed"
+          if printf '%s\n' "$changed" | grep -E '^(src/|tests/|examples/|scripts/|\.github/workflows/|package(-lock)?\.json|tsconfig[^/]*\.json|vite\.config\.|vitest\.config\.|eslint\.config\.|typedoc\.json)' >/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   format-check:
     name: Format (Prettier)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup Node.js 22
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -36,12 +82,14 @@ jobs:
 
   lint:
     name: Lint (ESLint)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup Node.js 22
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -52,12 +100,14 @@ jobs:
 
   typecheck:
     name: Typecheck (tsc --noEmit)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup Node.js 22
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -69,41 +119,165 @@ jobs:
   actionlint:
     name: Lint workflows (actionlint)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@v1
+        uses: reviewdog/action-actionlint@6fb7acc99f4a1008869fa8a0f09cfca740837d9d # v1.72.0
         with:
           fail_level: error
           reporter: github-check
 
-  test:
-    name: Test (Vitest + coverage)
+  audit:
+    name: Audit production deps (npm audit)
     runs-on: ubuntu-latest
-    needs: [format-check, lint, typecheck, actionlint]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup Node.js 22
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
           cache: npm
       - name: Install dependencies (npm ci)
         run: npm ci
+      - name: Audit production dependencies (high severity blocks)
+        run: npm audit --omit=dev --audit-level=high
+
+  docs:
+    name: API docs (typedoc)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      # Typedoc runs as a wiring/coverage check — a clean generation
+      # proves every exported symbol is reachable and documented.
+      # The generated `docs/api/` is regenerated on demand locally; we
+      # do not consume the artifact in CI, so skip the upload step.
+      - name: Generate API docs (typedoc)
+        run: npm run docs
+
+  # Vitest split into two jobs (row 4 of the polish-and-harden roadmap):
+  #
+  # - `test-core` runs the FULL vitest suite (with coverage) on the OS
+  #   matrix. Coverage upload still happens here once per push because
+  #   `test-tfjs` re-runs the same tfjs files under different backends
+  #   and would only inflate runtime, not coverage.
+  # - `test-tfjs` runs ONLY `tests/**/cognition/adapters/tfjs/**` under the
+  #   `cpu` × `wasm` backend axis. The matrix-selected backend is
+  #   activated by `tests/setup/tfjsBackendSetup.ts` via the
+  #   `TFJS_BACKEND` env var (see `tests/setup/tfjsBackend.ts`).
+  #
+  #   `tests/examples/learningMode.train.test.ts` deliberately stays out
+  #   of `test-tfjs`: the demo's switcher probes cpu first then promotes
+  #   the persisted backend, so under `TFJS_BACKEND=wasm` the suite still
+  #   exercises the cpu-fallback flow (the demo's intended user path).
+  #   Adding it to the wasm cell would burn runtime without catching new
+  #   regressions; reasoner-level wasm coverage already lives in
+  #   `tests/unit/cognition/adapters/Tfjs*.test.ts`.
+  #
+  # `fail-fast: false` keeps platform-specific failures from suppressing
+  # other cells — a windows-only flake should not hide a wasm-only one.
+  test-core:
+    name: Test core (Vitest, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [changes, format-check, lint, typecheck, actionlint, audit, docs]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      # Coverage runs on ubuntu only (the report is identical across
+      # OSes; running v8 coverage on every cell triples test runtime
+      # for no signal). Other cells run the same tests without the
+      # coverage instrumentation overhead.
       - name: Run Vitest with coverage
+        if: matrix.os == 'ubuntu-latest'
         run: npm run test:coverage
+      - name: Run Vitest
+        if: matrix.os != 'ubuntu-latest'
+        run: npm test
+      # Ship coverage-summary.json across jobs so the PR-comment job
+      # can diff it against the latest develop run's summary. Tiny
+      # file (<10 KB), uploaded only on ubuntu since that is the only
+      # cell that runs `npm run test:coverage`. `always()` so a vitest
+      # threshold failure (which fails the test step) still uploads
+      # the numbers — that is exactly the case where the reviewer
+      # needs the PR-comment to surface which metric dropped.
+      - name: Upload coverage summary
+        if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: coverage-summary
+          path: coverage/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
+  test-tfjs:
+    name: Test tfjs (${{ matrix.backend }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [changes, format-check, lint, typecheck, actionlint, audit, docs]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        backend: [cpu, wasm]
+    env:
+      TFJS_BACKEND: ${{ matrix.backend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (npm ci)
+        run: npm ci
+      # Targeted vitest invocation — only the test files that load a
+      # tfjs backend matter for the backend axis. Non-tfjs tests are
+      # already covered by `test-core` above; re-running them here
+      # would burn ~5x the runtime for zero extra signal.
+      - name: Run tfjs adapter tests
+        run: >
+          npx vitest run
+          tests/unit/cognition/adapters/TfjsReasoner.test.ts
+          tests/unit/cognition/adapters/TfjsLearner.test.ts
+          tests/unit/cognition/adapters/TfjsSnapshot.test.ts
 
   build:
     name: Build & size budget
     runs-on: ubuntu-latest
-    needs: test
+    needs: [changes, test-core, test-tfjs]
+    if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup Node.js 22
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -113,3 +287,206 @@ jobs:
         run: npm run build
       - name: Enforce bundle-size budget
         run: npx size-limit
+
+  coverage-pr-comment:
+    name: Coverage PR comment (vitest delta)
+    runs-on: ubuntu-latest
+    needs: [changes, test-core]
+    # Mirrors `size-limit-comment` semantics: posts the sticky comment
+    # whenever a code-change PR has finished `test-core` (only the
+    # ubuntu cell uploads `coverage-summary`, which is the artifact we
+    # diff). `always()` so a coverage-threshold failure (which trips
+    # vitest, failing `test-core`) still gets the PR comment with the
+    # numbers — that is exactly when the reviewer needs to see which
+    # metric dropped.
+    if: |
+      always()
+      && needs.changes.outputs.code == 'true'
+      && github.event_name == 'pull_request'
+      && needs.test-core.result != 'cancelled'
+      && needs.test-core.result != 'skipped'
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Download PR coverage summary
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: coverage-summary
+          path: coverage
+      # Best-effort base-branch coverage. Iterate this workflow's most
+      # recent push-triggered, SUCCESSFUL base-branch runs and pick
+      # the first one that has a non-expired `coverage-summary`
+      # artifact. The combined filter set converges on the right
+      # baseline through several awkward cases:
+      #   - The artifact upload runs `if: always()` so a failing
+      #     develop run still ships its summary; `status=success`
+      #     keeps us off flaky/failed runs that would mis-represent
+      #     baseline coverage.
+      #   - The runs endpoint includes `pull_request`-event runs by
+      #     default. A PR base-merge run can have its head branch
+      #     equal to ${BASE_REF} but the artifact reflects the PR
+      #     code, not the base tip. `event=push` restricts to runs
+      #     triggered by direct branch pushes (i.e. merges to
+      #     develop), which is the actual baseline.
+      #   - A push-triggered docs-only run can succeed without
+      #     producing the artifact (its `test-core` job is gated on
+      #     `changes.outputs.code`); per-run artifact probing walks
+      #     past those without giving up.
+      # API calls are individually guarded with `|| ...` fallbacks so
+      # a transient `gh api` failure (rate limit, restricted token
+      # scope on some PR contexts) degrades to deltas-omitted rather
+      # than aborting the whole comment job under `pipefail`.
+      # Capped at 100 base-branch runs (5 pages × 20). At ~1 develop
+      # merge per code change this covers months of activity.
+      - name: Download base-branch coverage summary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p base-coverage
+          BASE_RUN_ID=""
+          for PAGE in 1 2 3 4 5; do
+            RUNS=""
+            RUNS="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=${BASE_REF}&status=success&event=push&per_page=20&page=${PAGE}" \
+              --jq '.workflow_runs[].id' 2>/dev/null)" || RUNS=""
+            if [ -z "${RUNS}" ]; then break; fi
+            for RUN_ID in ${RUNS}; do
+              HAS_ART="0"
+              HAS_ART="$(gh api \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
+                --jq '[.artifacts[] | select(.name == "coverage-summary" and .expired == false)] | length' 2>/dev/null)" || HAS_ART="0"
+              if [ "${HAS_ART}" -gt 0 ]; then
+                BASE_RUN_ID="${RUN_ID}"
+                break 2
+              fi
+            done
+          done
+          if [ -z "${BASE_RUN_ID}" ]; then
+            echo "No coverage-summary artifact found on a push-triggered successful ${BASE_REF} run (last 100 scanned). Deltas will be omitted."
+            exit 0
+          fi
+          if ! gh run download "${BASE_RUN_ID}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name coverage-summary \
+            --dir base-coverage; then
+            echo "Download failed for run ${BASE_RUN_ID}. Deltas will be omitted."
+          fi
+      - name: Post sticky coverage comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -f base-coverage/coverage-summary.json ]; then
+            node scripts/coverage-pr-comment.mjs \
+              --post \
+              --pr-summary coverage/coverage-summary.json \
+              --base-summary base-coverage/coverage-summary.json
+          else
+            node scripts/coverage-pr-comment.mjs \
+              --post \
+              --pr-summary coverage/coverage-summary.json
+          fi
+
+  size-limit-comment:
+    name: Size-limit PR comment (gzip delta)
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    # Run after build for ordering, but post the delta comment
+    # regardless of build outcome — the size-budget failure is exactly
+    # when the reviewer needs to see which bytes regressed. Skip on
+    # docs-only PRs since `build` is skipped there and there are no
+    # bundle bytes to compare.
+    if: |
+      always()
+      && needs.changes.outputs.code == 'true'
+      && github.event_name == 'pull_request'
+      && needs.build.result != 'cancelled'
+      && needs.build.result != 'skipped'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      # andresz1/size-limit-action@v1 is the only remaining Node 20
+      # action in this workflow — no Node 24 fork exists yet, and the
+      # sticky-comment delta UX is high value, so we accept the single
+      # residual deprecation annotation until upstream cuts a Node 24
+      # release. Path-filter has been inlined; this is the only one left.
+      - name: Size Limit (sticky PR comment with gzip delta)
+        uses: andresz1/size-limit-action@e7493a72a44b113341c0cf6186ab49c17c4b65c1 # v1.6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Action runs `npm run <build_script>` then `npx size-limit --json`
+          # internally. Older `script` / `package_manager` inputs were
+          # removed upstream and now trigger schema warnings.
+          build_script: build
+
+  demo-build:
+    name: Demo build (examples/nurture-pet)
+    runs-on: ubuntu-latest
+    needs: [changes, build]
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js 22
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install library dependencies (npm ci)
+        run: npm ci
+      - name: Build library (vite build)
+        run: npm run build
+      - name: Install demo dependencies (npm ci)
+        working-directory: examples/nurture-pet
+        run: npm ci --no-audit --no-fund
+      - name: Build demo (vite build)
+        working-directory: examples/nurture-pet
+        run: npm run build
+
+  ci-gate:
+    # Single required status check on `develop` / `main` / `demo`. Treats
+    # legitimately-skipped jobs (docs-only PRs) as success while still
+    # failing on any actual job failure or cancellation. Wire branch
+    # protection to require ONLY this check — keeps the gate stable when
+    # adding/removing jobs above.
+    name: CI gate (required check)
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - format-check
+      - lint
+      - typecheck
+      - actionlint
+      - audit
+      - docs
+      - test-core
+      - test-tfjs
+      - build
+      - demo-build
+    if: always()
+    steps:
+      - name: Verify all needed jobs succeeded or were skipped
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          echo "$NEEDS_JSON"
+          echo "$NEEDS_JSON" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")'

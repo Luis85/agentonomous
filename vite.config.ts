@@ -1,7 +1,10 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import dts from 'vite-plugin-dts';
+
+import { COVERAGE_THRESHOLDS } from './scripts/coverageThresholds.mjs';
 
 // Library mode build. Entries:
 // - main:        src/index.ts                        → dist/index.js
@@ -10,8 +13,8 @@ import dts from 'vite-plugin-dts';
 //                                                    → dist/cognition/adapters/mistreevous/index.js
 // - js-son:      src/cognition/adapters/js-son/index.ts
 //                                                    → dist/cognition/adapters/js-son/index.js
-// - brain.js:    src/cognition/adapters/brainjs/index.ts
-//                                                    → dist/cognition/adapters/brainjs/index.js
+// - tfjs:        src/cognition/adapters/tfjs/index.ts
+//                                                    → dist/cognition/adapters/tfjs/index.js
 //
 // All peer dependencies are marked external so consumers provide them.
 
@@ -42,14 +45,6 @@ const ambientDtsEntries: AmbientDtsEntry[] = [
       'dist/cognition/adapters/js-son/JsSonReasoner.d.ts',
     ],
   },
-  {
-    from: 'src/cognition/adapters/brainjs/brain.d.ts',
-    to: 'dist/cognition/adapters/brainjs/brain.d.ts',
-    referencedBy: [
-      'dist/cognition/adapters/brainjs/index.d.ts',
-      'dist/cognition/adapters/brainjs/BrainJsReasoner.d.ts',
-    ],
-  },
 ];
 
 function copyAmbientDts(): Plugin {
@@ -78,13 +73,23 @@ function copyAmbientDts(): Plugin {
 
 const externalPackages = [
   '@anthropic-ai/sdk',
-  'brain.js',
+  // tfjs backends are dynamic-imported by `TfjsReasoner.detectBestBackend` /
+  // `probeBackend` and `learningMode.construct()` (literal-string `import()`
+  // per backend so Vite can code-split). Each is an optional peer dep —
+  // consumers install only the backend(s) they actually use. Without these
+  // entries Rollup pulls the full backend kernel sets into the published
+  // `dist/` (300–700 KB per backend), inflating the package and undermining
+  // the optional-peer contract.
+  '@tensorflow/tfjs-backend-cpu',
+  '@tensorflow/tfjs-backend-wasm',
+  '@tensorflow/tfjs-backend-webgl',
+  '@tensorflow/tfjs-core',
+  '@tensorflow/tfjs-layers',
   'excalibur',
   'js-son-agent',
   'mistreevous',
   'openai',
   'sim-ecs',
-  'gray-matter',
 ];
 
 export default defineConfig({
@@ -105,10 +110,7 @@ export default defineConfig({
           __dirname,
           'src/cognition/adapters/js-son/index.ts',
         ),
-        'cognition/adapters/brainjs/index': resolve(
-          __dirname,
-          'src/cognition/adapters/brainjs/index.ts',
-        ),
+        'cognition/adapters/tfjs/index': resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
       formats: ['es'],
     },
@@ -119,6 +121,19 @@ export default defineConfig({
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
       },
+      // `vite-plugin-dts` runs the TypeScript compiler to emit
+      // declarations and is intrinsically the slowest part of the
+      // build (~3s of a ~4s wall time). The levers we can pull are
+      // already tightened — `tsconfig.build.json` excludes tests,
+      // `skipLibCheck` is inherited from the base config,
+      // `rollupTypes: false` keeps us off the slow bundle-types
+      // path, and we are already pinned to the latest
+      // `vite-plugin-dts`. Rolldown's `pluginTimings` check is
+      // informational only; suppress it so the warning stops
+      // cluttering build output without misleading future
+      // contributors into chasing an actionable fix that does not
+      // exist.
+      checks: { pluginTimings: false },
     },
   },
   plugins: [
@@ -136,6 +151,12 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Activates the matrix-selected tfjs backend (see
+    // `tests/setup/tfjsBackend.ts`) BEFORE any test file's static
+    // imports run. No-op for non-tfjs tests — the import is cheap and
+    // the side effect (registering a backend factory) is harmless when
+    // no `TfjsReasoner` is constructed.
+    setupFiles: ['./tests/setup/tfjsBackendSetup.ts'],
     // Resolve `agentonomous` + its adapter subpaths against `src/` at test
     // time. Without this, vitest hits the root `package.json` exports
     // map (→ `./dist/*`), which requires a prior `npm run build` — but
@@ -154,34 +175,30 @@ export default defineConfig({
         replacement: resolve(__dirname, 'src/cognition/adapters/js-son/index.ts'),
       },
       {
-        find: /^agentonomous\/cognition\/adapters\/brainjs$/,
-        replacement: resolve(__dirname, 'src/cognition/adapters/brainjs/index.ts'),
+        find: /^agentonomous\/cognition\/adapters\/tfjs$/,
+        replacement: resolve(__dirname, 'src/cognition/adapters/tfjs/index.ts'),
       },
       {
         find: /^agentonomous$/,
         replacement: resolve(__dirname, 'src/index.ts'),
       },
-      // `brain.js` is an optional peer of `agentonomous` and a devDep of
-      // the `nurture-pet` demo workspace — not a root devDep (its
-      // `gpu.js` → `gl` chain needs X11 native build headers that
-      // explode on headless CI). The demo's `learning.ts` guards its
-      // `await import('brain.js')` with try/catch so a missing peer
-      // degrades gracefully, but `vite:import-analysis` resolves the
-      // specifier at transform time before the try/catch can run, so
-      // root `npm ci` CI fails before the first test executes. Alias
-      // to a test-local stub that exports a placeholder `NeuralNetwork`
-      // — the cognitionSwitcher tests never call `learningMode.construct()`,
-      // only check whether the probe resolved, so the stub is enough.
-      {
-        find: /^brain\.js$/,
-        replacement: resolve(__dirname, 'tests/examples/stubs/brain-js.ts'),
-      },
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
+      // `json-summary` is consumed by `scripts/coverage-pr-comment.mjs`
+      // (the sticky PR comment showing actual % + delta vs base + drift
+      // status). Other reporters are for humans reading the report
+      // locally / from the lcov artifact.
+      reporter: ['text', 'html', 'lcov', 'json-summary'],
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/index.ts', 'src/**/*.d.ts'],
+      // Floors live in `scripts/coverageThresholds.mjs` (single source
+      // of truth for both this gate and the PR-comment renderer). The
+      // PR-comment job warns when actual climbs `DRIFT_WARN_PP`pp above
+      // a floor; that is the cue to re-baseline (set the floor to
+      // `floor(measured - 2)` and cite the new measurement + commit
+      // SHA in the threshold module's docstring).
+      thresholds: COVERAGE_THRESHOLDS,
     },
   },
 });

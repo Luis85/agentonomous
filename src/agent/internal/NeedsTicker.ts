@@ -31,7 +31,7 @@ export class NeedsTicker {
           needId: delta.needId,
           level: delta.after,
         };
-        agent._internalPublish(event);
+        agent.publishEvent(event);
       } else if (delta.crossedSafe) {
         const event: NeedSafeEvent = {
           type: NEED_SAFE,
@@ -40,14 +40,14 @@ export class NeedsTicker {
           needId: delta.needId,
           level: delta.after,
         };
-        agent._internalPublish(event);
+        agent.publishEvent(event);
       }
       if (delta.needId === 'health' && delta.after <= 0) {
         healthDepleted = true;
       }
     }
     if (healthDepleted && !agent.halted) {
-      agent._internalDie('health-depleted', undefined, at);
+      agent.routeDeath('health-depleted', undefined, at);
     }
     return deltas;
   }

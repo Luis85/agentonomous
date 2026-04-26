@@ -2,7 +2,7 @@
  * Source of pseudo-randomness. Library code reads RNG through this port so
  * tests can pin the sequence by seeding a `SeededRng`.
  */
-export interface Rng {
+export type Rng = {
   /** Uniform random float in [0, 1). */
   next(): number;
 
@@ -17,4 +17,4 @@ export interface Rng {
 
   /** Uniform random element from a non-empty array. */
   pick<T>(items: readonly T[]): T;
-}
+};

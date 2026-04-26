@@ -9,28 +9,28 @@
  */
 
 /** Subset of `ex.Vector` used for position syncing. */
-export interface Vector2Like {
+export type Vector2Like = {
   x: number;
   y: number;
-}
+};
 
 /** Subset of `ex.Actor` used for sprite syncing and graphic swaps. */
-export interface ActorLike {
+export type ActorLike = {
   pos: Vector2Like;
   rotation: number;
   scale: Vector2Like;
   graphics: {
     use(nameOrGraphic: unknown): void;
   };
-}
+};
 
 /**
  * Keyboard+pointer state abstraction. The real Excalibur engine satisfies
  * this shape once wrapped — see `ExcaliburRemoteController.fromEngine`.
  */
-export interface InputSourceLike {
+export type InputSourceLike = {
   /** Snapshot the currently-pressed keys. */
   keysPressed(): readonly string[];
   /** Snapshot queued clicks since the last call, or `[]`. */
   clicksSince(): readonly { x: number; y: number; button: 'left' | 'right' | 'middle' }[];
-}
+};

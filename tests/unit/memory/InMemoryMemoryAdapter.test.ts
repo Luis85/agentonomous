@@ -43,7 +43,10 @@ describe('InMemoryMemoryAdapter', () => {
     await m.save(rec({ id: '2', topics: ['combat'] }));
     await m.save(rec({ id: '3', topics: ['trade', 'player'] }));
     const result = await m.query({ topics: ['trade'] });
-    expect(result.map((r) => r.id).sort()).toEqual(['1', '3']);
+    expect(result.map((r) => r.id).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))).toEqual([
+      '1',
+      '3',
+    ]);
   });
 
   it('query sorts descending by createdAt and applies limit', async () => {

@@ -22,7 +22,7 @@ export type ModifierStackPolicy = 'replace' | 'stack' | 'refresh' | 'ignore';
  *   - `'interaction:<verb>'`
  *   - `'trait:<traitId>'`
  */
-export interface Modifier {
+export type Modifier = {
   /** Identifier (stable across restarts; used for stack policy matching). */
   id: string;
   /** Source string — debugging and trace inspection. */
@@ -50,4 +50,4 @@ export interface Modifier {
     overlay?: string;
     fxHint?: string;
   };
-}
+};

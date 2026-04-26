@@ -1,28 +1,89 @@
 {
-  "type": "NeuralNetwork",
-  "sizes": [5, 1],
-  "layers": [
-    {
-      "hunger": {},
-      "cleanliness": {},
-      "happiness": {},
-      "energy": {},
-      "health": {}
-    },
-    {
-      "score": {
-        "bias": 0,
-        "weights": {
-          "hunger": -1,
-          "cleanliness": -0.8,
-          "happiness": -0.6,
-          "energy": -0.7,
-          "health": -0.9
+  "version": 1,
+  "topology": {
+    "class_name": "Sequential",
+    "config": {
+      "name": "sequential_1",
+      "layers": [
+        {
+          "class_name": "Dense",
+          "config": {
+            "units": 16,
+            "activation": "sigmoid",
+            "use_bias": true,
+            "kernel_initializer": {
+              "class_name": "VarianceScaling",
+              "config": {
+                "scale": 1,
+                "mode": "fan_avg",
+                "distribution": "normal",
+                "seed": 6221079
+              }
+            },
+            "bias_initializer": {
+              "class_name": "Zeros",
+              "config": {}
+            },
+            "kernel_regularizer": null,
+            "bias_regularizer": null,
+            "activity_regularizer": null,
+            "kernel_constraint": null,
+            "bias_constraint": null,
+            "name": "dense_Dense1",
+            "trainable": true,
+            "batch_input_shape": [null, 13],
+            "dtype": "float32"
+          }
+        },
+        {
+          "class_name": "Dense",
+          "config": {
+            "units": 7,
+            "activation": "softmax",
+            "use_bias": true,
+            "kernel_initializer": {
+              "class_name": "VarianceScaling",
+              "config": {
+                "scale": 1,
+                "mode": "fan_avg",
+                "distribution": "normal",
+                "seed": 6221080
+              }
+            },
+            "bias_initializer": {
+              "class_name": "Zeros",
+              "config": {}
+            },
+            "kernel_regularizer": null,
+            "bias_regularizer": null,
+            "activity_regularizer": null,
+            "kernel_constraint": null,
+            "bias_constraint": null,
+            "name": "dense_Dense2",
+            "trainable": true
+          }
         }
-      }
-    }
+      ]
+    },
+    "keras_version": "tfjs-layers 4.22.0",
+    "backend": "tensor_flow.js"
+  },
+  "weights": "zHdKP7cCBj7sVRU+n3IHPVjIj75vYga/HHBbPjz2xj5UBKe/oWURQAIKHj+VSinAEagXv1+iL71hcIe/TjekP46cd7+eSyQ/FcgVP03+Dr/djvQ92krLv26qpD+cgzi+trTuPjazyT9uz9K+TAXuPrfyN7/XBFy/W4V7vQ5cEL/ziVw+qCsAwE48+bzReS3A1kpyvlk4ob/Qure/AC6BP581fz7xLIy/9STsv4ywhz/QypQ/0pOXP4xBej8vxbE/Jrctv4F13z72Ycm+A0R+Pwekm797WsW/XjTUP50Cr7+DLB4/T4HXvgu7dj/zJg6/f+YDwGa7BUAs+7w/P+wgv6ocZb/i+tm+7UOqPxz9qT7W0SS9PlPvPvOoTj+0nmC+t0x9PwmIzz53Fqw9qiJtv3UR2740jCI/0LLdPv8VGz9tFRq+CU//PUv4wru0Hsm+PO13PpFgnz7QHeK+uHi6u5iDOz6agge+SEecPHPXXj4NGJY+xBvovrRINT1A6QY+3yOuvPYlYD79CLi+4mSpPkg50r45dj69kjs6vkJqxr6eUVw+2eMMv+SWPL5RJuk+7R6uvnvNtj6QreQ+WqhevxDKnT4KiKm8rwnqPUOL+T454xA+f4LNPjzLRL7cvS29xDsAPsHGfr4b0YK+E2oQP0F5Cj8lbju+WWhQPr8foD4BQE0+/ih4voZI+j0VUBI+vKP/vWm2yj5qppy8RUqFvaqQAb602qq+cmgiPsTjCj24HVq+cVDYvfQHzzxWKME92FDoPkgRojlTBRm+VxmrvuekVj5j5ws/uAbLvpCH3D48o9C+AQ+kvqbhCr82DeY+NjZeu7hLBDw+IvY7WbzsvjIQJjz2hWq+z6Czvi71Aj/zEI2+J8QXP94zFD5OGLA8Fg+YvpooKL8j/xM94u6DPRNOm72fPhw+YPC4PlVflj7iMwy9IMmhPk93073lMoi+iVzZPopmEz+JeMC+igd+PsFwWT5NiJC+eOQzPoPMyT7iwik/yyzevhaLBr/7us696HybvE/Gpz65Zw6/nUmVPnbdJb4pBIs+nAFdveNbSr43jQy+fZsRvr4PwD4ZeRK/t6XuPh9/E78gcQO/5B+bvvrGiD7+1ic+uY8nvrVGtz4VtZo+uLZQP+gQCb92/Ba8bzuovn5+kb5B8m8+OnzePr8DFz9CbCi/KFE3v+BCFr/EwGS/0ngSP3UxAL8/4uk++p5xv5UfYD9iLSA/NtBAvkGw174tKrY/OrEZPoebH7+e4ys/tAnJvzbG+TuEE4W+u7bZPj7g3T5BLD4/0Zx3v7qxhj5MMUa+mz6BP/g1EkARMFy/m65hv9Rudj6eIMW/0y7KPTyMqb6BLS8+0RSePx/geb/4Lq07XCB7Png6qLyAZrc/ESw9P/SMhz8QLSTAjUwqv8kCkD7IU1Y+3KXcvlFquD90o0S/X6DIPyBe4bq/stK/zx8Av/eDIr7ELI2/vCKGPwW90b6TeAG+BV2BP54D0T9ONLu9nWlEPY5Owb4tCDQ/jc/9vrwc6bzcXgDAFKRyv/cfbj/jIq4/tqqyP83hTT4RU4m/I94pv1bqMj9n1KI/yiwHv8oCxr5Uhek+Bwyzv3SSHkCqIrO/7cVsvyVfdLv8AeK/5mo4PqCOdT+LLCg+2rZwPlq1kb9fFLQ/2IDnv5iGi71Hk8s/OslzPUTopT5b7om/MiMcwIzTpT9i90K9i7qXPcwpnD8VIlK+4NxJv++N4r862nI/9TYdvhEEET5TnJu/MC4JP/4y17+Ltpo+QX5rP10bPb926RY/5GuAPmRHP76fbuS+NARdPtm3xL6xngM/FPYUPQ==",
+  "weightsShapes": [[13, 16], [16], [16, 7], [7]],
+  "inputKeys": [
+    "hunger",
+    "cleanliness",
+    "happiness",
+    "energy",
+    "health",
+    "mood:happy",
+    "mood:sad",
+    "mood:sleepy",
+    "mood:playful",
+    "modifierCount",
+    "recent:SkillCompleted",
+    "recent:SkillFailed",
+    "recent:NeedCritical"
   ],
-  "outputLookup": true,
-  "inputLookup": true,
-  "trainOpts": {}
+  "outputKeys": ["feed", "clean", "play", "rest", "pet", "medicate", "scold"]
 }

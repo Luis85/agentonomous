@@ -5,12 +5,12 @@ export type ConsoleLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const ORDER: Record<ConsoleLogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
 
-export interface ConsoleLoggerOptions {
+export type ConsoleLoggerOptions = {
   /** Minimum level to emit. Defaults to `'info'`. */
   level?: ConsoleLogLevel;
   /** Optional tag prepended to every message. */
   tag?: string;
-}
+};
 
 /** Logger backed by the global `console`. Suitable for browser + Node. */
 export class ConsoleLogger implements Logger {

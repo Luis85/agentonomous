@@ -8,13 +8,13 @@ declare module 'js-son-agent' {
   export type JsSonIntentions = Record<string, unknown>;
   export type JsSonAction = Record<string, unknown>;
 
-  export interface JsSonPlan {
+  export type JsSonPlan = {
     head: ((intentions: JsSonIntentions) => boolean) | { isActive: boolean; value?: unknown };
     body: (intentions: JsSonIntentions, ...rest: unknown[]) => readonly JsSonAction[];
     run: (intentions: JsSonIntentions) => readonly JsSonAction[] | null;
-  }
+  };
 
-  export interface JsSonAgentOptions {
+  export type JsSonAgentOptions = {
     id: string;
     beliefs: JsSonBeliefs;
     desires?: JsSonDesires;
@@ -25,7 +25,7 @@ declare module 'js-son-agent' {
     ) => (key: string) => boolean;
     reviseBeliefs?: (current: JsSonBeliefs, updates: JsSonBeliefs) => JsSonBeliefs;
     selfUpdatesPossible?: boolean;
-  }
+  };
 
   export class Agent {
     constructor(options: JsSonAgentOptions);

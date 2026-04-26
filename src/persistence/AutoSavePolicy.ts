@@ -8,7 +8,7 @@
  * Set `enabled: false` to disable auto-save entirely — consumers can still
  * call `agent.snapshot()` manually.
  */
-export interface AutoSavePolicy {
+export type AutoSavePolicy = {
   enabled?: boolean;
   /** Save every N ticks. Set to 0 or omit to disable tick-based saves. */
   everyTicks?: number;
@@ -16,7 +16,7 @@ export interface AutoSavePolicy {
   everyVirtualSeconds?: number;
   /** Save when any of these event types are published. */
   onEvents?: readonly string[];
-}
+};
 
 /** Default auto-save policy when consumers opt into persistence without specifying one. */
 export const DEFAULT_AUTOSAVE_POLICY: Readonly<Required<Omit<AutoSavePolicy, 'enabled'>>> & {
@@ -27,6 +27,10 @@ export const DEFAULT_AUTOSAVE_POLICY: Readonly<Required<Omit<AutoSavePolicy, 'en
   everyVirtualSeconds: 0,
   onEvents: ['AgentDied', 'LifeStageChanged'],
 };
+
+function isPositiveFiniteNumber(n: number | undefined): n is number {
+  return n !== undefined && Number.isFinite(n) && n > 0;
+}
 
 /**
  * Stateful auto-save tracker. Agent owns one of these and asks `.shouldSave()`
@@ -59,11 +63,14 @@ export class AutoSaveTracker {
   shouldSave(): boolean {
     if (this.policy.enabled === false) return false;
     if (this.eventTriggeredThisTick) return true;
-    if (this.policy.everyTicks && this.ticksSinceSave >= this.policy.everyTicks) {
+    if (
+      isPositiveFiniteNumber(this.policy.everyTicks) &&
+      this.ticksSinceSave >= this.policy.everyTicks
+    ) {
       return true;
     }
     if (
-      this.policy.everyVirtualSeconds &&
+      isPositiveFiniteNumber(this.policy.everyVirtualSeconds) &&
       this.virtualSecondsSinceSave >= this.policy.everyVirtualSeconds
     ) {
       return true;

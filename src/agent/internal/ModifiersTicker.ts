@@ -24,7 +24,7 @@ export class ModifiersTicker {
           ? { fxHint: removal.modifier.visual.fxHint }
           : {}),
       };
-      this.agent._internalPublish(event);
+      this.agent.publishEvent(event);
     }
     return expired;
   }

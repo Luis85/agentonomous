@@ -1,6 +1,12 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["src/index.ts", "src/integrations/excalibur/index.ts"],
+  "entryPoints": [
+    "src/index.ts",
+    "src/integrations/excalibur/index.ts",
+    "src/cognition/adapters/mistreevous/index.ts",
+    "src/cognition/adapters/js-son/index.ts",
+    "src/cognition/adapters/tfjs/index.ts"
+  ],
   "entryPointStrategy": "expand",
   "out": "docs/api",
   "tsconfig": "./tsconfig.build.json",
@@ -10,6 +16,12 @@
   "excludePrivate": true,
   "excludeInternal": true,
   "categorizeByGroup": true,
+  "treatWarningsAsErrors": false,
+  "validation": {
+    "notExported": false,
+    "invalidLink": true,
+    "notDocumented": false
+  },
   "navigationLinks": {
     "GitHub": "https://github.com/luis85/agentonomous"
   }

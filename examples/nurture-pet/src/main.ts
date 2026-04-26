@@ -13,6 +13,7 @@ import {
   type AgentTickedEvent,
 } from 'agentonomous';
 import { ApproachTreatSkill } from './skills/ApproachTreatSkill.js';
+import { setLearningAgent } from './cognition/learning.js';
 import { mountCognitionSwitcher } from './cognitionSwitcher.js';
 import { catSpecies } from './species.js';
 import {
@@ -81,9 +82,13 @@ const randomEvents = new RandomEventTicker([
   }),
 ]);
 
-// --- Skill registry populated with active + expressive defaults ---------------
+// --- Skill registry populated with expressive + approach defaults -------------
+// `createAgent({ modules: [defaultPetInteractionModule] })` auto-installs
+// that module's active-care skills (feed/clean/play/rest/pet/scold/
+// medicate), so we don't pre-register them here. The expressive + approach
+// skills below are not bundled in any module, so they still need manual
+// registration.
 const skills = new SkillRegistry();
-skills.registerAll(defaultPetInteractionModule.skills ?? []);
 skills.register(ExpressMeowSkill);
 skills.register(ExpressSadSkill);
 skills.register(ExpressSleepySkill);
@@ -115,6 +120,12 @@ const pet = createAgent({
   }),
   randomEvents,
 });
+
+// Wire the learning mode to the agent: scopes the persisted-network
+// localStorage key per-pet AND subscribes to the standard event bus to
+// feed the mood / modifier-count / event-count dims of
+// `featuresFromNeeds`.
+setLearningAgent(pet);
 
 // --- Mount UI + reactive binding ----------------------------------------------
 const hud = mountHud(pet);

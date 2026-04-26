@@ -2,14 +2,14 @@ import { DECEASED_STAGE, type LifeStage } from './LifeStage.js';
 import type { LifeStageSchedule } from './LifeStageSchedule.js';
 
 /** Result of a single AgeModel.advance() call. */
-export interface LifeStageTransition {
+export type LifeStageTransition = {
   from: LifeStage;
   to: LifeStage;
   atAgeSeconds: number;
-}
+};
 
 /** Construction options for AgeModel. */
-export interface AgeModelOptions {
+export type AgeModelOptions = {
   /** Wall-clock ms at which the agent was born. Used for snapshot rebinding. */
   bornAt: number;
   /** Ordered schedule of age → stage transitions. */
@@ -18,7 +18,7 @@ export interface AgeModelOptions {
   initialAgeSeconds?: number;
   /** Current life stage. Defaults to the first schedule entry (or 'egg'). */
   initialStage?: LifeStage;
-}
+};
 
 /**
  * Tracks an agent's virtual age and advances its life stage on thresholds.
@@ -27,6 +27,12 @@ export interface AgeModelOptions {
  * stage thresholds (for instance after restoring from a snapshot saved hours
  * ago), every crossed transition is reported in order so downstream emitters
  * can fire all intermediate `LifeStageChanged` events.
+ *
+ * @experimental — the direct constructor is wrapped by a `lifecycle`
+ * module in the 1.1 composable kernel. Prefer
+ * `createAgent({ species: { lifecycle: defineLifecycle(...) } })` over
+ * `new AgeModel(...)`; reach for the class only when you need full
+ * control over the slot (tests and tick-helper extraction do).
  */
 export class AgeModel {
   readonly bornAt: number;

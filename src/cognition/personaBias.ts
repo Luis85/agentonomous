@@ -19,26 +19,48 @@ import { PERSONA_TRAIT_WEIGHTS } from './tuning.js';
  */
 export type PersonaBiasFn = (intentionType: string, persona: Persona | undefined) => number;
 
+type TraitRule = {
+  readonly trait: keyof typeof PERSONA_TRAIT_WEIGHTS;
+  readonly matches: (intentionType: string) => boolean;
+};
+
+// Data-driven trait → matcher table. Splitting the rules out keeps the
+// dispatcher's cyclomatic complexity flat (one branch per match call,
+// no matter how many traits ship).
+const TRAIT_RULES: readonly TraitRule[] = [
+  {
+    trait: 'ambition',
+    matches: (t) => t === 'do-task' || t.startsWith('do-task:'),
+  },
+  {
+    trait: 'sociability',
+    matches: (t) => t.startsWith('react:greet') || t.startsWith('react:talk'),
+  },
+  {
+    trait: 'aggression',
+    matches: (t) => t.startsWith('react:attack') || t === 'satisfy-need:dominance',
+  },
+  {
+    trait: 'curiosity',
+    matches: (t) => t.startsWith('explore') || t.startsWith('investigate'),
+  },
+  {
+    trait: 'playfulness',
+    matches: (t) => t.includes('play'),
+  },
+];
+
+// Per-rule contribution: zero when the matcher misses, otherwise the
+// trait's value scaled by its tuned weight. Pulled out so the dispatcher
+// stays a flat `reduce` and ESLint's complexity rule doesn't need to
+// climb back toward the 15-branch ceiling as new rules land.
+function weightForRule(rule: TraitRule, intentionType: string, traits: Persona['traits']): number {
+  if (!rule.matches(intentionType)) return 0;
+  return (traits[rule.trait] ?? 0) * PERSONA_TRAIT_WEIGHTS[rule.trait];
+}
+
 export const defaultPersonaBias: PersonaBiasFn = (intentionType, persona) => {
   if (!persona) return 0;
   const traits = persona.traits;
-  let bias = 0;
-
-  if (intentionType === 'do-task' || intentionType.startsWith('do-task:')) {
-    bias += (traits.ambition ?? 0) * PERSONA_TRAIT_WEIGHTS.ambition;
-  }
-  if (intentionType.startsWith('react:greet') || intentionType.startsWith('react:talk')) {
-    bias += (traits.sociability ?? 0) * PERSONA_TRAIT_WEIGHTS.sociability;
-  }
-  if (intentionType.startsWith('react:attack') || intentionType === 'satisfy-need:dominance') {
-    bias += (traits.aggression ?? 0) * PERSONA_TRAIT_WEIGHTS.aggression;
-  }
-  if (intentionType.startsWith('explore') || intentionType.startsWith('investigate')) {
-    bias += (traits.curiosity ?? 0) * PERSONA_TRAIT_WEIGHTS.curiosity;
-  }
-  if (intentionType.includes('play')) {
-    bias += (traits.playfulness ?? 0) * PERSONA_TRAIT_WEIGHTS.playfulness;
-  }
-
-  return bias;
+  return TRAIT_RULES.reduce((bias, rule) => bias + weightForRule(rule, intentionType, traits), 0);
 };

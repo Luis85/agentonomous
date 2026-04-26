@@ -33,7 +33,7 @@ export class AnimationReconciler {
       ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
       ...(transition.fxHint !== undefined ? { fxHint: transition.fxHint } : {}),
     };
-    agent._internalPublish(event);
+    agent.publishEvent(event);
     return {
       from: transition.from,
       to: transition.to,

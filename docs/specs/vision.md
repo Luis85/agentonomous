@@ -77,6 +77,11 @@ provider of choice, use `MockLlmProvider` in tests, plug the library
 into their existing event bus via adapters. LLM tool integration
 (Phase B) treats non-determinism as a budget, not a bug.
 
+> Status: the `LlmProviderPort` contract + `MockLlmProvider` ship in
+> 1.0 — see `examples/llm-mock/` for the deterministic playback
+> end-to-end. Concrete `AnthropicLlmProvider` / `OpenAiLlmProvider`
+> adapters land in Phase B; existing consumers pick them up additively.
+
 ## Product pillars
 
 These are the invariants every feature must honor. Trade-offs flow
@@ -125,7 +130,7 @@ what they use.
 ### 6. Peer-optional brains
 
 Advanced cognition adapters (`JsSonReasoner`, `MistreevousBehavior`,
-`BrainJsLearner`, `AnthropicLlmProvider`, `OpenAiLlmProvider`) are
+`TfjsReasoner`, `AnthropicLlmProvider`, `OpenAiLlmProvider`) are
 peer dependencies with `peerDependenciesMeta.optional: true`. Core
 stays usable without any of them. Consumers opt in one at a time.
 
@@ -161,8 +166,9 @@ emergent narrative out of data, not hand-scripted sequences.
   modifiers. Decoupled from cognition.
 - **Cognition**: `UrgencyReasoner` + `DirectBehaviorRunner` defaults,
   swappable for BDI / behavior-tree / LLM adapters.
-- **Skills**: 10 defaults (feed/clean/play/rest/pet/scold/medicate +
-  meow/sad/sleepy). Consumers add more via `SkillRegistry`.
+- **Skills**: a default bundle (feed / clean / play / rest / pet /
+  scold / medicate plus a few expressive reactions). Consumers add
+  more via `SkillRegistry`.
 - **Random events**: seeded per-tick probability table with
   cooldowns and guards.
 
@@ -314,4 +320,5 @@ the vision. Changes to this document require:
 3. A corresponding update to `docs/specs/roadmap.md` showing how the
    change propagates.
 
-Last reviewed: 2026-04-19. Next review: at V1.0.0 release.
+Last reviewed: 2026-04-26. Next review: when the pre-1.0 polish-and-harden
+roadmap closes (see `docs/plans/2026-04-25-comprehensive-polish-and-harden.md`).

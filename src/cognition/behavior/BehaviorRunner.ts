@@ -7,6 +7,6 @@ import type { Intention } from '../Intention.js';
  * (`DirectBehaviorRunner`); consumers can plug in richer runners — e.g.,
  * a mistreevous-backed behavior tree — through the same port.
  */
-export interface BehaviorRunner {
+export type BehaviorRunner = {
   run(intention: Intention): readonly AgentAction[];
-}
+};
