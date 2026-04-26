@@ -53,6 +53,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "coverage:report": "node scripts/coverage-pr-comment.mjs --render-only",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -197,7 +198,7 @@
     }
   ],
   "lint-staged": {
-    "*.{ts,tsx}": [
+    "*.{ts,tsx,mjs,d.mts}": [
       "eslint --fix",
       "prettier --write"
     ],

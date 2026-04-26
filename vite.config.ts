@@ -4,6 +4,8 @@ import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import dts from 'vite-plugin-dts';
 
+import { COVERAGE_THRESHOLDS } from './scripts/coverageThresholds.mjs';
+
 // Library mode build. Entries:
 // - main:        src/index.ts                        → dist/index.js
 // - excalibur:   src/integrations/excalibur/index.ts → dist/integrations/excalibur/index.js
@@ -170,20 +172,20 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html', 'lcov'],
+      // `json-summary` is consumed by `scripts/coverage-pr-comment.mjs`
+      // (the sticky PR comment showing actual % + delta vs base + drift
+      // status). Other reporters are for humans reading the report
+      // locally / from the lcov artifact.
+      reporter: ['text', 'html', 'lcov', 'json-summary'],
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/index.ts', 'src/**/*.d.ts'],
-      // Baseline 2026-04-25 (commit f6e4464): statements 76.22 / branches
-      // 66.61 / functions 85.42 / lines 77.78. Thresholds set at
-      // floor(measured - 2) so routine PRs don't trip the gate but a
-      // coverage regression beyond ~2pp fails the build. Bump these in
-      // step with measured improvements (cite the new baseline + commit).
-      thresholds: {
-        statements: 74,
-        branches: 64,
-        functions: 83,
-        lines: 75,
-      },
+      // Floors live in `scripts/coverageThresholds.mjs` (single source
+      // of truth for both this gate and the PR-comment renderer). The
+      // PR-comment job warns when actual climbs `DRIFT_WARN_PP`pp above
+      // a floor; that is the cue to re-baseline (set the floor to
+      // `floor(measured - 2)` and cite the new measurement + commit
+      // SHA in the threshold module's docstring).
+      thresholds: COVERAGE_THRESHOLDS,
     },
   },
 });
