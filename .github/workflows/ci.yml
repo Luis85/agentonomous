@@ -58,7 +58,7 @@ jobs:
           changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr_number/files" --jq '.[].filename')
           echo "Changed files in PR #$pr_number:"
           printf '%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -E '^(src/|tests/|examples/|\.github/workflows/|package(-lock)?\.json|tsconfig[^/]*\.json|vite\.config\.|vitest\.config\.|eslint\.config\.|typedoc\.json)' >/dev/null; then
+          if printf '%s\n' "$changed" | grep -E '^(src/|tests/|examples/|scripts/|\.github/workflows/|package(-lock)?\.json|tsconfig[^/]*\.json|vite\.config\.|vitest\.config\.|eslint\.config\.|typedoc\.json)' >/dev/null; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
