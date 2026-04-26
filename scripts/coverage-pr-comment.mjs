@@ -131,7 +131,17 @@ async function ghJson(path, init = {}) {
 
 async function upsertStickyComment({ repo, pr, body }) {
   const existing = await ghJson(`/repos/${repo}/issues/${pr}/comments?per_page=100`);
-  const prior = existing.find((c) => typeof c.body === 'string' && c.body.includes(COMMENT_MARKER));
+  // Match the marker AND require a bot-authored comment. A user could
+  // legitimately quote the marker text in a review comment (e.g. while
+  // discussing the script's behavior); without the bot filter we'd
+  // happily overwrite their reply with the next coverage update,
+  // breaking conversation continuity.
+  const prior = existing.find(
+    (c) =>
+      typeof c.body === 'string' &&
+      c.body.includes(COMMENT_MARKER) &&
+      c.user?.type === 'Bot',
+  );
   if (prior) {
     await ghJson(`/repos/${repo}/issues/comments/${prior.id}`, {
       method: 'PATCH',

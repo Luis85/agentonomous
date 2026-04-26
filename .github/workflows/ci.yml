@@ -322,32 +322,39 @@ jobs:
         with:
           name: coverage-summary
           path: coverage
-      # Best-effort base-branch coverage. When develop has no successful
-      # CI run yet (first push, retention expiry), the script still
-      # renders absolute % without deltas.
+      # Best-effort base-branch coverage. Query the artifacts API by
+      # name + base branch directly (rather than `gh run list
+      # --status success`) — a successful docs-only run skips
+      # `test-core` (gated on `changes.outputs.code`) and therefore
+      # never produces `coverage-summary`, so picking "latest
+      # successful base run" can land on a run with no artifact and
+      # silently lose deltas after every docs merge until another
+      # code-changing run lands. Filtering by artifact name +
+      # non-expired + base branch picks the most recent run that
+      # ACTUALLY has coverage data.
       - name: Download base-branch coverage summary
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
           mkdir -p base-coverage
-          BASE_RUN_ID="$(gh run list \
-            --repo "${GITHUB_REPOSITORY}" \
-            --branch "${{ github.event.pull_request.base.ref }}" \
-            --workflow ci.yml \
-            --status success \
-            --limit 1 \
-            --json databaseId \
-            --jq '.[0].databaseId // empty')"
+          BASE_RUN_ID="$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=coverage-summary&per_page=50" \
+            --jq ".artifacts
+                  | map(select(.expired == false and .workflow_run.head_branch == \"${BASE_REF}\"))
+                  | sort_by(.created_at)
+                  | reverse
+                  | .[0].workflow_run.id // empty")"
           if [ -z "${BASE_RUN_ID}" ]; then
-            echo "No successful base-branch run found; deltas will be omitted."
+            echo "No coverage-summary artifact found on ${BASE_REF}. Deltas will be omitted."
             exit 0
           fi
           if ! gh run download "${BASE_RUN_ID}" \
             --repo "${GITHUB_REPOSITORY}" \
             --name coverage-summary \
             --dir base-coverage; then
-            echo "Base-branch artifact missing on run ${BASE_RUN_ID} (likely older than retention). Deltas will be omitted."
+            echo "Download failed for run ${BASE_RUN_ID}. Deltas will be omitted."
           fi
       - name: Post sticky coverage comment
         env:
