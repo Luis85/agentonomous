@@ -613,9 +613,18 @@ jobs:
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run build
+      # Resolve the SHA from the checked-out tree, NOT from
+      # `github.sha`. On `schedule` runs the event context's SHA points
+      # at the default-branch tip (this repo's default is `main` while
+      # the checkout above pins `ref: develop`), so the two diverge and
+      # the JSONL row would record a SHA that does not match the code
+      # `size-limit` actually measured.
+      - name: Resolve checked-out SHA
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Append snapshot row
         env:
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ steps.head.outputs.sha }}
         run: |
           npx size-limit --json | \
             node scripts/append-size-snapshot.mjs \
