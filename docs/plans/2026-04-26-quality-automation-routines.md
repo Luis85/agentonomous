@@ -84,7 +84,7 @@ merges.
 | 2   | [quality-dep-triage-bot.md](./2026-04-26-quality-dep-triage-bot.md) | Cloud routine prompt + `dependabot.yml` grouping for weekly Dependabot triage | weekly | no | - [x] shipped |
 | 3   | [quality-actions-bump-bot.md](./2026-04-26-quality-actions-bump-bot.md) | Cloud routine prompt that runs `scripts/bump-actions.mjs` weekly + opens a bump PR | weekly | no | - [ ] not started |
 | 4   | [quality-plan-recon-bot.md](./2026-04-26-quality-plan-recon-bot.md) | Cloud routine prompt that archives shipped plans monthly | monthly | no | - [x] shipped via #143 |
-| 5   | [quality-bundle-trend.md](./2026-04-26-quality-bundle-trend.md) | Weekly snapshot of `npx size-limit --json` to a committed JSONL trend file | weekly | no | - [ ] not started |
+| 5   | [quality-bundle-trend.md](./2026-04-26-quality-bundle-trend.md) | Weekly snapshot of `npx size-limit --json` to a committed JSONL trend file | weekly | no | - [x] shipped via #144 |
 | 6   | [quality-determinism-replay.md](./2026-04-26-quality-determinism-replay.md) | Weekly + push hash-pinned replay across 8 seeds with committed baseline | weekly + push | no (tests/) | - [ ] not started |
 | 7   | [quality-mutation-testing.md](./2026-04-26-quality-mutation-testing.md) | Weekly StrykerJS mutation run with HTML report artifact | weekly | no | - [ ] not started |
 | 8   | [quality-demo-smoke.md](./2026-04-26-quality-demo-smoke.md) | Nightly Playwright headless smoke against built demo | nightly + PR-path | no (demo/) | - [ ] not started |

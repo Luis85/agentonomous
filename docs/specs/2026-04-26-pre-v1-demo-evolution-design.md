@@ -78,11 +78,24 @@ examples/product-demo/src/
 │       └── useShellLayout.ts
 ├── composables/               # cross-cutting hooks (router-aware, focus, a11y)
 ├── demo-domain/               # demo-specific domain modules (NOT in `agentonomous`)
-│   ├── scenarios/             # Scenario contract impls (pet-care, companion-npc)
-│   ├── walkthrough/           # step-graph definitions + completion predicates
-│   ├── diff/                  # rolling-window metric helpers
-│   ├── fingerprint/           # normalizer + hash function
-│   └── config/                # whitelisted-field schema + validator
+│   ├── scenarios/             # Scenario contract impls (each owns its species + skills + per-scenario config schema)
+│   │   ├── petCare/           # bootstrapped in Pillar-1 slice 1.2a (`git mv` from
+│   │   │   ├── species.ts     # legacy `species.ts` / `constants.ts` / `cognition/*` /
+│   │   │   ├── constants.ts   # `skills/*` + new `buildAgent.ts` extracting random-event
+│   │   │   ├── cognition/     # defs from legacy `main.ts`); wrapped in Scenario contract
+│   │   │   ├── skills/        # in Pillar-5 slice 5.2. Pillar-4 slice 4.1 also adds a
+│   │   │   ├── config/        # `config/` subfolder porting `speciesConfig.ts`'s
+│   │   │   ├── buildAgent.ts  # `validateEditableConfig` + `applyOverride` + the
+│   │   │   └── scenario.ts    # pet-care-specific schema (the cross-scenario engine
+│   │   │                      # lives in `demo-domain/config/` below).
+│   │   └── companionNpc/      # added in Pillar-5 slice 5.3
+│   ├── walkthrough/           # step-graph definitions + completion predicates (cross-scenario)
+│   ├── diff/                  # rolling-window metric helpers (cross-scenario)
+│   ├── fingerprint/           # normalizer + hash function (cross-scenario)
+│   └── config/                # cross-scenario engine: ConfigPath, ValidationFinding,
+│                              # ConfigDraft shape, schema/validator framework. Each
+│                              # scenario plugs its own per-scenario schema in via
+│                              # `demo-domain/scenarios/<id>/config/`.
 ├── copy/                      # English-only UI strings, grouped by pillar
 └── styles/                    # tokens, layout, component overrides
 ```
@@ -90,6 +103,47 @@ examples/product-demo/src/
 `examples/product-demo/` is the renamed workspace as of Wave-0 (preflight
 shipped 2026-04-26). The old workspace name has been retired; the per-pillar
 plans below all assume `examples/product-demo/` from day 1.
+
+### Legacy code recycling
+
+The increment is intentionally pre-v1 (no compat shims), but "no compat"
+does not mean "rewrite everything from scratch". The legacy vanilla-TS
+demo on `develop` after Wave-0 contains a substantial body of pure
+domain logic (species descriptor, cognition mode probes + reasoner
+constructors + softmax helpers, skill, random-event defs, config
+validator, SVG renderers) that is fully reusable under the new shell.
+Each pillar plan calls out exactly what it recycles vs rebuilds. The
+recycle map for the increment as a whole:
+
+| Legacy module | Reuse strategy | Lands in |
+|---|---|---|
+| `src/species.ts`, `src/constants.ts` | `git mv` (history preserved) — pure data | Pillar-1 slice 1.2a → `demo-domain/scenarios/petCare/{species,constants}.ts` |
+| `src/cognition/{heuristic,bt,bdi,learning,index}.ts` + `learning.network.json` | `git mv` — pure TS, peer-dep probes intact | Pillar-1 slice 1.2a → `demo-domain/scenarios/petCare/cognition/` |
+| `src/skills/ApproachTreatSkill.ts` | `git mv` — pure Skill | Pillar-1 slice 1.2a → `demo-domain/scenarios/petCare/skills/` |
+| Random-event defs + skill-registry wiring + `createAgent` call from `src/main.ts` | Extract verbatim into a `buildAgent({ seed, speciesOverride? })` factory | Pillar-1 slice 1.2a → `demo-domain/scenarios/petCare/buildAgent.ts` |
+| `src/seed.ts loadSeed()` | Storage-key migration to `demo.v2.session.lastSeed.<scenarioId>` (no key migration — pre-v1 clean break); copy/new/replay buttons port to `<SeedPanel>` in Pillar-3 slice 3.3 | Pillar-1 slice 1.2a (`useAgentSession`) + Pillar-3 slice 3.3 (`<SeedPanel>`) |
+| `src/ui.ts mountHud / mountSpeedPicker / mountResetButton / mountExportImport` | Port DOM-mount fns to Vue SFCs; reuse `INTERACTION_BUTTONS`, `STAGE_LABELS`, `LIFETIME_COUNTERS`, per-need bar markup verbatim | Pillar-1 slice 1.2b → `<HudPanel>` / `<SpeedPicker>` / `<ResetButton>` / `<ExportImportPanel>` |
+| `src/traceView.ts mountTraceView` | Port four-section computation; Vue handles reactivity (drop the manual signature-diff trick) | Pillar-1 slice 1.2b → `<TracePanel>` |
+| `src/cognitionSwitcher.ts` (46 KB) | Port to `<CognitionSwitcher>` SFC; mode-construction logic moves to `useAgentSession.setMode()` | Pillar-2 slice 2.5 |
+| `src/lossSparkline.ts` / `src/predictionStrip.ts` | Pure SVG renderers — extract compute helpers into `demo-domain/scenarios/petCare/cognition/` and let thin Vue SFCs render | Pillar-2 slice 2.5 → `<LossSparkline>` / `<PredictionStrip>` |
+| `src/speciesConfig.ts` | Port `EditableSpeciesConfig` shape, `validateEditableConfig`, `applyOverride` into `demo-domain/scenarios/petCare/config/`; `mountConfigPanel` becomes `<JsonEditor>` SFC family | Pillar-4 slices 4.1 (validator + applyOverride) + 4.3 (editor SFCs + delete legacy file) |
+
+Module-deletion timeline (per pre-v1 clean break):
+
+- **Slice 1.2a** deletes nothing — only `git mv`s.
+- **Slice 1.2b** deletes `src/{ui.ts, traceView.ts, seed.ts, main.ts}`.
+  `cognitionSwitcher.ts`, `lossSparkline.ts`, `predictionStrip.ts`,
+  `speciesConfig.ts` stay until **Pillar 2 slice 2.5** and **Pillar 4
+  slice 4.3** respectively port them. The demo eslint config's `ignores`
+  list shrinks every step.
+- **Pillar 5 slice 5.2** is therefore much lighter than originally
+  scoped: it WRAPS the existing `demo-domain/scenarios/petCare/`
+  modules in the `Scenario` contract rather than relocating them.
+
+The `Scenario` contract under "Cross-pillar contracts" below is the
+final shape every pet-care module gets composed into; nothing in the
+recycle map blocks adding `companion-npc` as a peer in Pillar-5 slice
+5.3.
 
 ### Build + dev commands (unchanged contract, renamed targets)
 

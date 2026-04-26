@@ -1,6 +1,6 @@
 import { isEmitEventAction, isInvokeSkillAction } from 'agentonomous';
 import type { Agent, AgentState, DecisionTrace, IntentionCandidate } from 'agentonomous';
-import { NEEDS } from './constants.js';
+import { NEEDS } from './demo-domain/scenarios/petCare/constants.js';
 
 const VISIBILITY_STORAGE_KEY = 'agentonomous/trace-visible';
 const TOP_CANDIDATES = 5;
