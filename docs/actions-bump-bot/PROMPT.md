@@ -95,8 +95,20 @@ weekly `dep-triage-bot` and the daily `review-bot`.
 
 # Process
 
-Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
-`ERROR` per [Hard rules](#hard-rules)):
+Run weekly.
+
+**Pre-flight before touching any bump:** if `scripts/bump-actions.mjs`
+reports **any** `ERROR` row, abort the run immediately and open a
+failure issue per [Failure handling](#failure-handling) — do NOT
+process any `PENDING` rows. `ERROR` indicates a tooling-level failure
+(auth, network, rate-limit, missing CLI) that taints the entire scan;
+opening a partial bump PR would hide the underlying break.
+
+`DIVERGENT` rows are filed under their own issue per
+[Failure handling](#failure-handling) but do NOT abort the run —
+processing of `PENDING` rows continues alongside.
+
+For each remaining `PENDING` row in scope:
 
 1. **Re-resolve every SHA fresh.** Never copy the script's `latest sha`
    column directly into a workflow edit — re-run the peel via the
@@ -178,7 +190,11 @@ Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
      echo "No bumps applied (all PENDING rows skipped by policy). Exiting cleanly."
      exit 0
    fi
-   git add .github/workflows/*.yml
+   # Stage the whole workflows directory so both *.yml AND *.yaml
+   # bumps land in the commit. The bump scanner accepts both
+   # extensions; staging only *.yml would leave .yaml edits in the
+   # worktree and produce a partial bump PR + dirty tree.
+   git add .github/workflows/
    git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
    ```
 
