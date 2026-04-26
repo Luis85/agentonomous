@@ -136,24 +136,89 @@ describe('useAgentSession', () => {
     expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 2);
   });
 
-  it('replayFromSnapshot(null) rebuilds a fresh agent reusing the persisted seed', () => {
+  it('replayFromSnapshot(null) rebuilds a fresh agent reusing the persisted seed', async () => {
     const session = useAgentSession();
     session.init({ seed: 'replay-seed' });
     const firstAgent = session.agent;
-    session.replayFromSnapshot(null);
+    await session.replayFromSnapshot(null);
     expect(session.agent).not.toBe(firstAgent);
     expect(session.seed).toBe('replay-seed');
     expect(session.running).toBe(true);
     expect(session.speedMultiplier).toBe(1);
   });
 
-  it('replayFromSnapshot(null) reapplies the species override that init received', () => {
+  it('replayFromSnapshot(null) preserves the user-chosen speedMultiplier across rebuild', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'replay-preserve-speed-seed' });
+    session.setSpeed(4);
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 4);
+
+    await session.replayFromSnapshot(null);
+
+    expect(session.speedMultiplier).toBe(4);
+    expect(session.running).toBe(true);
+    // The fresh agent must mirror the preserved control state — buildAgent
+    // returns BASE_TIME_SCALE × 1 by default, so without the explicit
+    // setTimeScale at the end of replay, a 4× user would silently end up
+    // back at 1× until the next manual SpeedPicker click.
+    expect(session.agent?.getTimeScale()).toBe(BASE_TIME_SCALE * 4);
+  });
+
+  it('replayFromSnapshot(null) preserves the paused running state across rebuild', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'replay-preserve-pause-seed' });
+    session.pause();
+    expect(session.running).toBe(false);
+    expect(session.agent?.getTimeScale()).toBe(0);
+
+    await session.replayFromSnapshot(null);
+
+    expect(session.running).toBe(false);
+    expect(session.agent?.getTimeScale()).toBe(0);
+  });
+
+  it("replayFromSnapshot(null) clears the previous agent's tfjs-network localStorage key", async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'tfjs-clear-seed' });
+    const agentId = session.agent!.identity.id;
+    const tfjsKey = `agentonomous/${agentId}/tfjs-network`;
+    globalThis.localStorage.setItem(tfjsKey, '{"weights":"trained-on-previous-pet"}');
+
+    await session.replayFromSnapshot(null);
+
+    expect(globalThis.localStorage.getItem(tfjsKey)).toBeNull();
+  });
+
+  it('replayFromSnapshot(snapshot) leaves the live agent untouched when restore rejects', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'replay-failure-seed' });
+    const previousAgent = session.agent;
+
+    // Spy on the prototype so the SPY catches the FRESH agent's restore
+    // call (the fresh instance hasn't been built yet — we can't spy on it
+    // directly). Reject once to simulate a semantically broken import.
+    const proto = Object.getPrototypeOf(previousAgent);
+    const restoreSpy = vi
+      .spyOn(proto, 'restore')
+      .mockRejectedValueOnce(new Error('synthetic restore failure'));
+
+    await expect(
+      session.replayFromSnapshot({} as unknown as Parameters<typeof session.replayFromSnapshot>[0]),
+    ).rejects.toThrow('synthetic restore failure');
+
+    // The previous agent must still be the live one — failed import is
+    // not allowed to be destructive.
+    expect(session.agent).toBe(previousAgent);
+    restoreSpy.mockRestore();
+  });
+
+  it('replayFromSnapshot(null) reapplies the species override that init received', async () => {
     const session = useAgentSession();
     session.init({ seed: 'override-seed', speciesOverride: catSpecies });
     expect(session.lastSpeciesOverride?.id).toBe(catSpecies.id);
     const firstAgent = session.agent;
 
-    session.replayFromSnapshot(null);
+    await session.replayFromSnapshot(null);
     expect(session.agent).not.toBe(firstAgent);
     // Override is retained across rebuild — without this the rebuilt
     // agent would silently revert to the scenario default.
@@ -185,7 +250,7 @@ describe('useAgentSession', () => {
     const firstCount = ticked.length;
     expect(firstCount).toBeGreaterThan(0);
 
-    session.replayFromSnapshot(null);
+    await session.replayFromSnapshot(null);
     await session.tick(0.1);
     expect(ticked.length).toBeGreaterThan(firstCount);
 
@@ -195,9 +260,54 @@ describe('useAgentSession', () => {
     expect(ticked.length).toBe(afterUnsubCount);
   });
 
-  it('replayFromSnapshot(snapshot) is deferred to slice 1.2b and throws today', () => {
+  it('replayFromSnapshot(snapshot) restores the supplied agent state', async () => {
     const session = useAgentSession();
-    session.init({ seed: 'defer-seed' });
-    expect(() => session.replayFromSnapshot({ version: 1 })).toThrow(/slice 1\.2b/);
+    session.init({ seed: 'snap-seed' });
+    // Tick once so the snapshot's state diverges from a fresh build.
+    await session.tick(1);
+    const snap = session.agent!.snapshot();
+    const snapAge = snap.lifecycle?.ageSeconds ?? 0;
+
+    // Drift the live agent further so we can prove the restore won.
+    await session.tick(1);
+    await session.tick(1);
+
+    await session.replayFromSnapshot(snap);
+    // After restore, the agent reports the exact age stored in snap
+    // (no fast-forward — `catchUp: false`).
+    expect(session.agent!.getState().ageSeconds).toBeCloseTo(snapAge, 6);
+  });
+
+  it('AGENT_TICKED projections (tickIndex / lastTrace / lastTickNumber) update reactively', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'project-seed' });
+    expect(session.tickIndex).toBe(0);
+    expect(session.lastTrace).toBeNull();
+    await session.tick(0.1);
+    expect(session.tickIndex).toBeGreaterThan(0);
+    expect(session.lastTrace).not.toBeNull();
+    expect(session.lastTickNumber).toBeGreaterThan(0);
+  });
+
+  it('tickIndex stays frozen on paused (virtualDtSeconds === 0) ticks but advances on step()', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'pause-progress-seed' });
+    expect(session.tickIndex).toBe(0);
+
+    // Pause the agent: setTimeScale(0). Subsequent tick(dt) calls still
+    // emit AGENT_TICKED (so trace panels stay live) but with
+    // virtualDtSeconds === 0 — the chapter-1 `tickAtLeast(N)` predicate
+    // must NOT count these or paused playback auto-completes the tour.
+    session.pause();
+    const beforeIndex = session.tickIndex;
+    await session.tick(0.1);
+    await session.tick(0.1);
+    expect(session.tickIndex).toBe(beforeIndex);
+    expect(session.lastTickNumber).toBeGreaterThan(0); // trace still updates
+
+    // step() temporarily unpauses, ticks once with virtual time, then
+    // re-pauses — that one tick must count.
+    await session.step(1);
+    expect(session.tickIndex).toBe(beforeIndex + 1);
   });
 });

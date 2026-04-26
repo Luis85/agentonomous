@@ -1,12 +1,21 @@
 import { defineStore } from 'pinia';
-import { markRaw, ref } from 'vue';
-import type { Agent, DomainEvent, SpeciesDescriptor } from 'agentonomous';
+import { computed, markRaw, ref } from 'vue';
+import { AGENT_TICKED } from 'agentonomous';
+import type {
+  Agent,
+  AgentSnapshot,
+  AgentTickedEvent,
+  DecisionTrace,
+  DomainEvent,
+  SpeciesDescriptor,
+} from 'agentonomous';
 import {
   BASE_TIME_SCALE,
   buildAgent,
   type BuildAgentOptions,
 } from '../../demo-domain/scenarios/petCare/buildAgent.js';
 import { setLearningAgent } from '../../demo-domain/scenarios/petCare/cognition/learning.js';
+import type { AgentSessionSnapshot, SessionEvent } from '../../demo-domain/walkthrough/types.js';
 
 const DEFAULT_SCENARIO_ID = 'petCare';
 const SEED_STORAGE_KEY_PREFIX = 'demo.v2.session.lastSeed.';
@@ -64,12 +73,49 @@ type SubscriberRecord = {
   detach: () => void;
 };
 
+/** Bounded ring buffer size for `recentEvents` — feeds tour predicates. */
+const RECENT_EVENT_LIMIT = 50;
+
+/**
+ * Convert a string seed (`createAgent({ rng: 'whiskers' })`) into a
+ * stable numeric form for the `AgentSessionSnapshot.seed` projection.
+ * Tour predicates only need identity equality across sibling snapshots,
+ * not cryptographic uniqueness — `cyrb53` is plenty.
+ */
+function hashSeed(seedStr: string): number {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < seedStr.length; i += 1) {
+    const ch = seedStr.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0) * 4294967296 + (h1 >>> 0);
+}
+
 export const useAgentSession = defineStore('agentSession', () => {
   const agent = ref<Agent | null>(null);
   const scenarioId = ref<string>(DEFAULT_SCENARIO_ID);
   const seed = ref<string>('');
   const speedMultiplier = ref<number>(1);
   const running = ref<boolean>(false);
+  // `tickIndex` mirrors the agent's tick counter for cheap reactivity-
+  // friendly reads (the agent itself is `markRaw` so its internal
+  // counters don't drive Vue updates). `recentEvents` is a bounded
+  // ring buffer feeding tour predicates without re-subscribing per
+  // step. Both reset on `init` / `replayFromSnapshot`.
+  const tickIndex = ref<number>(0);
+  const recentEvents = ref<SessionEvent[]>([]);
+  const cognitionModeId = ref<string>('heuristic');
+  // Reactive last-tick projection for `<TracePanel>`. Updated inside the
+  // internal AGENT_TICKED listener so the panel never needs its own
+  // subscription (and therefore no runtime `agentonomous` import).
+  const lastTrace = ref<DecisionTrace | null>(null);
+  const lastTickNumber = ref<number>(0);
   // Last species override handed to `init`, retained so
   // `replayFromSnapshot(null)` can rebuild the agent with the same
   // configuration the user is currently running. Without this, reset /
@@ -78,6 +124,33 @@ export const useAgentSession = defineStore('agentSession', () => {
   // Tracked outside the reactive state — Pinia must not traverse the
   // listener closures (and the Set's identity is stable across rebuilds).
   const subscribers = new Set<SubscriberRecord>();
+  // Internal AGENT_TICKED listener: keeps `tickIndex` + `recentEvents`
+  // current. Stored separately from user `subscribers` so it survives
+  // agent rebuilds via the same rebind path.
+  let internalDetach: () => void = () => {};
+
+  function attachInternalListener(target: Agent): void {
+    internalDetach();
+    internalDetach = target.subscribe((event) => {
+      if (event.type === AGENT_TICKED) {
+        const ticked = event as AgentTickedEvent;
+        // Gate `tickIndex` on real virtual-time advancement: `Agent.tick`
+        // still publishes AGENT_TICKED at `timeScale === 0` so the trace
+        // panel and event ring buffer keep observing the paused frame,
+        // but a frozen frame must NOT count toward tour-progression
+        // predicates like chapter-1's `tickAtLeast(N)` — otherwise
+        // pause-then-wait silently auto-completes the tour.
+        if (ticked.virtualDtSeconds > 0) tickIndex.value += 1;
+        lastTrace.value = ticked.trace;
+        lastTickNumber.value = ticked.tickNumber;
+      }
+      const projected: SessionEvent = { type: event.type, tickIndex: tickIndex.value };
+      recentEvents.value.push(projected);
+      if (recentEvents.value.length > RECENT_EVENT_LIMIT) {
+        recentEvents.value.splice(0, recentEvents.value.length - RECENT_EVENT_LIMIT);
+      }
+    });
+  }
 
   function rebindSubscribers(target: Agent): void {
     for (const record of subscribers) {
@@ -100,6 +173,10 @@ export const useAgentSession = defineStore('agentSession', () => {
     scenarioId.value = resolvedScenario;
     seed.value = resolvedSeed;
     speedMultiplier.value = 1;
+    tickIndex.value = 0;
+    recentEvents.value = [];
+    lastTrace.value = null;
+    lastTickNumber.value = 0;
     lastSpeciesOverride.value = options.speciesOverride;
     const fresh = markRaw(
       buildAgent({
@@ -116,6 +193,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     // a null hydration scope and stale feature inputs (mood / recent
     // events).
     setLearningAgent(fresh);
+    attachInternalListener(fresh);
     rebindSubscribers(fresh);
     running.value = true;
     writePersistedSeed(resolvedScenario, resolvedSeed);
@@ -173,17 +251,30 @@ export const useAgentSession = defineStore('agentSession', () => {
   }
 
   /**
-   * Slice 1.2a wires only the reset path (`snapshot === null`) — that is
-   * all chapter-1 needs. Snapshot deserialisation lands in slice 1.2b
-   * alongside `<ExportImportPanel>`; the `unknown` parameter type is
-   * intentional until the real `AgentSnapshot` import is needed there.
+   * Reset (`snapshot === null`) rebuilds the agent from the current seed
+   * + species override and clears any per-agent learning artifacts so
+   * the next Learning-mode hydration cannot re-load weights trained on
+   * the previous pet. Restore (`snapshot !== null`) rebuilds the agent
+   * fresh and hands the parsed snapshot to `agent.restore` with
+   * `catchUp: false` — the imported state's virtual-time cursor stays
+   * stable, matching the legacy `mountExportImport` semantics.
+   *
+   * Restore is attempted on the FRESH agent BEFORE we publish it as the
+   * live one: a syntactically-valid-but-semantically-broken snapshot
+   * makes `restore` reject, and we want that rejection to leave the
+   * current pet untouched (a failed import must not be destructive).
+   * On rejection the fresh agent is dropped and the error propagates
+   * to the caller (typically `<ExportImportPanel>`'s alert path).
+   *
+   * Speed + control state (`speedMultiplier`, `running`) are preserved
+   * across replay — they reflect the user's UI choice, not the
+   * snapshot's contents, so Reset / New-pet / import must not silently
+   * unpause or rescale the simulation.
+   *
+   * Stale modifiers from the previous agent are dropped by virtue of
+   * the rebuild; callers don't need to scrub them up-front.
    */
-  function replayFromSnapshot(snapshot: unknown = null): void {
-    if (snapshot !== null) {
-      throw new Error(
-        'useAgentSession.replayFromSnapshot: snapshot deserialisation lands in slice 1.2b',
-      );
-    }
+  async function replayFromSnapshot(snapshot: AgentSnapshot | null = null): Promise<void> {
     const fresh = markRaw(
       buildAgent({
         seed: seed.value,
@@ -192,11 +283,36 @@ export const useAgentSession = defineStore('agentSession', () => {
           : {}),
       }),
     );
+    if (snapshot !== null) {
+      // Throws here propagate to caller WITHOUT swapping the live agent.
+      await fresh.restore(snapshot, { catchUp: false });
+    } else {
+      // Reset path: discard the previous agent's persisted learning
+      // network so a freshly trained model isn't silently rehydrated
+      // onto the new pet. Same key the cognition switcher's "Untrain"
+      // and Train code paths use.
+      const prev = agent.value;
+      if (prev !== null) {
+        try {
+          globalThis.localStorage?.removeItem(`agentonomous/${prev.identity.id}/tfjs-network`);
+        } catch {
+          // localStorage unavailable — fresh learning-mode construct
+          // falls back to the bundled baseline anyway.
+        }
+      }
+    }
     agent.value = fresh;
     setLearningAgent(fresh);
+    attachInternalListener(fresh);
     rebindSubscribers(fresh);
-    speedMultiplier.value = 1;
-    running.value = true;
+    // Replay the user's current control state onto the fresh agent.
+    // `buildAgent` returns a running agent at BASE_TIME_SCALE; if the
+    // user had paused or scaled before reset/import, mirror that here.
+    fresh.setTimeScale(running.value ? BASE_TIME_SCALE * speedMultiplier.value : 0);
+    tickIndex.value = 0;
+    recentEvents.value = [];
+    lastTrace.value = null;
+    lastTickNumber.value = 0;
   }
 
   /**
@@ -221,12 +337,32 @@ export const useAgentSession = defineStore('agentSession', () => {
     };
   }
 
+  /**
+   * Read-only projection consumed by tour completion predicates. The
+   * shape mirrors `AgentSessionSnapshot` from the walkthrough domain
+   * module so the view layer never has to reach into the live agent
+   * directly. Returned as a `computed` so `<TourOverlay>` re-evaluates
+   * whenever `tickIndex` / `recentEvents` change.
+   */
+  const sessionSnapshot = computed<AgentSessionSnapshot>(() => ({
+    tickIndex: tickIndex.value,
+    cognitionModeId: cognitionModeId.value,
+    seed: hashSeed(seed.value),
+    recentEvents: recentEvents.value,
+  }));
+
   return {
     agent,
     scenarioId,
     seed,
     speedMultiplier,
     running,
+    tickIndex,
+    recentEvents,
+    cognitionModeId,
+    lastTrace,
+    lastTickNumber,
+    sessionSnapshot,
     lastSpeciesOverride,
     init,
     tick,

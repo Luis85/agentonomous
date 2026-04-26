@@ -1,34 +1,42 @@
 /**
- * Product-demo bootstrap entry. Wave-0 (rename preflight) introduces this
- * file as the demo's `app/` entry point per the design's folder layout.
- * Future pillar PRs migrate the rest of `src/main.ts` into the layered
- * `app/` + `routes/` + `views/` + `stores/` + `demo-domain/` tree.
+ * Product-demo Vue bootstrap (Pillar 1, slice 1.2b — bridge swap).
  *
- * Responsibilities for the rename slice:
+ * Replaces the Wave-0 `await import('../main.js')` shim. This module is
+ * the live entry: it purges legacy localStorage keys (spec STO-3),
+ * spins up Pinia + the demo router, and mounts `<App />` into
+ * `index.html`'s `#app` slot.
  *
- * 1. Purge legacy `nurture-pet.*` and un-prefixed `demo.*` localStorage
- *    keys on first load (spec STO-3). Pre-v1 policy explicitly drops
- *    back-compat with old key shapes; the purge frees those slots so the
- *    `demo.v2.*` key namespace introduced by the pillar PRs is the only
- *    surface in DevTools.
- * 2. Hand off to the existing `src/main.ts` module so the current
- *    nurture-pet baseline keeps booting end-to-end. The pillar refactor
- *    will rewrite that module into Vue + Pinia + Router; until then the
- *    side-effect import is the contract.
+ * The legacy vanilla-TS DOM-mount files (`src/{ui,traceView,seed,main}.ts`)
+ * are deleted in this slice — their logic now lives in the Vue SFCs and
+ * Pinia stores under `app/`, `components/`, `views/`, `stores/`.
  */
+
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+import { createAppRouter } from '../routes/index.js';
 
 const LEGACY_KEY_PREFIXES = ['nurture-pet.', 'demo.'] as const;
 // `demo.v2.*` is the new namespace the pillar PRs write into; leave it
 // alone. Anything else under `demo.*` is the un-prefixed legacy shape
-// the spec instructs us to purge.
+// the spec instructs us to purge — likewise the legacy `agentonomous/*`
+// + `whiskers*` keys the vanilla-TS demo wrote pre-rename.
 const PURGE_NAMESPACE_GUARD = 'demo.v2.';
+const LEGACY_EXACT_KEYS: ReadonlyArray<string> = [
+  'agentonomous/seed',
+  'agentonomous/speed',
+  'agentonomous/trace-visible',
+  'agentonomous/species-config',
+  'whiskers',
+  'whiskers:speed',
+];
 
 function purgeLegacyDemoKeys(): readonly string[] {
   const purged: string[] = [];
 
   // Reading `globalThis.localStorage` itself can throw `SecurityError` in
   // privacy-restricted browsers and sandboxed iframes — guard the access
-  // inside the try so the bootstrap never crashes before main.ts loads.
+  // inside the try so the bootstrap never crashes before mount.
   try {
     const storage = globalThis.localStorage;
     if (!storage) return purged;
@@ -38,6 +46,19 @@ function purgeLegacyDemoKeys(): readonly string[] {
       const key = storage.key(i);
       if (key === null) continue;
       if (key.startsWith(PURGE_NAMESPACE_GUARD)) continue;
+      if (LEGACY_EXACT_KEYS.includes(key)) {
+        matches.push(key);
+        continue;
+      }
+      // The `agentonomous/*` namespace also held per-pet snapshots
+      // (`agentonomous/<id>` + `agentonomous/<id>/tfjs-network` +
+      // `agentonomous/__agentonomous/index__`). Pre-v1 clean break:
+      // wipe the whole namespace; the new shell rebuilds via the
+      // `demo.v2.*` keys on first mount.
+      if (key.startsWith('agentonomous/')) {
+        matches.push(key);
+        continue;
+      }
       for (const prefix of LEGACY_KEY_PREFIXES) {
         if (key.startsWith(prefix)) {
           matches.push(key);
@@ -61,12 +82,14 @@ const purged = purgeLegacyDemoKeys();
 // spamming production builds. `import.meta.env.DEV` is set by Vite at
 // build time (not in the demo's tsconfig types — typed inline to avoid
 // pulling in `vite/client` ambient types).
-const meta = import.meta as unknown as { env?: { DEV?: boolean } };
+const meta = import.meta as unknown as { env?: { DEV?: boolean; BASE_URL?: string } };
 if (purged.length > 0 && meta.env?.DEV === true) {
   console.warn(
     `[product-demo] Purged ${String(purged.length)} legacy localStorage key(s): ${purged.join(', ')} (spec STO-3).`,
   );
 }
 
-// Side-effect import: triggers the existing nurture-pet baseline boot.
-await import('../main.js');
+const app = createApp(App);
+app.use(createPinia());
+app.use(createAppRouter(meta.env?.BASE_URL ?? '/'));
+app.mount('#app');
