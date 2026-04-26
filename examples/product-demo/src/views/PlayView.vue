@@ -47,9 +47,16 @@ async function loop(now: number): Promise<void> {
   });
 }
 
+// Initialize the agent session synchronously during setup so it runs
+// before any child component's `onMounted`. Vue fires child mounted hooks
+// before the parent's, so deferring `session.init` to the parent's
+// `onMounted` would silently overwrite persisted controls (notably
+// SpeedPicker's saved speed / pause) that children re-apply on their own
+// mount.
+const initialSeed = readPersistedSeed() ?? generateSeed();
+session.init({ seed: initialSeed });
+
 onMounted(() => {
-  const seed = readPersistedSeed() ?? generateSeed();
-  session.init({ seed });
   raf = globalThis.requestAnimationFrame((t) => {
     last = t;
     void loop(t);
