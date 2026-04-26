@@ -37,7 +37,7 @@ external narration.
 |---|---|---|---|---|---|
 | 1.1 | Step-graph + completion-predicate domain module + headless tests | `examples/product-demo/src/demo-domain/walkthrough/{types.ts,graph.ts,predicates.ts}`, `examples/product-demo/test/demo-domain/walkthrough/*.test.ts` | P1-FR-2, P1-FR-3, P1-FR-4 | ✅ shipped | [#140](https://github.com/Luis85/agentonomous/pull/140) |
 | 1.2a | Vue 3 / Pinia 2 / Vue Router 4 shell bootstrap + `git mv` salvage of pure legacy modules into `demo-domain/scenarios/petCare/` + `useAgentSession` domain store wrapping `buildAgent` factory | `examples/product-demo/package.json` (vue/pinia/vue-router/@vue/test-utils/@pinia/testing/@vue/eslint-parser/eslint-plugin-vue), `examples/product-demo/src/{app/App.vue,app/main.ts,routes/index.ts,views/IntroView.vue,views/PlayView.vue,components/shell/AppHeader.vue,stores/domain/useAgentSession.ts,composables/}`, `git mv` of `examples/product-demo/src/{species.ts,constants.ts,cognition/**,skills/**}` → `examples/product-demo/src/demo-domain/scenarios/petCare/{species.ts,constants.ts,cognition/**,skills/**}`, new `examples/product-demo/src/demo-domain/scenarios/petCare/buildAgent.ts` (random-event defs + skill registry wiring extracted from legacy `main.ts`), `examples/product-demo/eslint.config.js` (drop relocated paths from `ignores`, add Vue SFC parser), `examples/product-demo/test/stores/domain/useAgentSession.test.ts` | P1-FR-1 (CTA scaffolding) | not started | — |
-| 1.2b | Chapter-1 vertical: port `mountHud`→`<HudPanel>` + `mountTraceView`→`<TracePanel>`, introduce `useTourProgress` view store + `<TourOverlay>` + `<StepHighlight>`, chapter-1 (autonomy) step content, **delete** legacy `examples/product-demo/src/{ui.ts,traceView.ts,seed.ts,speciesConfig.ts,cognitionSwitcher.ts,lossSparkline.ts,predictionStrip.ts,main.ts}` (their logic now lives in SFCs+stores OR is preserved for the Pillar 2 / 4 ports — see "Recycle deferral" below) | `examples/product-demo/src/components/{shell/HudPanel.vue,trace/TracePanel.vue,tour/TourOverlay.vue,tour/StepHighlight.vue}`, `examples/product-demo/src/stores/view/useTourProgress.ts`, `examples/product-demo/src/demo-domain/walkthrough/chapters/1.ts`, `examples/product-demo/test/stores/view/useTourProgress.test.ts`, `examples/product-demo/test/components/{HudPanel,TracePanel,TourOverlay}.test.ts`, `examples/product-demo/src/copy/tour.ts` | P1-FR-1, P1-FR-3, P1-FR-5, P1-FR-6, P1-FR-8 | not started | — |
+| 1.2b | Chapter-1 vertical: port `mountHud`→`<HudPanel>` + `mountTraceView`→`<TracePanel>`, introduce `useTourProgress` view store + `<TourOverlay>` + `<StepHighlight>`, chapter-1 (autonomy) step content, **delete** legacy `examples/product-demo/src/{ui.ts,traceView.ts,seed.ts,main.ts}` (their logic now lives in SFCs+stores). `cognitionSwitcher.ts`, `lossSparkline.ts`, `predictionStrip.ts`, `speciesConfig.ts` are explicitly NOT deleted here — Pillar 2 slice 2.5 deletes the first three after porting them; Pillar 4 slice 4.3 deletes `speciesConfig.ts` after relocating its pure logic. | `examples/product-demo/src/components/{shell/HudPanel.vue,trace/TracePanel.vue,tour/TourOverlay.vue,tour/StepHighlight.vue}`, `examples/product-demo/src/stores/view/useTourProgress.ts`, `examples/product-demo/src/demo-domain/walkthrough/chapters/1.ts`, `examples/product-demo/test/stores/view/useTourProgress.test.ts`, `examples/product-demo/test/components/{HudPanel,TracePanel,TourOverlay}.test.ts`, `examples/product-demo/src/copy/tour.ts` | P1-FR-1, P1-FR-3, P1-FR-5, P1-FR-6, P1-FR-8 | not started | — |
 | 1.3 | Chapters 2-5 wired end-to-end + restart/skip/resume + selector-handle registry | `examples/product-demo/src/demo-domain/walkthrough/chapters/{2..5}.ts`, `examples/product-demo/src/components/**/registerSelector.ts`, `examples/product-demo/src/views/TourView.vue` | P1-FR-2, P1-FR-4, P1-FR-5, P1-FR-6, P1-FR-7 | not started | — |
 | 1.4 | Playwright `tour-happy-path.spec.ts` | `examples/product-demo/tests/e2e/tour-happy-path.spec.ts`, `examples/product-demo/playwright.config.ts` (script wiring) | P1-AC-1, P1-AC-5 | not started | — |
 
@@ -113,16 +113,20 @@ external narration.
   vs. terse-instructional vs. presenter-narration, record the choice
   in this plan's Done log + apply to chapter-1 copy.
 - **Legacy file deletion (clean break per pre-v1 policy):** delete
-  `examples/product-demo/src/{ui.ts, traceView.ts, seed.ts,
-  speciesConfig.ts, main.ts}`. `cognitionSwitcher.ts`,
-  `lossSparkline.ts`, `predictionStrip.ts` stay until **Pillar 2**
-  ports them; `speciesConfig.ts`'s pure logic (validator + applyOverride)
-  stays available for **Pillar 4** to relocate. Update
-  `eslint.config.js` `ignores` accordingly each step. Note: the legacy
-  `agentonomous/seed`, `agentonomous/speed`, `agentonomous/trace-visible`,
-  `agentonomous/species-config`, `whiskers`, `whiskers:speed` localStorage
-  keys are NOT migrated (pre-v1 clean break) — the new shell uses the
-  `demo.v2.*` namespace exclusively per design's storage contract.
+  `examples/product-demo/src/{ui.ts, traceView.ts, seed.ts, main.ts}`
+  in this slice — their logic now lives in the SFCs and stores above.
+  `cognitionSwitcher.ts`, `lossSparkline.ts`, `predictionStrip.ts`,
+  `speciesConfig.ts` are deliberately NOT deleted here: Pillar 2 slice
+  2.5 deletes the first three after porting them, Pillar 4 slice 4.3
+  deletes `speciesConfig.ts` after relocating its pure logic
+  (`EditableSpeciesConfig` shape, `validateEditableConfig`,
+  `applyOverride`) into `demo-domain/scenarios/petCare/config/`.
+  Update `eslint.config.js` `ignores` accordingly each step. Note: the
+  legacy `agentonomous/seed`, `agentonomous/speed`,
+  `agentonomous/trace-visible`, `agentonomous/species-config`,
+  `whiskers`, `whiskers:speed` localStorage keys are NOT migrated
+  (pre-v1 clean break) — the new shell uses the `demo.v2.*` namespace
+  exclusively per design's storage contract.
 
 ### 1.3 — Fan-out + resilience
 

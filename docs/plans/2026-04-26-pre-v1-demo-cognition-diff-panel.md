@@ -28,10 +28,10 @@ users see — not infer — what changed between modes.
   `cognitionSwitcher.ts` (46 KB; probe + dropdown + reasoner reconstruct
   + train button + softmax viz), `lossSparkline.ts`, and
   `predictionStrip.ts` are PRESERVED on `develop` after slice 1.2b
-  specifically so Pillar 2 can port them rather than rebuild. Slice 2.3
-  ports the SVG renderers as-is into thin Vue SFCs (logic stays pure);
-  slice 2.5 ports the switcher into a `<CognitionSwitcher>` SFC and
-  moves its mode-construction logic into `useAgentSession.setMode()`.
+  specifically so Pillar 2 can port them rather than rebuild. Slice 2.5
+  ports all three together: the SVG renderers as-is into thin Vue SFCs
+  (logic stays pure) and the switcher into a `<CognitionSwitcher>` SFC
+  whose mode-construction logic moves into `useAgentSession.setMode()`.
 
 ## Roadmap
 
