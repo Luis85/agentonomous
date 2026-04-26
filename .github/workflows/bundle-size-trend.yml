@@ -1,0 +1,90 @@
+name: Bundle-size trend
+
+on:
+  schedule:
+    # Sundays 04:00 UTC. Deliberately offset from the Monday CodeQL
+    # window (Mondays 06:00 UTC) so two cron workflows do not collide
+    # on a single runner pool peak.
+    - cron: '0 4 * * 0'
+  workflow_dispatch:
+
+# Serialize snapshot runs. The append script's (sha, calendar-date)
+# dedupe relies on exactly one writer at a time — without this, a
+# manual workflow_dispatch fired on the same UTC day as the cron
+# could race past dedupe (both runs read an empty tail, both append).
+# `cancel-in-progress: false` queues the second run instead of
+# cancelling it so a manual retry after a transient failure still
+# completes.
+concurrency:
+  group: bundle-size-trend
+  cancel-in-progress: false
+
+permissions:
+  contents: write # commits the snapshot row directly to develop
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: develop
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Resolve the SHA from the checked-out tree, NOT from
+      # `github.sha`. On `schedule` runs the event context's SHA
+      # points at the default-branch tip (this repo's default is
+      # `main`) while the checkout above pins `ref: develop`, so the
+      # two diverge and the JSONL row would record a SHA that does
+      # not match the code `size-limit` actually measured.
+      - name: Resolve checked-out SHA
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Append snapshot row
+        env:
+          GITHUB_SHA: ${{ steps.head.outputs.sha }}
+        # `npx size-limit --json` exits non-zero when ANY configured
+        # budget is exceeded — but it still emits a complete JSON
+        # status payload to stdout. Default Actions bash sets
+        # pipefail, so a piped invocation would fail the step in
+        # exactly the weeks the trend matters most (over-budget
+        # weeks). Capture stdout, tolerate the non-zero exit, fail
+        # only if size-limit produced no JSON at all (genuine
+        # tooling failure).
+        run: |
+          set +o pipefail
+          out="$(npx size-limit --json || true)"
+          if [[ -z "${out}" ]]; then
+            echo "::error::size-limit produced no JSON output"
+            exit 1
+          fi
+          printf '%s' "${out}" | node scripts/append-size-snapshot.mjs \
+            --target docs/metrics/bundle-trend.jsonl
+      - name: Commit + push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain docs/metrics/bundle-trend.jsonl)" ]]; then
+            git add docs/metrics/bundle-trend.jsonl
+            git commit -m "chore(metrics): bundle-size snapshot $(date -u +%F)"
+            # Rebase + retry: develop may have advanced while npm ci /
+            # build / size-limit ran. The JSONL is append-only and only
+            # this workflow writes it, so rebase conflicts are
+            # vanishingly rare; three attempts is plenty.
+            for attempt in 1 2 3; do
+              git fetch origin develop
+              git pull --rebase --autostash origin develop
+              if git push origin develop; then
+                exit 0
+              fi
+              if [[ "${attempt}" == "3" ]]; then
+                echo "::error::push failed after 3 rebase attempts"
+                exit 1
+              fi
+              sleep 5
+            done
+          fi

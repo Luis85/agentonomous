@@ -53,6 +53,13 @@ export default tseslint.config(
             'scripts/*.mjs',
             'scripts/*.d.mts',
           ],
+          // The default cap of 8 fires once `scripts/` grows past a
+          // handful of one-shot helpers. None of these files are part
+          // of the lib's tsconfig project — type-aware rules are
+          // already turned off for them — so the "this will slow down
+          // linting" warning does not apply. Bump the cap so adding a
+          // new helper does not require editing eslint.config.js.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
       },
