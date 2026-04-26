@@ -10,7 +10,7 @@ import type { Reasoner, ReasonerContext } from './Reasoner.js';
  * `null` (the agent is idle this tick).
  *
  * No beliefs, no planning — just weighted scoring. Adequate for the MVP
- * nurture-pet; consumers who want BDI / planning can plug in a richer
+ * product demo; consumers who want BDI / planning can plug in a richer
  * `Reasoner` implementation through the same port.
  */
 export type UrgencyReasonerOptions = {

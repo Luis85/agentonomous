@@ -36,7 +36,7 @@ export default tseslint.config(
     // `examples/product-demo/eslint.config.js`, which scopes the design's
     // DDD forbidden-import + determinism rules (spec NFR-D-1, design's
     // forbidden-import table) to the layered subpaths. The root config
-    // intentionally ignores `examples/` so the legacy nurture-pet baseline
+    // intentionally ignores `examples/` so the legacy product-demo baseline
     // doesn't fire type-aware rules until pillar 5.2 refactors it.
     ignores: ['dist', 'node_modules', 'coverage', 'docs', 'examples', 'schema'],
   },

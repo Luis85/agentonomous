@@ -7,7 +7,7 @@ import type { Needs } from './Needs.js';
  * by default:
  *
  * - `ExpressiveNeedsPolicy` — emits `kind: 'express'` intentions (meow, look
- *   sad). Used by the MVP nurture-pet: the pet reacts emotionally; the
+ *   sad). Used by the MVP product demo: the pet reacts emotionally; the
  *   player satisfies needs via interactions.
  * - `ActiveNeedsPolicy` — emits `kind: 'satisfy'` intentions (eat food, go
  *   drink). Used by self-directed sim agents (gatherers, NPCs).

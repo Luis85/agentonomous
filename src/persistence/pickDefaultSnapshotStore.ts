@@ -8,7 +8,7 @@ import type { SnapshotStorePort } from './SnapshotStorePort.js';
  * Priority:
  * 1. If `globalThis.localStorage` is available (browser), return a
  *    `LocalStorageSnapshotStore` — zero-config persistence across tab
- *    reloads, exactly what the MVP nurture-pet demo needs.
+ *    reloads, exactly what the MVP product demo needs.
  * 2. Otherwise (Node, workers, unknown env), return `InMemorySnapshotStore`
  *    so nothing blows up.
  *
