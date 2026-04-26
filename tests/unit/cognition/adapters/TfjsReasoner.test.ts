@@ -201,6 +201,89 @@ describe('TfjsReasoner — inference', () => {
     reasoner.dispose();
   });
 
+  it('selectIntention with number[] (single sample) wraps to shape [1, N] — output length matches model.units', () => {
+    // 1-D path: a `number[]` of length 2 must wrap to a rank-2 tensor
+    // `[1, 2]`, so a `units: 1` head emits a single scalar (length 1
+    // after `dataSync` flatten). Pins the contract for the
+    // `toInputTensor` 1-D branch.
+    const model = makeInferenceOnlyModel();
+    let captured: number[] | null = null;
+    const reasoner = newReasoner<number[], number[]>({
+      model,
+      featuresOf: () => [0.5, 0.5],
+      interpret: (out) => {
+        captured = out;
+        return null;
+      },
+    });
+    reasoner.selectIntention(ctx());
+    expect(captured).not.toBeNull();
+    expect(captured!).toHaveLength(1);
+    reasoner.dispose();
+  });
+
+  it('selectIntention with Float32Array (single sample) wraps to shape [1, N]', () => {
+    // TypedArray-of-numbers path: same wrap as `number[]` — a single
+    // `Float32Array` of length 2 must produce a rank-2 input
+    // `[1, 2]`, yielding output length 1.
+    const model = makeInferenceOnlyModel();
+    let captured: number[] | null = null;
+    const reasoner = newReasoner<Float32Array, number[]>({
+      model,
+      featuresOf: () => new Float32Array([0.5, 0.5]),
+      interpret: (out) => {
+        captured = out;
+        return null;
+      },
+    });
+    reasoner.selectIntention(ctx());
+    expect(captured).not.toBeNull();
+    expect(captured!).toHaveLength(1);
+    reasoner.dispose();
+  });
+
+  it('selectIntention with number[][] (pre-batched B samples) preserves rank-2 shape [B, N] — output flattens to B*units', () => {
+    // Pre-batched path: a `number[][]` of two samples must NOT pick up
+    // an extra leading axis. The input tensor must be rank 2
+    // (`[2, 2]`), so a `units: 1` head emits two scalars
+    // (length 2 after flatten). Without this guard the implementation
+    // wraps to rank 3 `[1, 2, 2]` and dense-layer predict either
+    // throws (ndim mismatch) or produces wrong-rank output.
+    const model = makeInferenceOnlyModel();
+    let captured: number[] | null = null;
+    const reasoner = newReasoner<number[][], number[]>({
+      model,
+      featuresOf: () => [
+        [0, 0],
+        [1, 1],
+      ],
+      interpret: (out) => {
+        captured = out;
+        return null;
+      },
+    });
+    reasoner.selectIntention(ctx());
+    expect(captured).not.toBeNull();
+    expect(captured!).toHaveLength(2);
+    reasoner.dispose();
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['string', 'hello'],
+    ['number', 42],
+  ] as const)('selectIntention throws TypeError when featuresOf returns %s', (_label, value) => {
+    const model = makeInferenceOnlyModel();
+    const reasoner = newReasoner<unknown, number[]>({
+      model,
+      featuresOf: () => value,
+      interpret: () => null,
+    });
+    expect(() => reasoner.selectIntention(ctx())).toThrow(TypeError);
+    reasoner.dispose();
+  });
+
   it('selectIntention does not leak input tensors when featuresOf returns a tf.Tensor', () => {
     const model = makeInferenceOnlyModel();
     const reasoner = newReasoner({

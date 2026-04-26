@@ -108,7 +108,19 @@ function seededShuffle<T>(arr: T[], rng: () => number): void {
  */
 function toInputTensor(features: unknown): tf.Tensor {
   if (features instanceof tf.Tensor) return features as tf.Tensor;
-  if (Array.isArray(features) || ArrayBuffer.isView(features)) {
+  if (Array.isArray(features)) {
+    const first: unknown = features[0];
+    if (first !== undefined && (Array.isArray(first) || ArrayBuffer.isView(first))) {
+      // Pre-batched: `number[][]` or `TypedArray[]`. Already rank-2 in
+      // intent — pass through to `tf.tensor` as-is so the resulting
+      // tensor is `[B, N]`, not `[1, B, N]`.
+      return tf.tensor(features as never);
+    }
+    // Single sample: `number[]` or empty array. Wrap to `[1, N]`.
+    return tf.tensor([features as never]);
+  }
+  if (ArrayBuffer.isView(features)) {
+    // Single TypedArray. Wrap to `[1, N]`.
     return tf.tensor([features as never]);
   }
   const got = features === null ? 'null' : typeof features;
