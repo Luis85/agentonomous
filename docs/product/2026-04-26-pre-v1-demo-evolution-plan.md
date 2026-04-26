@@ -68,7 +68,7 @@ The **current `examples/product-demo` demo is the shippable product demo baselin
 
 For this pre-v1 evolution, we are not replacing it with a different demo concept; we are expanding it into an **interactive website experience** that covers the demo intent end-to-end and showcases the library’s capabilities in a way that is explorable by first-time visitors.
 
-This means roadmap work should upgrade and productize the existing nurture-pet surface (guided flow, explainability, determinism proof, cognition contrast, scenario breadth, integration story), then package that as a coherent interactive site experience.
+This means roadmap work should upgrade and productize the existing pet-care surface (guided flow, explainability, determinism proof, cognition contrast, scenario breadth, integration story), then package that as a coherent interactive site experience.
 
 ---
 

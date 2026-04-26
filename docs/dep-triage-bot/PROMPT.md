@@ -72,7 +72,7 @@ bumped package.
 | Peer-deps (any magnitude) | Never auto-merge. Comment for owner.                             |
 
 `dev-deps` = anything in `devDependencies` of `package.json` /
-`examples/nurture-pet/package.json`. `runtime` = anything in
+`examples/product-demo/package.json`. `runtime` = anything in
 `dependencies`. `peer` = anything in `peerDependencies`.
 
 A grouped Dependabot PR (per `.github/dependabot.yml` `groups:` block)
@@ -245,10 +245,9 @@ comment. Same convention as the daily code-review bot.
 
   Every login should be `dependabot[bot]` (or whichever bot account
   the org uses). Anything else → block.
-- If `examples/nurture-pet/` has been renamed (see umbrella plan
-  coordination with PR #129) — substitute the new path
-  (`examples/product-demo/`) in the `gh pr diff` filter above. Do
-  NOT pre-rename anywhere else; the rename PR sweeps mechanically.
+- The example workspace is `examples/product-demo/` (renamed from
+  `examples/nurture-pet/` in PR #134). Use the current path in the
+  `gh pr diff` filter above.
 
 # Idempotency
 
@@ -332,7 +331,7 @@ dumping.
 
 - Open PRs. The routine only comments + auto-merges existing
   Dependabot PRs. Never craft its own dependency-bump branch.
-- Edit `package.json` / `package-lock.json` / `examples/nurture-pet/
+- Edit `package.json` / `package-lock.json` / `examples/product-demo/
   package*.json` directly. Bumps come from Dependabot.
 - Post `Closes #N` / `Fixes #N` referencing the rolling tracker.
 - Comment on Dependabot PRs from a prior triaged head SHA (see

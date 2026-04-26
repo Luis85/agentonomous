@@ -37,8 +37,9 @@ five CI/cron jobs, three cloud-routine prompt directories.
   action-SHA bumps, plan reconciliation). Same shape as the existing
   `docs/review-bot/` and `docs/docs-review-bot/`.
 - **No core library changes.** All additions live under `.github/`,
-  `docs/`, `tests/determinism/`, and the demo workspace (currently
-  `examples/nurture-pet/`; see [Coordination with PR #129](#coordination-with-pr-129-demo-rename)).
+  `docs/`, `tests/determinism/`, and the demo workspace
+  (`examples/product-demo/`; renamed from `examples/nurture-pet/` in
+  PR #134 — see [Coordination with PR #129](#coordination-with-pr-129-demo-rename)).
   No `src/**` edits. No changesets needed (tooling-only PRs).
 
 ## Tech stack
@@ -61,40 +62,16 @@ five CI/cron jobs, three cloud-routine prompt directories.
 
 PR [#129](https://github.com/Luis85/agentonomous/pull/129) is the
 umbrella tracker for the pre-v1 demo evolution increment. **Wave 0 of
-that increment is an atomic single-PR rename** of
-`examples/nurture-pet/` → `examples/product-demo/` (see
-`docs/plans/2026-04-26-pre-v1-demo-rename-preflight.md` once #129
-merges). The rename PR is responsible for sweeping every reference
-across the repo — scripts, GitHub Pages workflow, README, CI, and (if
-it lands after this increment's demo-smoke row) the Playwright wiring
-that row introduces.
+that increment was the atomic single-PR rename** of
+`examples/nurture-pet/` → `examples/product-demo/` (shipped in
+[PR #134](https://github.com/Luis85/agentonomous/pull/134)). The
+rename PR swept every path reference across the repo — scripts,
+GitHub Pages workflow, README, and CI.
 
-**Path policy across all chunk plans below:**
-
-| Section | What it uses today | After Wave 0 of #129 |
-| --- | --- | --- |
-| Demo-smoke chunk paths | `examples/nurture-pet/...` | `examples/product-demo/...` |
-| `.gitignore` rules touching the demo | `examples/nurture-pet/...` | `examples/product-demo/...` |
-
-**Sequencing rule (decide at the start of the demo-smoke row):**
-
-1. **If Wave 0 has merged into `develop` before the demo-smoke row
-   starts** — pull `develop`, resolve conflicts via
-   `git merge origin/develop` (NOT rebase, per
-   `MEMORY.md → feedback_parallel_pr_plan_conflicts.md`), then
-   substitute `examples/nurture-pet/` → `examples/product-demo/` in
-   every file that row creates or touches.
-2. **If Wave 0 has NOT merged before that row starts** — implement
-   verbatim against `examples/nurture-pet/`. The Wave 0 rename PR will
-   sweep this increment's additions the same way it sweeps every
-   other reference. Add a one-line note on the Wave 0 PR when it
-   opens calling out that this increment introduced new
-   `examples/nurture-pet/` paths so the sweep is complete.
-
-**Do not pre-rename in any chunk plan.** A single mechanical sed in
-the Wave 0 PR converges everything; pre-renaming half-and-half forces
-a manual reconciliation in two places and risks Codex re-flagging
-path mismatches between this plan and `develop` truth.
+**Path policy across all chunk plans below:** every demo path uses
+`examples/product-demo/...`. Historical references to the prior
+`examples/nurture-pet/` path are preserved only in archived plans
+and the localStorage purge prefix (spec STO-3).
 
 ---
 
@@ -255,13 +232,9 @@ before continuing.
   uses pinned SHAs. After each chunk merges, the next
   `actions-bump-bot` run will attempt to bump them. That's expected
   — review that bump PR like any other.
-- **Demo rename in flight (PR #129 / Wave 0).** Demo-smoke chunk
-  paths point at `examples/nurture-pet/`. If Wave 0 of PR #129 lands
-  first, every demo-smoke path becomes `examples/product-demo/`.
-  Follow the chunk plan's first step to detect, then substitute
-  mechanically. Do NOT ship `examples/product-demo/` paths from a
-  chunk before Wave 0 has merged — the directory does not exist on
-  `develop` yet.
+- **Demo rename shipped (PR #134 / Wave 0 of #129).** Demo-smoke chunk
+  paths point at `examples/product-demo/` — the `examples/nurture-pet/`
+  directory no longer exists on `develop`.
 
 ---
 
