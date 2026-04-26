@@ -5,7 +5,7 @@
 // safe (factory registration is idempotent) but is no longer required.
 import * as tf from '@tensorflow/tfjs-core';
 import { layers, sequential, type Sequential } from '@tensorflow/tfjs-layers';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   TfjsReasoner,
   TfjsBackendNotRegisteredError,
@@ -600,5 +600,40 @@ describe('TfjsReasoner — backend detection', () => {
     const b = await TfjsReasoner.detectBestBackend();
     expect(a).toBe(b);
     expect(['cpu', 'wasm', 'webgl']).toContain(a);
+  });
+
+  it('detectBestBackend serialises overlapping calls (single in-flight detection shared across concurrent callers)', async () => {
+    // Three concurrent callers must share one detection chain. Without
+    // an in-flight lock each caller mutates global tfjs state via
+    // `tf.setBackend` independently — interleaved chains can return
+    // mismatched names (one caller resolves to `'wasm'` while another
+    // races through and leaves tfjs on `'cpu'`), violating the
+    // post-condition that `tf.getBackend()` agrees with the returned
+    // value for every caller.
+    //
+    // Spy on `tf.setBackend` to count invocations across the batch.
+    // With the lock, a single chain runs and probes at most
+    // `BACKEND_PROBE_ORDER.length === 3` backends → ≤ 3 setBackend
+    // calls. Without the lock, three independent chains could fire up
+    // to 3 × 3 = 9 invocations.
+    // Spy on the engine instance (`tf.setBackend` is a namespace export
+    // and ESM forbids redefining its property; the underlying
+    // `tf.engine().setBackend` is a regular instance method).
+    const engine = tf.engine();
+    const setBackendSpy = vi.spyOn(engine, 'setBackend');
+    setBackendSpy.mockClear();
+    try {
+      const [a, b, c] = await Promise.all([
+        TfjsReasoner.detectBestBackend(),
+        TfjsReasoner.detectBestBackend(),
+        TfjsReasoner.detectBestBackend(),
+      ]);
+      expect(a).toBe(b);
+      expect(b).toBe(c);
+      expect(tf.getBackend()).toBe(a);
+      expect(setBackendSpy.mock.calls.length).toBeLessThanOrEqual(3);
+    } finally {
+      setBackendSpy.mockRestore();
+    }
   });
 });

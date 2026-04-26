@@ -271,6 +271,17 @@ export type TrainResult = {
  * ```
  */
 export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
+  /**
+   * In-flight `detectBestBackend` promise, shared across overlapping
+   * callers so they don't each mutate global tfjs state via
+   * `tf.setBackend` independently. Cleared in a `finally` once the
+   * detection chain settles, so the next call after settle re-probes
+   * the environment (matters when callers want to re-detect after
+   * loading a new backend package). See
+   * `static detectBestBackend` for the full reasoning.
+   */
+  private static inflightDetection: Promise<'webgl' | 'wasm' | 'cpu'> | null = null;
+
   private readonly model: Sequential;
   private readonly featuresOf: TfjsReasonerOptions<In, Out>['featuresOf'];
   private readonly interpret: TfjsReasonerOptions<In, Out>['interpret'];
@@ -450,44 +461,64 @@ export class TfjsReasoner<In = unknown, Out = unknown> implements Reasoner {
    * indicates a broken environment.
    */
   static async detectBestBackend(): Promise<'webgl' | 'wasm' | 'cpu'> {
-    // Snapshot the prior backend (may be empty string when tf hasn't
-    // initialized any backend yet). If every probe fails, attempt to
-    // restore it before throwing — a failed `tf.setBackend` can leave
-    // `engine.backendInstance` cleared, so a later inference call from
-    // an unrelated code path would otherwise hit a broken global state
-    // (Codex P1 round 10).
-    const prior = tf.getBackend();
-    for (const name of BACKEND_PROBE_ORDER) {
-      try {
-        await loadBackendModule(name);
-        const ok = await tf.setBackend(name);
-        if (ok) {
-          await tf.ready();
-          return name;
+    // Serialise overlapping callers behind a single in-flight promise.
+    // Each invocation mutates global tfjs state via `tf.setBackend`, so
+    // two concurrent chains can race — one resolves to `'wasm'` while
+    // the other races through and leaves tfjs on `'cpu'`, breaking the
+    // first caller's "returned backend is the active backend"
+    // post-condition. Sharing the same promise means probes run once
+    // for the whole batch and every caller sees the same final state.
+    if (TfjsReasoner.inflightDetection !== null) {
+      return TfjsReasoner.inflightDetection;
+    }
+    TfjsReasoner.inflightDetection = (async (): Promise<'webgl' | 'wasm' | 'cpu'> => {
+      // Snapshot the prior backend (may be empty string when tf hasn't
+      // initialized any backend yet). If every probe fails, attempt to
+      // restore it before throwing — a failed `tf.setBackend` can leave
+      // `engine.backendInstance` cleared, so a later inference call from
+      // an unrelated code path would otherwise hit a broken global state
+      // (Codex P1 round 10).
+      const prior = tf.getBackend();
+      for (const name of BACKEND_PROBE_ORDER) {
+        try {
+          await loadBackendModule(name);
+          const ok = await tf.setBackend(name);
+          if (ok) {
+            await tf.ready();
+            return name;
+          }
+        } catch {
+          // Factory threw (e.g. WebGL in headless Node). Try next.
         }
-      } catch {
-        // Factory threw (e.g. WebGL in headless Node). Try next.
       }
-    }
-    // All-failed path: best-effort restore of the prior backend so the
-    // rejection doesn't silently corrupt global tf state. If `prior`
-    // was empty (no backend ever initialized) or the restore itself
-    // throws, leave tf in whatever state the loop ended on — the
-    // caller's `cpu`-bundled invariant has already been violated, so
-    // there is no clean fallback.
-    if (prior !== '') {
-      try {
-        await tf.setBackend(prior);
-        await tf.ready();
-      } catch {
-        // Best-effort — surfacing this as a separate error would mask
-        // the more useful rejection below.
+      // All-failed path: best-effort restore of the prior backend so the
+      // rejection doesn't silently corrupt global tf state. If `prior`
+      // was empty (no backend ever initialized) or the restore itself
+      // throws, leave tf in whatever state the loop ended on — the
+      // caller's `cpu`-bundled invariant has already been violated, so
+      // there is no clean fallback.
+      if (prior !== '') {
+        try {
+          await tf.setBackend(prior);
+          await tf.ready();
+        } catch {
+          // Best-effort — surfacing this as a separate error would mask
+          // the more useful rejection below.
+        }
       }
+      throw new Error(
+        'TfjsReasoner.detectBestBackend: every backend (webgl, wasm, cpu) failed to activate. ' +
+          'cpu is bundled and should always succeed — reaching this error indicates a broken environment.',
+      );
+    })();
+    try {
+      return await TfjsReasoner.inflightDetection;
+    } finally {
+      // Clear the slot once the detection settles so the next call
+      // after settle re-probes (lets a consumer re-detect after
+      // installing a new backend package mid-session).
+      TfjsReasoner.inflightDetection = null;
     }
-    throw new Error(
-      'TfjsReasoner.detectBestBackend: every backend (webgl, wasm, cpu) failed to activate. ' +
-        'cpu is bundled and should always succeed — reaching this error indicates a broken environment.',
-    );
   }
 
   /**
