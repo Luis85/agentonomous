@@ -204,6 +204,20 @@ if (!env.GITHUB_TOKEN || !repo || !pr) {
   exit(0);
 }
 
-const result = await upsertStickyComment({ repo, pr, body });
-stdout.write(`coverage-pr-comment: ${result.action} comment ${result.id} on PR ${pr}.\n`);
+// Wrap the API write so transient failures (5xx, rate limits) and
+// permission slips (403 when fork PRs run without `pull-requests:
+// write`) degrade to a stdout fallback instead of failing the
+// CI job. The file-level contract says this helper is reviewer
+// signal, never a gate — that contract held when only network reads
+// could throw, and must keep holding now that we issue writes too.
+try {
+  const result = await upsertStickyComment({ repo, pr, body });
+  stdout.write(`coverage-pr-comment: ${result.action} comment ${result.id} on PR ${pr}.\n`);
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err);
+  stdout.write(
+    `coverage-pr-comment: failed to upsert sticky comment (${message}). Falling back to log-only:\n\n`,
+  );
+  stdout.write(`${body}\n`);
+}
 exit(0);
