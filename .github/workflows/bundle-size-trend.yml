@@ -8,6 +8,17 @@ on:
     - cron: '0 4 * * 0'
   workflow_dispatch:
 
+# Serialize snapshot runs. The append script's (sha, calendar-date)
+# dedupe relies on exactly one writer at a time — without this, a
+# manual workflow_dispatch fired on the same UTC day as the cron
+# could race past dedupe (both runs read an empty tail, both append).
+# `cancel-in-progress: false` queues the second run instead of
+# cancelling it so a manual retry after a transient failure still
+# completes.
+concurrency:
+  group: bundle-size-trend
+  cancel-in-progress: false
+
 permissions:
   contents: write # commits the snapshot row directly to develop
 
