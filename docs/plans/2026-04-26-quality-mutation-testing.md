@@ -68,9 +68,32 @@ export default {
 - [ ] **Step 3: Add scripts to `package.json`**
 
 ```json
-"mutation": "stryker run",
-"mutation:report": "open reports/mutation/mutation.html"
+"mutation": "stryker run"
 ```
+
+> **Why no `mutation:report` convenience script?** Earlier drafts of
+> this plan included `"mutation:report": "open reports/mutation/mutation.html"`,
+> but `open` is macOS-only — it fails with `command not found` on
+> Linux (which uses `xdg-open`) and Windows (which uses `start`).
+> Adding a cross-platform launcher (`open-cli`, `node:child_process`
+> branch by `process.platform`, etc.) buys ~3 keystrokes for one
+> extra devDep or one extra script file. Not worth it. Document the
+> path in the per-OS commands below instead and let contributors
+> open the file with their platform's native tools:
+>
+> ```bash
+> # macOS
+> open reports/mutation/mutation.html
+> # Linux
+> xdg-open reports/mutation/mutation.html
+> # Windows (Git Bash / WSL)
+> start reports/mutation/mutation.html
+> ```
+>
+> The HTML report is the deliverable; how a reader opens it is not a
+> repo concern. CI uploads the same file as the `mutation-report`
+> artifact (Step 6), so reviewers consume it from the GitHub UI
+> anyway.
 
 - [ ] **Step 4: Update `.gitignore`**
 

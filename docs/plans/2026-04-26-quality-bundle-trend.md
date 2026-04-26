@@ -44,6 +44,14 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+function run(target, fixture, sha) {
+  return spawnSync(
+    process.execPath,
+    ['scripts/append-size-snapshot.mjs', '--target', target],
+    { input: fixture, env: { ...process.env, GITHUB_SHA: sha } },
+  );
+}
+
 test('appends one JSONL row from size-limit JSON on stdin', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sizesnap-'));
   const target = join(dir, 'bundle-trend.jsonl');
@@ -52,11 +60,7 @@ test('appends one JSONL row from size-limit JSON on stdin', () => {
     { name: 'core', size: 1234, gzip: 567 },
     { name: 'integrations/excalibur', size: 200, gzip: 100 },
   ]);
-  const out = spawnSync(
-    process.execPath,
-    ['scripts/append-size-snapshot.mjs', '--target', target],
-    { input: fixture, env: { ...process.env, GITHUB_SHA: 'abcdef0' } },
-  );
+  const out = run(target, fixture, 'abcdef0');
   expect(out.status).toBe(0);
   const rows = readFileSync(target, 'utf8').trim().split('\n').filter(Boolean);
   expect(rows).toHaveLength(1);
@@ -64,6 +68,30 @@ test('appends one JSONL row from size-limit JSON on stdin', () => {
   expect(row.sha).toBe('abcdef0');
   expect(row.entries).toHaveLength(2);
   expect(row.iso).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('dedupes a same-day same-sha re-run (workflow_dispatch retry)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sizesnap-'));
+  const target = join(dir, 'bundle-trend.jsonl');
+  writeFileSync(target, '');
+  const fixture = JSON.stringify([{ name: 'core', size: 100, gzip: 50 }]);
+  expect(run(target, fixture, 'cafef00').status).toBe(0);
+  expect(run(target, fixture, 'cafef00').status).toBe(0); // same (sha, date)
+  const rows = readFileSync(target, 'utf8').trim().split('\n').filter(Boolean);
+  expect(rows).toHaveLength(1); // second invocation was a no-op
+});
+
+test('appends a new row when entries are unchanged but sha differs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sizesnap-'));
+  const target = join(dir, 'bundle-trend.jsonl');
+  writeFileSync(target, '');
+  // Identical bundle payload week-over-week MUST still produce a
+  // new row — the JSONL is a snapshot time series, not a changelog.
+  const fixture = JSON.stringify([{ name: 'core', size: 100, gzip: 50 }]);
+  expect(run(target, fixture, 'aaaaaaa').status).toBe(0);
+  expect(run(target, fixture, 'bbbbbbb').status).toBe(0);
+  const rows = readFileSync(target, 'utf8').trim().split('\n').filter(Boolean);
+  expect(rows).toHaveLength(2);
 });
 ```
 
@@ -78,11 +106,35 @@ Expected: FAIL (`Cannot find module 'scripts/append-size-snapshot.mjs'`).
 - [ ] **Step 3: Implement `scripts/append-size-snapshot.mjs`**
 
 Argv: `--target <path>`. Reads stdin → JSON. Builds
-`{iso, sha, entries}`. Appends one line. Idempotent on identical
-content (skip if last line equals new line minus `iso`). Reads
-`GITHUB_SHA` from env verbatim — no truncation, no validation. The
-workflow feeds whatever shape it wants (full 40-char SHA in
-production; the test fixture uses 7-char to demonstrate passthrough).
+`{iso, sha, entries}`. Appends one line. Reads `GITHUB_SHA` from env
+verbatim — no truncation, no validation. The workflow feeds whatever
+shape it wants (full 40-char SHA in production; the test fixture
+uses 7-char to demonstrate passthrough).
+
+> **Idempotency policy.** Dedupe ONLY when the last existing row has
+> the SAME `(date-portion-of-iso, sha)` tuple as the new row — that
+> is, treat a re-run of the same cron firing as a no-op. **Do NOT
+> dedupe on identical `entries`**: weeks where bundle sizes are
+> unchanged from the previous snapshot must still produce a row, or
+> the JSONL becomes a change-log instead of a time series and breaks
+> any weekly trend analysis.
+>
+> Concretely, in the implementation:
+>
+> ```js
+> // pseudo
+> const lastRow = readLastJsonlRow(target);
+> const sameRunRetry =
+>   lastRow &&
+>   lastRow.sha === newRow.sha &&
+>   isoDate(lastRow.iso) === isoDate(newRow.iso);
+> if (sameRunRetry) return; // identical (sha, calendar-date) → skip
+> appendRow(target, newRow);
+> ```
+>
+> The dedupe goal is "don't double-write if `workflow_dispatch` re-
+> runs the cron in the same UTC day on the same commit", not
+> "compress unchanged trends".
 
 - [ ] **Step 4: Re-run the test (green)**
 
@@ -222,7 +274,10 @@ Ticks row 5 of the umbrella tracker."
 
 ## Acceptance criteria
 
-- `scripts/append-size-snapshot.mjs` test passes locally and in CI.
+- `scripts/append-size-snapshot.mjs` test passes locally and in CI,
+  including the dedupe-policy assertions: same `(sha, calendar-date)`
+  re-run is a no-op; identical-payload week-over-week with a new sha
+  appends a new row.
 - `docs/metrics/bundle-trend.jsonl` exists (empty) on `develop`.
 - `.github/workflows/bundle-size-trend.yml` is actionlint-clean.
 - First scheduled run on the next Sunday produces a single JSONL row
