@@ -12,19 +12,18 @@
 
 import { AGENT_TICKED } from 'agentonomous';
 import { combineAll, eventEmittedSince, tickAtLeast } from '../predicates.js';
-import { TOUR_END, selectorHandle } from '../types.js';
 import type { WalkthroughStep } from '../types.js';
-import { STEP_ID_AUTONOMY, tourCopy } from '../../../copy/tour.js';
+import { STEP_ID_AUTONOMY, STEP_ID_TRACE_OPEN, tourCopy } from '../../../copy/tour.js';
+import { registeredHandle } from '../../../stores/view/selectorHandles.js';
 
 /**
  * Logical UI handle for the HUD's needs panel. The HUD component
  * (`<HudPanel>`) registers this handle on mount so `<StepHighlight>`
- * can resolve a real DOM element to outline. Slice 1.3 generalises
- * the registration into a typed `useSelectorRegistry` mirror; for
- * now the handle is a plain branded string and the registry stub in
- * `stores/view/useSelectorRegistry.ts` does the lookup.
+ * can resolve a real DOM element to outline. The literal is checked
+ * against `RegisteredHandle` at compile time — a typo here surfaces
+ * as a `tsc` error rather than a silent label-only render.
  */
-const HUD_NEEDS_HANDLE = selectorHandle('hud.needs');
+const HUD_NEEDS_HANDLE = registeredHandle('hud.needs');
 
 /** Number of agent ticks required before chapter-1 advances. */
 const AUTONOMY_TICK_THRESHOLD = 3;
@@ -52,7 +51,7 @@ const autonomyStep: WalkthroughStep = {
     tickAtLeast(AUTONOMY_TICK_THRESHOLD),
     eventEmittedSince(AGENT_TICKED, 0),
   ),
-  nextOnComplete: TOUR_END,
+  nextOnComplete: STEP_ID_TRACE_OPEN,
 };
 
 /** All steps authored for chapter 1, in declaration order. */

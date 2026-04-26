@@ -2,8 +2,11 @@
 import { computed, getCurrentInstance, ref } from 'vue';
 import type { AgentSnapshot } from 'agentonomous';
 import { useAgentSession } from '../../stores/domain/useAgentSession.js';
+import { useRegisterSelector } from '../../composables/useRegisterSelector.js';
 
 const session = useAgentSession();
+useRegisterSelector('export.button');
+useRegisterSelector('import.button');
 // Same template-ref workaround as `<HudPanel>` — Vue Test Utils +
 // plugin-vue 6 production transform hoists template refs and the
 // binding warning fires. Look up the file input lazily via the root
@@ -32,6 +35,8 @@ function exportSnapshot(): void {
     globalThis.document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
+    // Tour-aware UI signal — chapter-5 step "replay-export" advances on this.
+    session.recordUiEvent('SnapshotExported');
   } catch (err) {
     error.value = `Export failed: ${(err as Error).message}`;
   } finally {
@@ -54,9 +59,17 @@ function handleFile(): void {
     input.value = '';
     try {
       const parsed = JSON.parse(text) as AgentSnapshot;
-      void session.replayFromSnapshot(parsed).catch((err: Error) => {
-        error.value = `Import failed: ${err.message}`;
-      });
+      void session
+        .replayFromSnapshot(parsed)
+        .then(() => {
+          // Recorded AFTER the rebuild so the event lands in the fresh
+          // `recentEvents` buffer (replay clears the previous one).
+          // Chapter-5 step "replay-import" advances on this signal.
+          session.recordUiEvent('SnapshotImported');
+        })
+        .catch((err: Error) => {
+          error.value = `Import failed: ${err.message}`;
+        });
       error.value = null;
     } catch (err) {
       error.value = `Import failed: ${(err as Error).message}`;
@@ -74,6 +87,7 @@ function handleFile(): void {
     <button
       type="button"
       class="io-button"
+      data-tour-handle="export.button"
       :aria-label="`Export ${petName}`"
       @click="exportSnapshot"
     >
@@ -82,6 +96,7 @@ function handleFile(): void {
     <button
       type="button"
       class="io-button"
+      data-tour-handle="import.button"
       :aria-label="`Import a saved ${petName}`"
       @click="triggerImport"
     >

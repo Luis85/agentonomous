@@ -54,6 +54,26 @@ export function eventEmittedSince(type: string, sinceTick: number): CompletionPr
     ctx.session.recentEvents.some((e) => e.type === type && e.tickIndex >= sinceTick);
 }
 
+/**
+ * True when an event of `type` has been emitted at or after the tick the
+ * current step started. Used by chapter 2-5 predicates so events
+ * emitted before the user reached the step don't auto-complete it.
+ */
+export function eventEmittedSinceStep(type: string): CompletionPredicate {
+  return (ctx: TourCtx) =>
+    ctx.session.recentEvents.some((e) => e.type === type && e.tickIndex >= ctx.stepBaselineTick);
+}
+
+/**
+ * True once at least `n` ticks have elapsed since the current step
+ * started. Used to give the user a minimum dwell time on a chapter
+ * (e.g. "wait two ticks so you can read the trace") without coupling
+ * to absolute tick counts.
+ */
+export function ticksSinceStepAtLeast(n: number): CompletionPredicate {
+  return (ctx: TourCtx) => ctx.session.tickIndex - ctx.stepBaselineTick >= n;
+}
+
 /** Logical AND across `predicates`. An empty list returns `true`. */
 export function combineAll(...predicates: ReadonlyArray<CompletionPredicate>): CompletionPredicate {
   return (ctx: TourCtx) => predicates.every((p) => p(ctx));

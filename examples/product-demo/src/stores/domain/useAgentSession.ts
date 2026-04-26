@@ -14,6 +14,10 @@ import {
   buildAgent,
   type BuildAgentOptions,
 } from '../../demo-domain/scenarios/petCare/buildAgent.js';
+import {
+  COGNITION_MODES,
+  type CognitionModeSpec,
+} from '../../demo-domain/scenarios/petCare/cognition/index.js';
 import { setLearningAgent } from '../../demo-domain/scenarios/petCare/cognition/learning.js';
 import type { AgentSessionSnapshot, SessionEvent } from '../../demo-domain/walkthrough/types.js';
 
@@ -234,6 +238,56 @@ export const useAgentSession = defineStore('agentSession', () => {
     }
   }
 
+  /**
+   * Push a synthetic UI event onto the recent-events ring buffer. Used
+   * by tour-aware components (`<TracePanel>`, `<ExportImportPanel>`,
+   * the JSON-preview placeholder in `<HudPanel>`) to record a moment
+   * the user can act on — chapter predicates use `eventEmittedSinceStep`
+   * to detect the moment without coupling to UI internals.
+   *
+   * UI events share the same `SessionEvent` projection as agent-emitted
+   * events, so chapter predicates don't need to know the difference. The
+   * `recentEvents` ring buffer stays bounded at `RECENT_EVENT_LIMIT`.
+   */
+  function recordUiEvent(type: string): void {
+    recentEvents.value.push({ type, tickIndex: tickIndex.value });
+    if (recentEvents.value.length > RECENT_EVENT_LIMIT) {
+      recentEvents.value.splice(0, recentEvents.value.length - RECENT_EVENT_LIMIT);
+    }
+  }
+
+  /**
+   * Swap the live agent's reasoner to the requested cognition mode.
+   * Probes the mode's peer dep before constructing a reasoner; throws
+   * with a peer-install hint when probe fails. Callers (the cognition
+   * toggle in `<HudPanel>`) should surface the error to the user.
+   *
+   * Slice 1.3 wires this so chapter 3's predicate can observe a real
+   * swap; the full per-mode UI (loss sparkline, prediction strip,
+   * train button) is Pillar-2's slice 2.5.
+   */
+  async function setCognitionMode(modeId: CognitionModeSpec['id']): Promise<void> {
+    const mode = COGNITION_MODES.find((m) => m.id === modeId);
+    if (mode === undefined) {
+      throw new Error(`useAgentSession.setCognitionMode: unknown mode "${String(modeId)}".`);
+    }
+    if (agent.value === null) {
+      throw new Error('useAgentSession.setCognitionMode: no live agent (call init() first).');
+    }
+    const available = await mode.probe();
+    if (!available) {
+      const hint =
+        mode.peerName === null
+          ? `mode "${modeId}" unavailable.`
+          : `mode "${modeId}" unavailable — install ${mode.peerName} to enable.`;
+      throw new Error(`useAgentSession.setCognitionMode: ${hint}`);
+    }
+    const reasoner = await mode.construct();
+    agent.value.setReasoner(reasoner);
+    cognitionModeId.value = modeId;
+    recordUiEvent('CognitionModeChanged');
+  }
+
   function setSpeed(multiplier: number): void {
     // Up-front validation: non-finite or non-positive values would either
     // reach `agent.setTimeScale` (which throws after `speedMultiplier`
@@ -364,6 +418,12 @@ export const useAgentSession = defineStore('agentSession', () => {
     lastTickNumber,
     sessionSnapshot,
     lastSpeciesOverride,
+    // Re-export the scenario's cognition mode registry so the HUD's
+    // picker can render labels + per-mode probes without taking a
+    // runtime import on `demo-domain/scenarios/...` (lint:demo's
+    // no-restricted-imports rule keeps presentation/view layers off
+    // the domain module).
+    cognitionModes: COGNITION_MODES,
     init,
     tick,
     start,
@@ -371,7 +431,11 @@ export const useAgentSession = defineStore('agentSession', () => {
     resume,
     step,
     setSpeed,
+    setCognitionMode,
+    recordUiEvent,
     replayFromSnapshot,
     subscribe,
   };
 });
+
+export type { CognitionModeSpec };

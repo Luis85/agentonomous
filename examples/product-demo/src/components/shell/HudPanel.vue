@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, getCurrentInstance, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { AgentState } from 'agentonomous';
 import { useAgentSession } from '../../stores/domain/useAgentSession.js';
-import { useSelectorRegistry } from '../../stores/view/useSelectorRegistry.js';
-import type { SelectorHandle } from '../../demo-domain/walkthrough/types.js';
+import type { CognitionModeSpec } from '../../stores/domain/useAgentSession.js';
+import { useRegisterSelector } from '../../composables/useRegisterSelector.js';
 
 type NeedDef = { readonly id: string; readonly label: string };
 type InteractionDef = { readonly verb: string; readonly label: string };
@@ -47,20 +47,58 @@ const STAGE_LABELS: Record<string, string> = {
   deceased: 'Deceased',
 };
 
-const HUD_NEEDS_HANDLE = 'hud.needs' as unknown as SelectorHandle;
-
 const session = useAgentSession();
-const registry = useSelectorRegistry();
+useRegisterSelector('hud.needs');
+useRegisterSelector('hud.cognition.toggle');
+useRegisterSelector('hud.cognition.indicator');
+useRegisterSelector('hud.json.toggle');
 
-// Template refs in `<script setup>` get hoisted to module-scoped
-// constants by `@vitejs/plugin-vue`'s production transform, which makes
-// `useTemplateRef` and `:ref="fnRef"` brittle under Vue Test Utils'
-// component wrapper (the inner SFC's vnodes look "hoisted" from VTU's
-// perspective and the binding warning fires). Resolve the highlight
-// host lazily via `instance.proxy.$el.querySelector(...)` after mount —
-// the data attribute is the durable handle and `<TourOverlay>` looks
-// it up through the registry the same way regardless.
-const instance = getCurrentInstance();
+// Cognition picker (Pillar-1 slice 1.3): minimal placeholder until
+// Pillar-2 slice 2.5 ports the legacy cognitionSwitcher with its loss
+// sparkline + prediction strip. Probes the peer dep on first hover so
+// unavailable modes render disabled with an install hint.
+const cognitionAvailable = ref<Record<CognitionModeSpec['id'], boolean>>({
+  heuristic: true,
+  bt: false,
+  bdi: false,
+  learning: false,
+});
+const cognitionError = ref<string | null>(null);
+
+async function probeCognitionModes(): Promise<void> {
+  for (const mode of session.cognitionModes) {
+    if (mode.id === 'heuristic') continue;
+    try {
+      cognitionAvailable.value = {
+        ...cognitionAvailable.value,
+        [mode.id]: await mode.probe(),
+      };
+    } catch {
+      cognitionAvailable.value = { ...cognitionAvailable.value, [mode.id]: false };
+    }
+  }
+}
+
+async function handleCognitionChange(event: Event): Promise<void> {
+  const target = event.target as HTMLSelectElement;
+  const next = target.value as CognitionModeSpec['id'];
+  cognitionError.value = null;
+  try {
+    await session.setCognitionMode(next);
+  } catch (err) {
+    cognitionError.value = (err as Error).message;
+    // Revert the select to whatever the session actually applied.
+    target.value = session.cognitionModeId;
+  }
+}
+
+function handleJsonPreview(): void {
+  // Pillar-4 placeholder: chapter-4 advances when this UI event fires.
+  // Pillar-4 slice 4.3 swaps the button for the real preview/commit
+  // editor, which will emit the same event when the preview opens.
+  session.recordUiEvent('ConfigPreviewOpened');
+}
+
 const state = ref<AgentState | null>(null);
 const modifiers = ref<ReadonlyArray<ModifierLike>>([]);
 const paused = ref<boolean>(false);
@@ -136,9 +174,7 @@ watch(
 
 onMounted(() => {
   refreshFromAgent();
-  const root = instance?.proxy?.$el as HTMLElement | undefined;
-  const host = root?.querySelector?.<HTMLElement>('[data-tour-handle="hud.needs"]') ?? null;
-  if (host !== null) registry.register(HUD_NEEDS_HANDLE, host);
+  void probeCognitionModes();
   unsubscribe = session.subscribe((event) => {
     refreshFromAgent();
     tally(event.type, event as unknown as Record<string, unknown>);
@@ -153,10 +189,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   unsubscribe?.();
-  // `setNeedsHost(null)` runs as part of unmount and removes the
-  // handle; defensively call again here so an early teardown path
-  // (e.g. throw mid-mount) cannot leave a dangling registration.
-  registry.unregister(HUD_NEEDS_HANDLE);
 });
 
 function levelOf(needId: string): number {
@@ -253,6 +285,48 @@ function formatDiedAt(ms: number): string {
       </div>
     </div>
 
+    <div class="cognition">
+      <label class="cognition__label" for="cognition-mode"> Cognition mode </label>
+      <select
+        id="cognition-mode"
+        class="cognition__select"
+        data-tour-handle="hud.cognition.toggle"
+        :value="session.cognitionModeId"
+        @change="handleCognitionChange"
+      >
+        <option
+          v-for="mode in session.cognitionModes"
+          :key="mode.id"
+          :value="mode.id"
+          :disabled="!cognitionAvailable[mode.id]"
+        >
+          {{ mode.label
+          }}{{
+            !cognitionAvailable[mode.id] && mode.peerName !== null
+              ? ` (install ${mode.peerName})`
+              : ''
+          }}
+        </option>
+      </select>
+      <span class="cognition__indicator" data-tour-handle="hud.cognition.indicator">
+        Active: <strong>{{ session.cognitionModeId }}</strong>
+      </span>
+      <p v-if="cognitionError !== null" class="cognition__error" role="alert">
+        {{ cognitionError }}
+      </p>
+    </div>
+
+    <div class="json-preview">
+      <button
+        type="button"
+        class="json-preview__button"
+        data-tour-handle="hud.json.toggle"
+        @click="handleJsonPreview"
+      >
+        🛠️ Preview JSON (placeholder)
+      </button>
+    </div>
+
     <div class="modifiers">
       <strong>Buffs / debuffs</strong>
       <ul>
@@ -340,10 +414,55 @@ function formatDiedAt(ms: number): string {
 
 .bars,
 .modifiers,
-.buttons {
+.buttons,
+.cognition,
+.json-preview {
   background: var(--panel-bg, #fff);
   border-radius: 12px;
   padding: 16px;
+}
+
+.cognition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.cognition__label {
+  font-weight: 600;
+}
+
+.cognition__select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.cognition__indicator {
+  opacity: 0.7;
+}
+
+.cognition__error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.json-preview__button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: #0ea5e9;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.json-preview__button:hover {
+  background: #0284c7;
 }
 
 .bar {

@@ -9,16 +9,23 @@ const tour = useTourProgress();
 
 const step = computed(() => tour.currentStep);
 
-// Re-evaluate the active step's predicate on every tick. The predicate
-// is pure + cheap, so polling per tick is the simplest correct shape;
-// once chapter-2 lands (slice 1.3) we can switch to a debounced
-// `watchEffect` if measurement shows it matters.
-watch(
-  () => session.tickIndex,
-  () => {
-    tour.next();
-  },
-);
+// Re-evaluate the active step's predicate when either the agent ticks
+// OR a UI event lands in the recent-events ring buffer (e.g. chapter-2
+// `TracePanelOpened`, chapter-3 `CognitionModeChanged`, chapter-5
+// `SnapshotImported`). Watching both sources keeps the overlay
+// responsive to user actions without requiring per-event imperative
+// `tour.next()` calls from each component.
+watch([() => session.tickIndex, () => session.recentEvents.length], () => {
+  tour.next();
+});
+
+function handleSkip(): void {
+  tour.skip();
+}
+
+function handleRestart(): void {
+  tour.restart();
+}
 </script>
 
 <template>
@@ -29,7 +36,8 @@ watch(
       <h3 class="tour-overlay__title">{{ step.title }}</h3>
       <p class="tour-overlay__hint">{{ step.hint }}</p>
       <div class="tour-overlay__actions">
-        <button type="button" class="tour-overlay__skip" @click="tour.skip">Skip</button>
+        <button type="button" class="tour-overlay__skip" @click="handleSkip">Skip</button>
+        <button type="button" class="tour-overlay__restart" @click="handleRestart">Restart</button>
       </div>
     </div>
   </div>
@@ -76,9 +84,11 @@ watch(
 .tour-overlay__actions {
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
 }
 
-.tour-overlay__skip {
+.tour-overlay__skip,
+.tour-overlay__restart {
   background: transparent;
   color: inherit;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -88,7 +98,8 @@ watch(
   cursor: pointer;
 }
 
-.tour-overlay__skip:hover {
+.tour-overlay__skip:hover,
+.tour-overlay__restart:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 </style>

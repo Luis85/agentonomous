@@ -41,36 +41,46 @@ describe('<TourOverlay>', () => {
     expect(wrapper.find('.tour-overlay__hint').text()).toContain('Whiskers');
   });
 
-  it('clicking Skip advances cursor + records skip', async () => {
+  it('clicking Skip records the step + advances the cursor', async () => {
     const wrapper = await mountOverlay();
     const tour = useTourProgress();
     await nextTick();
     expect(wrapper.find('.tour-overlay__skip').exists()).toBe(true);
+    const before = tour.lastStep;
     await wrapper.find('.tour-overlay__skip').trigger('click');
     expect(tour.skipped.length).toBeGreaterThan(0);
-    expect(tour.completedAt).not.toBeNull();
+    expect(tour.lastStep).not.toBe(before);
   });
 
-  it('clears its `currentStep` once the chapter-1 predicate is satisfied via tickIndex changes', async () => {
+  it('clicking Restart returns the cursor to chapter-1 step-1', async () => {
+    const wrapper = await mountOverlay();
+    const tour = useTourProgress();
+    await nextTick();
+    // Skip once to move off the first step, then restart.
+    const initial = tour.lastStep;
+    await wrapper.find('.tour-overlay__skip').trigger('click');
+    expect(tour.lastStep).not.toBe(initial);
+    expect(wrapper.find('.tour-overlay__restart').exists()).toBe(true);
+    await wrapper.find('.tour-overlay__restart').trigger('click');
+    expect(tour.lastStep).toBe(initial);
+    expect(tour.skipped).toEqual([]);
+    expect(tour.completedAt).toBeNull();
+  });
+
+  it('advances chapter-1 once the predicate fires via tickIndex changes', async () => {
     const wrapper = await mountOverlay();
     const session = useAgentSession();
     const tour = useTourProgress();
+    const initial = tour.lastStep;
     session.init({ seed: 'overlay-advance-seed' });
     for (let i = 0; i < 4; i += 1) await session.tick(0.1);
     await nextTick();
     await nextTick();
-    // Predicate-driven advancement: either the watcher fired and tour
-    // already completed, or an explicit `next()` finds the predicate
-    // satisfied. Either way, after this `currentStep` is null and
-    // `<TourOverlay>` would render nothing in production.
-    if (tour.completedAt === null) tour.next();
-    expect(tour.completedAt).not.toBeNull();
-    expect(tour.currentStep).toBeNull();
-    // VTU's wrapper component re-render queue under jsdom can lag the
-    // store update by an extra tick, so we don't assert on the DOM
-    // disappearance here — the live demo + Playwright happy path in
-    // slice 1.4 cover that path end-to-end. The stub assertion below
-    // proves the wrapper is alive for unmount cleanup.
+    // Either the watcher already fired, or an explicit `next()` finds
+    // the predicate satisfied. Either way, after this the cursor has
+    // moved off chapter-1.
+    if (tour.lastStep === initial) tour.next();
+    expect(tour.lastStep).not.toBe(initial);
     expect(wrapper.exists()).toBe(true);
   });
 });

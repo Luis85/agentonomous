@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw, type Router } from 'vue-router';
 import IntroView from '../views/IntroView.vue';
 import PlayView from '../views/PlayView.vue';
+import TourView from '../views/TourView.vue';
 
 /**
  * Pre-v1 demo route map (Pillar 1, slice 1.2a — scaffold only). The Vue
@@ -17,7 +18,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/', name: 'intro', component: IntroView },
   { path: '/play', name: 'play', component: PlayView },
   { path: '/play/:scenarioId', name: 'play-scenario', component: PlayView, props: true },
-  { path: '/tour/:step?', name: 'tour', component: PlayView, props: true },
+  { path: '/tour/:step?', name: 'tour', component: TourView, props: true },
   { path: '/diff', name: 'diff', component: PlayView },
   { path: '/replay', name: 'replay', component: PlayView },
 ];

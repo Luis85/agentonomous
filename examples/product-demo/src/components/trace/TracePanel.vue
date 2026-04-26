@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import type { IntentionCandidate } from 'agentonomous';
 import { useAgentSession } from '../../stores/domain/useAgentSession.js';
 import { projectCandidates, projectSelectionRows } from '../../composables/useTraceSelectors.js';
+import { useRegisterSelector } from '../../composables/useRegisterSelector.js';
 
 type NeedDef = { readonly id: string; readonly label: string };
 
@@ -19,6 +20,7 @@ const VISIBILITY_STORAGE_KEY = 'demo.v2.trace.visible';
 
 const session = useAgentSession();
 const visible = ref(readVisible());
+useRegisterSelector('trace.panel');
 
 function readVisible(): boolean {
   try {
@@ -37,8 +39,12 @@ function writeVisible(next: boolean): void {
 }
 
 function toggle(): void {
-  visible.value = !visible.value;
-  writeVisible(visible.value);
+  const next = !visible.value;
+  visible.value = next;
+  writeVisible(next);
+  // Tour-aware UI signal: chapter-2 step "trace-open" advances when the
+  // user reveals the panel for the first time on the current step.
+  if (next) session.recordUiEvent('TracePanelOpened');
 }
 
 const allCandidates = computed<readonly IntentionCandidate[]>(() => {
@@ -112,7 +118,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="trace-panel" :data-visible="String(visible)">
+  <section class="trace-panel" data-tour-handle="trace.panel" :data-visible="String(visible)">
     <button
       type="button"
       class="trace-panel__toggle"

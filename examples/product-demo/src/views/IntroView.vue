@@ -13,7 +13,10 @@ const ctaLabel = computed(() => {
 
 function startTour(): void {
   if (tour.completedAt !== null) tour.restart();
-  void router.push('/play');
+  // Reflect the active step in the URL so a hard reload mid-tour
+  // resumes via `useTourProgress.resumeFromRoute(...)` (P1-FR-6).
+  const step = tour.currentStep;
+  void router.push(step === null ? '/play' : `/tour/${step.id}`);
 }
 
 function skipTour(): void {

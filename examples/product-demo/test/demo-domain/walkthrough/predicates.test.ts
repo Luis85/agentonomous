@@ -7,10 +7,12 @@ import {
   combineAll,
   combineAny,
   eventEmittedSince,
+  eventEmittedSinceStep,
   not,
   onRoute,
   onRoutePrefix,
   tickAtLeast,
+  ticksSinceStepAtLeast,
 } from '../../../src/demo-domain/walkthrough/predicates.js';
 import type {
   AgentSessionSnapshot,
@@ -22,6 +24,7 @@ import { walkthroughStepId } from '../../../src/demo-domain/walkthrough/types.js
 function makeCtx(overrides: {
   session?: Partial<AgentSessionSnapshot>;
   route?: Partial<RouteContext>;
+  stepBaselineTick?: number;
 }): TourCtx {
   const session: AgentSessionSnapshot = {
     tickIndex: overrides.session?.tickIndex ?? 0,
@@ -34,7 +37,7 @@ function makeCtx(overrides: {
     scenarioId: overrides.route?.scenarioId ?? null,
     tourStep: overrides.route?.tourStep ?? null,
   };
-  return { session, route };
+  return { session, route, stepBaselineTick: overrides.stepBaselineTick ?? 0 };
 }
 
 describe('walkthrough predicates', () => {
@@ -143,6 +146,59 @@ describe('walkthrough predicates', () => {
         },
       });
       expect(eventEmittedSince('PREVIEW_APPLIED', 0)(ctx)).toBe(true);
+    });
+  });
+
+  describe('eventEmittedSinceStep', () => {
+    it('is true when the event tick is at or after stepBaselineTick', () => {
+      const p = eventEmittedSinceStep('SNAPSHOT_EXPORTED');
+      const ctx = makeCtx({
+        stepBaselineTick: 10,
+        session: {
+          tickIndex: 12,
+          recentEvents: [{ type: 'SNAPSHOT_EXPORTED', tickIndex: 11 }],
+        },
+      });
+      expect(p(ctx)).toBe(true);
+    });
+
+    it('is false when the only matching event was emitted before the step started', () => {
+      const p = eventEmittedSinceStep('SNAPSHOT_EXPORTED');
+      const ctx = makeCtx({
+        stepBaselineTick: 10,
+        session: {
+          tickIndex: 12,
+          recentEvents: [{ type: 'SNAPSHOT_EXPORTED', tickIndex: 5 }],
+        },
+      });
+      expect(p(ctx)).toBe(false);
+    });
+
+    it('is false when no matching event has been seen', () => {
+      const p = eventEmittedSinceStep('SNAPSHOT_EXPORTED');
+      const ctx = makeCtx({
+        stepBaselineTick: 0,
+        session: { tickIndex: 5, recentEvents: [{ type: 'AGENT_TICKED', tickIndex: 1 }] },
+      });
+      expect(p(ctx)).toBe(false);
+    });
+  });
+
+  describe('ticksSinceStepAtLeast', () => {
+    it('is true once the elapsed-since-baseline ticks meet the threshold', () => {
+      const p = ticksSinceStepAtLeast(3);
+      expect(p(makeCtx({ stepBaselineTick: 10, session: { tickIndex: 13 } }))).toBe(true);
+      expect(p(makeCtx({ stepBaselineTick: 10, session: { tickIndex: 14 } }))).toBe(true);
+    });
+
+    it('is false when fewer than n ticks have elapsed since the step started', () => {
+      const p = ticksSinceStepAtLeast(3);
+      expect(p(makeCtx({ stepBaselineTick: 10, session: { tickIndex: 12 } }))).toBe(false);
+    });
+
+    it('treats a baseline of 0 the same as a fresh session', () => {
+      const p = ticksSinceStepAtLeast(2);
+      expect(p(makeCtx({ stepBaselineTick: 0, session: { tickIndex: 2 } }))).toBe(true);
     });
   });
 
