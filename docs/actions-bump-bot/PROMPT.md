@@ -116,13 +116,18 @@ Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
    > Bash helper above (or shell out to `node scripts/bump-actions.mjs`
    > and parse its stdout) for any scripted access.
 
-2. **Cut the bump branch off `develop`:**
+2. **Cut the bump branch off `develop` and capture the base SHA.**
+   `BASE_SHA` is the develop-tip SHA at branch-cut. The
+   [Failure-issue spec](#failure-issue-spec) uses its 7-char prefix
+   for issue titles since the bump commit (step 6) may not exist yet
+   when actionlint or verify fails:
 
    ```bash
    git fetch origin
    git switch develop
    git pull --ff-only origin develop
    git switch -c "chore/actions-bump-$(date -u +%F)"
+   BASE_SHA="$(git rev-parse HEAD)"
    ```
 
 3. **Apply each bump.** For every pending row, edit the matching
@@ -163,28 +168,44 @@ Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
    git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
    ```
 
-7. **Write the PR body to the cache file.** The routine assembled
-   `${BODY}` in memory while applying bumps (see
-   [PR body shape](#pr-body-shape) below for the required format).
-   Persist it before `gh pr create` so a `--body-file` reference has
-   something to read, AND so an `gh pr create` failure leaves a
-   re-submit-by-hand artifact (per
-   [Failure handling](#failure-handling)):
+7. **Write the PR body to the cache file (skipped in `DRY_RUN`).**
+   The routine assembled `${BODY}` in memory while applying bumps
+   (see [PR body shape](#pr-body-shape) below for the required
+   format). Persist it before `gh pr create` so a `--body-file`
+   reference has something to read, AND so an `gh pr create` failure
+   leaves a re-submit-by-hand artifact (per
+   [Failure handling](#failure-handling)). The
+   [Dry-run mode](#dry-run-mode) contract requires zero filesystem
+   side effects from cache writes — gate this step:
 
    ```bash
-   mkdir -p .actions-bump-cache
    BODY_FILE=".actions-bump-cache/pr-body-$(date -u +%F).md"
-   printf '%s\n' "${BODY}" > "${BODY_FILE}"
+   if [ -n "${DRY_RUN:-}" ]; then
+     printf '[DRY_RUN] would write PR body to %q (skipped — zero filesystem side effects)\n' \
+       "${BODY_FILE}"
+   else
+     mkdir -p .actions-bump-cache
+     printf '%s\n' "${BODY}" > "${BODY_FILE}"
+   fi
    ```
 
-8. **Push and open one PR per run** with every applied bump in a
-   single diff:
+8. **Push and open one PR per run (gated for `DRY_RUN`)** with every
+   applied bump in a single diff. Dry-run dumps the would-be calls +
+   body in memory; non-dry mode actually pushes and opens the PR:
 
    ```bash
-   git push -u origin "chore/actions-bump-$(date -u +%F)"
-   gh pr create --base develop \
-     --title "chore: bump pinned action SHAs ($(date -u +%F))" \
-     --body-file "${BODY_FILE}"
+   if [ -n "${DRY_RUN:-}" ]; then
+     printf '[DRY_RUN] would call: git push -u origin %q\n' \
+       "chore/actions-bump-$(date -u +%F)"
+     printf '[DRY_RUN] would call: gh pr create --base develop --title %q --body-file <inline>\n' \
+       "chore: bump pinned action SHAs ($(date -u +%F))"
+     printf '[DRY_RUN] body:\n%s\n' "${BODY}"
+   else
+     git push -u origin "chore/actions-bump-$(date -u +%F)"
+     gh pr create --base develop \
+       --title "chore: bump pinned action SHAs ($(date -u +%F))" \
+       --body-file "${BODY_FILE}"
+   fi
    ```
 
    The owner reviews and merges. The PR is the run's artifact —
@@ -403,8 +424,11 @@ filesystem side effects. Exit 0 after dumping.
   rate-limit, missing CLI) → do NOT proceed with any bump. Open a
   fresh issue under the `actions-bump-bot` label titled
   `Action SHA bumps YYYY-MM-DD — script error` with the script's
-  full stderr in the body, and exit 1. The owner triages the
-  underlying tooling failure before the next run.
+  **merged stdout + stderr** (capture via `node scripts/bump-actions.mjs 2>&1`)
+  in the body — the per-action `ERROR` rows live in the script's
+  stdout status table; stderr alone can be empty for these cases.
+  Exit 1. The owner triages the underlying tooling failure before
+  the next run.
 
 - **`scripts/bump-actions.mjs` reports `DIVERGENT` rows** → open a
   fresh issue under the `actions-bump-bot` label titled
@@ -445,9 +469,11 @@ When verify (or actionlint) fails after applying bumps, open one
 issue per failed run:
 
 - **Title:** `Action SHA bumps YYYY-MM-DD — <sha7>`
-  where `<sha7>` is the seven-char prefix of the bump branch's
-  HEAD SHA (the commit that contained the bump edits, even though
-  it never reached `develop`).
+  where `<sha7>` is the seven-char prefix of `BASE_SHA` (the
+  develop-tip SHA captured at [step 2](#process) when the bump
+  branch was cut). `BASE_SHA` is always available — failure issues
+  open even when no bump commit exists yet (e.g. actionlint or
+  `npm run verify` fails before [step 6](#process)).
 - **Label:** `actions-bump-bot` (already exists in this repo;
   re-create idempotently if missing — `gh label create` no-ops on
   conflict).
@@ -456,8 +482,9 @@ issue per failed run:
   reproduce the diff:
 
   ````markdown
-  Verify failed at `<head-sha>` on `chore/actions-bump-<UTC-date>`
-  after applying these bumps:
+  Verify failed at `${BASE_SHA}` on `chore/actions-bump-<UTC-date>`
+  after applying these bumps (no commit was created — actionlint or
+  `npm run verify` ran before step 6):
 
   | Action | Old SHA | New SHA | Old label | New label | Workflow file(s) |
   | --- | --- | --- | --- | --- | --- |
