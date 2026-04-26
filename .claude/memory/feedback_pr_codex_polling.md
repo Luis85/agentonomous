@@ -2,7 +2,6 @@
 name: Auto-poll Codex reviews on PRs
 description: After pushing to a PR + requesting Codex review, automatically arm a 5m cron poll loop without asking each time
 type: feedback
-originSessionId: 39908e5f-123e-46e0-8622-c0dde295e974
 ---
 
 After every push to an open PR that triggers a Codex review (`@codex review`), automatically arm a `/loop 5m` cron poll that checks for findings/approval and stops itself when results land. Don't ask "want me to /loop?" each time — just do it.

@@ -1,11 +1,10 @@
 ---
 name: Autonomous merge OK after Codex 👍
-description: User pre-authorized self-merge of agentonomous PRs once Codex approves and CI is green; overrides the "owner merges" default for this project.
+description: Owner pre-authorized self-merge of this repo's PRs once Codex approves and CI is green; overrides the "owner merges" default for this project.
 type: feedback
-originSessionId: 27a11830-02a1-46c1-b7cd-8e898d7c63e7
 ---
 
-Claude may self-merge `Luis85/agentonomous` PRs without asking, **provided
+Claude may self-merge this repo's PRs without asking, **provided
 all of the following hold**:
 
 1. Codex Review issue-level comment contains "Didn't find any major issues".

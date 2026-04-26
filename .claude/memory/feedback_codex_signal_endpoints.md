@@ -2,7 +2,6 @@
 name: Codex approval/finding signal lives in issue comments, not pull review state
 description: When polling Codex review state, query issue-level comments + line-level P1/P2 comments separately — `gh pr view --json reviews` is not the signal
 type: feedback
-originSessionId: 97567988-a027-4521-a75a-dcd260ce4d8e
 ---
 
 Codex's "Codex Review: Didn't find any major issues" approval lands as a **PR-level issue comment**, not as an `APPROVED` review state. Findings land as **line-level review comments** with P1/P2 badges in the body. Polling `gh pr view <N> --json reviews` misses both signals — it only shows `COMMENTED` review wrappers.

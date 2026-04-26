@@ -33,7 +33,7 @@ one-off. Optimizing PR shape for it pays off on every change.
 1. Wait for Codex to post its review (usually within a few minutes of
    push).
 2. Triage PR-by-PR: `gh pr view <num> --comments` (or
-   `gh api repos/Luis85/agentonomous/pulls/<num>/comments` for the
+   `gh api repos/:owner/:repo/pulls/<num>/comments` for the
    line-level comments with their commit anchors).
 3. Address concerns with follow-up commits on the same branch (a fresh
    push triggers a Codex re-review). **Don't rebase mid-review** — the

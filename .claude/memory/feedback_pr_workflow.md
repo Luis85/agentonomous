@@ -22,13 +22,13 @@ beat serial PR-by-PR completion.
    covers, then switch into review-sweep mode.
 3. **Multi-pass Codex resolution.** Sweep PRs in order:
    - `gh pr view <num> --comments` and
-     `gh api repos/Luis85/agentonomous/pulls/<num>/comments` to read
+     `gh api repos/:owner/:repo/pulls/<num>/comments` to read
      line comments + their commit anchors.
    - Address real findings with a follow-up commit on the same
      branch. Push (do **not** rebase mid-review — Codex's line
      anchors break).
    - Loop until Codex posts a 👍 reaction
-     (`gh api repos/Luis85/agentonomous/issues/<num>/reactions`) on
+     (`gh api repos/:owner/:repo/issues/<num>/reactions`) on
      the latest commit. Per Codex docs: "If Codex has suggestions, it
      will comment; otherwise it will react with 👍."
    - **Skip literal re-flags** of comments already addressed by a
@@ -74,13 +74,13 @@ for pr in 63 64 65 66 67 68 69 70; do
   gh pr view "$pr" --json reviews \
     -q '.reviews | map(.author.login + " " + .state) | join(", ")'
   echo "--reactions--"
-  gh api "repos/Luis85/agentonomous/issues/$pr/reactions" \
+  gh api "repos/:owner/:repo/issues/$pr/reactions" \
     -q '.[] | "\(.user.login) \(.content)"'
 done
 ```
 
 ```bash
 # Fetch line comments on the latest fix commit only
-gh api "repos/Luis85/agentonomous/pulls/$PR/comments" \
+gh api "repos/:owner/:repo/pulls/$PR/comments" \
   -q ".[] | select(.commit_id[0:8] == \"$SHA\") | {path, line, body}"
 ```

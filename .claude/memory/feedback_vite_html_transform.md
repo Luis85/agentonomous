@@ -2,7 +2,6 @@
 name: Vite HTML transform rewrites only publicDir-resolved root-relative URLs
 description: Vite's HTML transform leaves bare-relative hrefs untouched and only prefixes `base` onto root-relative URLs that resolve to existing files in `publicDir`; closeBundle-emitted assets are never rewritten. Affects favicon/asset wiring in examples/.
 type: feedback
-originSessionId: 10ae7a32-2d50-4ea8-a67a-f1d0e8167796
 ---
 
 When wiring a static asset into an example's `index.html`, do NOT claim Vite will rewrite the href against `base` (e.g. `PAGES_BASE=/agentonomous/`) unless the asset actually lives in `publicDir` (default `<root>/public/`) at HTML-transform time.

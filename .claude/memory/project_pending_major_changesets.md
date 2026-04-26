@@ -2,7 +2,6 @@
 name: Pending 1.0 breaking changesets
 description: Which open / merged PRs already carry major-bump changesets queued for the eventual 1.0 publish.
 type: project
-originSessionId: 6f19e206-9f41-4d74-83ca-15c93838fba3
 ---
 
 Changesets under `.changeset/*.md` accumulate until the owner cuts the 1.0

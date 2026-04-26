@@ -2,7 +2,6 @@
 name: Parallel PRs in same wave will conflict on the plan-shipped table — merge-not-rebase
 description: When dispatching N parallel topic-branch PRs that all mark themselves shipped in docs/plans/*.md, plan on resolving N-1 trivial conflicts via `git merge origin/develop` (preserves Codex review anchors)
 type: feedback
-originSessionId: 97567988-a027-4521-a75a-dcd260ce4d8e
 ---
 
 Every parallel-wave PR in this repo marks its row shipped in the same `docs/plans/YYYY-MM-DD-*.md` "What's already shipped" table. The first to merge cleanly establishes a new line; every subsequent PR in the wave gets a one-line conflict on that table. Confirmed twice in session 2026-04-25 (waves 1 and 2 — 4 PRs, 2 conflicts each wave).
