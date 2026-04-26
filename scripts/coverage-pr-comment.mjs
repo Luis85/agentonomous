@@ -154,10 +154,7 @@ async function upsertStickyComment({ repo, pr, body }) {
   // happily overwrite their reply with the next coverage update,
   // breaking conversation continuity.
   const prior = existing.find(
-    (c) =>
-      typeof c.body === 'string' &&
-      c.body.includes(COMMENT_MARKER) &&
-      c.user?.type === 'Bot',
+    (c) => typeof c.body === 'string' && c.body.includes(COMMENT_MARKER) && c.user?.type === 'Bot',
   );
   if (prior) {
     await ghJson(`/repos/${repo}/issues/comments/${prior.id}`, {
