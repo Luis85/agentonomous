@@ -1,7 +1,7 @@
 # Pre-v1 Demo Evolution — Specification
 
 Spec date: 2026-04-26
-Tracker PR: [#129](https://github.com/Luis85/agentonomous/pull/129)
+Tracker issue: [#132](https://github.com/Luis85/agentonomous/issues/132) (originating PR [#129](https://github.com/Luis85/agentonomous/pull/129) landed the doc set; the live tracker is now the issue)
 Companion docs:
 - Planning doc: [`docs/product/2026-04-26-pre-v1-demo-evolution-plan.md`](../product/2026-04-26-pre-v1-demo-evolution-plan.md)
 - Design doc: [`2026-04-26-pre-v1-demo-evolution-design.md`](./2026-04-26-pre-v1-demo-evolution-design.md)
@@ -29,8 +29,9 @@ acceptance criterion's bug, not the policy's.
 The increment is "done" when **all** of:
 
 - IAC-1. The demo workspace is renamed to `examples/product-demo`; no
-  `examples/nurture-pet` references remain in tracked files (docs,
-  scripts, workflows, tests).
+  references to the old workspace path remain in tracked files (docs,
+  scripts, workflows, tests). Verified by a `git grep` on the legacy
+  path string excluding `.worktrees/` and `docs/archive/`.
 - IAC-2. `npm run demo:dev` and `npm run demo:build` succeed against
   `examples/product-demo`; the GitHub Pages workflow publishes from
   `examples/product-demo/dist`.
@@ -444,8 +445,8 @@ rule.
 
 ### Functional requirements
 
-- **R-FR-1.** `examples/nurture-pet/` is renamed to
-  `examples/product-demo/` via `git mv` (history preserved).
+- **R-FR-1.** The demo workspace is renamed to `examples/product-demo/`
+  via `git mv` (history preserved).
 - **R-FR-2.** Root npm scripts `demo:install`, `demo:dev`, `demo:build`
   shell into the new path.
 - **R-FR-3.** A new `npm run e2e` script runs Playwright against the
@@ -453,11 +454,11 @@ rule.
   consume it).
 - **R-FR-4.** The GitHub Pages workflow uploads from
   `examples/product-demo/dist`.
-- **R-FR-5.** Test fixtures and import paths referencing
-  `examples/nurture-pet` are updated.
+- **R-FR-5.** Test fixtures and import paths referencing the legacy
+  workspace path are updated.
 - **R-FR-6.** `README.md`, `CLAUDE.md`, `PUBLISHING.md`, and any
-  `docs/` references to `examples/nurture-pet` are updated in the same
-  PR.
+  `docs/` references to the legacy workspace path are updated in the
+  same PR.
 - **R-FR-7.** A pre-merge dry-run gate is recorded: build the demo,
   confirm the artifact upload path, confirm the Pages deploy job
   resolves the new folder.
@@ -470,8 +471,9 @@ rule.
   against `examples/product-demo` in a clean clone.
 - **R-AC-2.** CI Pages workflow publishes from
   `examples/product-demo/dist` with no manual patching.
-- **R-AC-3.** No tracked file in the repo references
-  `examples/nurture-pet` (verified by a `grep` step in the rename plan).
+- **R-AC-3.** No tracked file in the repo references the legacy
+  workspace path (verified by a `git grep` step in the rename plan,
+  excluding `.worktrees/` and `docs/archive/`).
 - **R-AC-4.** `npm run e2e` exits 0 against a placeholder Playwright
   config (the named scripts are added by their owning pillar PRs).
 

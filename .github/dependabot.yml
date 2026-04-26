@@ -31,7 +31,7 @@ updates:
 
   # Demo example (workspace-local, consumes the built library).
   - package-ecosystem: npm
-    directory: /examples/nurture-pet
+    directory: /examples/product-demo
     target-branch: develop
     schedule:
       interval: weekly

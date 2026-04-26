@@ -32,6 +32,12 @@ const SRC_PORT_LLM = 'src/ports/{LlmProviderPort,MockLlmProvider}.ts';
 
 export default tseslint.config(
   {
+    // The demo workspace lives under its own flat config at
+    // `examples/product-demo/eslint.config.js`, which scopes the design's
+    // DDD forbidden-import + determinism rules (spec NFR-D-1, design's
+    // forbidden-import table) to the layered subpaths. The root config
+    // intentionally ignores `examples/` so the legacy nurture-pet baseline
+    // doesn't fire type-aware rules until pillar 5.2 refactors it.
     ignores: ['dist', 'node_modules', 'coverage', 'docs', 'examples', 'schema'],
   },
   js.configs.recommended,
@@ -322,5 +328,6 @@ export default tseslint.config(
       'no-restricted-syntax': 'off',
     },
   },
+
   prettier,
 );

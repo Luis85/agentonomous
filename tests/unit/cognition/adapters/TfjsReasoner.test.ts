@@ -482,7 +482,7 @@ describe('TfjsReasoner — bundled demo baseline', () => {
     const path = await import('node:path');
     const baselinePath = path.resolve(
       process.cwd(),
-      'examples/nurture-pet/src/cognition/learning.network.json',
+      'examples/product-demo/src/cognition/learning.network.json',
     );
     const snapshot = JSON.parse(await readFile(baselinePath, 'utf8')) as Parameters<
       typeof TfjsReasoner.fromJSON

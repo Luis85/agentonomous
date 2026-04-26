@@ -13,7 +13,7 @@ Project memory for Claude Code. Keep this file terse — details belong in
 
 `agentonomous` — a TypeScript library for autonomous agents in browser /
 Node simulations. Engine-agnostic core, optional Excalibur adapter. Phase A
-MVP is a virtual-pet nurture demo (`examples/nurture-pet`).
+MVP is a virtual-pet nurture demo (`examples/product-demo`).
 
 ## Non-negotiables
 
@@ -64,7 +64,7 @@ npm run format        # prettier --write .
 npm run build         # vite lib mode → dist/
 npm run verify        # all of the above, sequentially
 npm run analyze       # build + top 20 largest dist/*.js by bytes
-npm run demo:dev      # build library then run examples/nurture-pet via Vite
+npm run demo:dev      # build library then run examples/product-demo via Vite
 ```
 
 Node 22 (see `.nvmrc`). Run `nvm use` once per shell.
@@ -94,7 +94,7 @@ Node 22 (see `.nvmrc`). Run `nvm use` once per shell.
 - `src/integrations/excalibur/` — optional Excalibur actor sync. Separate
   bundle entry; don't import from core.
 - `tests/unit/` mirrors `src/` 1:1. `tests/integration/` is multi-subsystem.
-- `examples/nurture-pet/` is a Vite demo that resolves `agentonomous` via
+- `examples/product-demo/` is a Vite demo that resolves `agentonomous` via
   Vite + tsconfig aliases pointing at `../../dist/` (not an npm dep — a
   `file:../..` link inside its own target triggers `EISDIR` on Windows).
   Build the library first (`npm run build`) before running the demo.

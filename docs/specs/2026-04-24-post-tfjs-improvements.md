@@ -110,7 +110,7 @@ opens real work that was previously unviable.
 
 ---
 
-## 2. Demo — examples/nurture-pet
+## 2. Demo — examples/product-demo
 
 The demo currently shows training happened (Train button flashes
 "Trained ✓") but doesn't *visualise* it. tfjs's real `history.loss`
@@ -243,21 +243,21 @@ surfacing on every IDE reopen.
 
 ### 3A.1 Demo `js-son-agent` ambient-module gap
 
-- **Symptom.** `cd examples/nurture-pet && npx tsc --noEmit` reports
+- **Symptom.** `cd examples/product-demo && npx tsc --noEmit` reports
   four `TS7016 Could not find a declaration file for module
   'js-son-agent'` errors in `src/cognition/bdi.ts` and the
   transitively-referenced `src/cognition/adapters/js-son/*.ts`.
 - **Why it exists.** The root workspace carries an ambient shim
   (`src/cognition/adapters/js-son/js-son-agent.d.ts`, copied into
   `dist/` by the vite ambient-dts plugin) but the demo's
-  `tsconfig.json` `include` only covers `examples/nurture-pet/src/**/*`
+  `tsconfig.json` `include` only covers `examples/product-demo/src/**/*`
   — the shim lives outside that scope. When the demo tsc reaches into
   `../../src/cognition/adapters/js-son/` via `paths`, it sees the TS
   source but the ambient module declaration is out of reach.
 - **Fix options (pick one).**
   (a) Extend demo tsconfig's `include` to pull in the shim file only
   (`"../../src/cognition/adapters/js-son/js-son-agent.d.ts"`).
-  (b) Put a copy of the ambient shim in `examples/nurture-pet/src/`
+  (b) Put a copy of the ambient shim in `examples/product-demo/src/`
   scoped to the demo.
   (c) Let the demo target the built `dist/` via `paths` pointing at
   `../../dist/...` — would mirror production resolution and the

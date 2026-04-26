@@ -20,15 +20,15 @@ This planning doc is the **what + why**. The shape lives in three companion docu
 | Spec | [`docs/specs/2026-04-26-pre-v1-demo-evolution-spec.md`](../specs/2026-04-26-pre-v1-demo-evolution-spec.md) | Per-pillar *requirements* — FRs, data shapes, acceptance criteria, NFRs. |
 | Plans | `docs/plans/2026-04-26-pre-v1-demo-*.md` (six files; see [Tracker table](#tracker-table)) | Per-pillar **roadmaps** — chunked PR slices, file targets, verification gates. |
 
-### PR #129 — umbrella tracker
+### Issue #132 — umbrella tracker
 
-[PR #129](https://github.com/Luis85/agentonomous/pull/129) holds this planning doc, the design doc, the spec, and all six plans. It stays **docs-only** for the duration of the increment — implementation lives in downstream PRs cut from `develop`.
+The doc set originally landed via [PR #129](https://github.com/Luis85/agentonomous/pull/129) (squash-merged `b2f9342`); the umbrella tracker for the live increment is now [issue #132](https://github.com/Luis85/agentonomous/issues/132). The planning doc, design doc, spec, and the six per-pillar plans all live on `develop` — implementation lives in downstream PRs cut from `develop`.
 
 Every downstream PR cut from this plan must:
 
-- include the body line `Tracks: #129`,
+- include the body line `Tracks: #132`,
 - tick its row in the [Tracker table](#tracker-table) in the same diff (per the project rule that plan + doc updates ride with their PR),
-- get added as a row to the GitHub tasklist on PR #129's body so completion auto-flips on merge.
+- get added as a row to the GitHub tasklist on issue #132's body so completion auto-flips on merge.
 
 ---
 
@@ -64,7 +64,7 @@ Deliver a “Demo v2” that can be shown publicly without narration and still c
 
 ## Product demo direction (explicit)
 
-The **current `examples/nurture-pet` demo is the shippable product demo baseline** and remains the primary vehicle for this increment.
+The **current `examples/product-demo` demo is the shippable product demo baseline** and remains the primary vehicle for this increment.
 
 For this pre-v1 evolution, we are not replacing it with a different demo concept; we are expanding it into an **interactive website experience** that covers the demo intent end-to-end and showcases the library’s capabilities in a way that is explorable by first-time visitors.
 
@@ -91,38 +91,25 @@ The UI layer is explicitly **SFC-first** (`.vue` components), not string-templat
 
 ---
 
-## Demo rename plan (`examples/nurture-pet` → `examples/product-demo`)
+## Demo rename plan — shipped (Wave-0)
 
-This increment also includes renaming the demo workspace from `examples/nurture-pet` to `examples/product-demo`.
+The demo workspace has been renamed to `examples/product-demo/` (Wave-0 preflight). Plan archived at [`docs/archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md).
 
-### Why this matters
-- Naming must match product positioning (shippable product demo, not a side example).
-- The demo is published on GitHub Pages, so path-sensitive build/deploy wiring must be updated in lockstep.
+### What landed
 
-### Required implementation updates
-- Rename workspace folder and update all repo references (`README`, `CLAUDE.md`, docs, scripts, tests).
-- Update root npm scripts that currently shell into `examples/nurture-pet` (`demo:install`, `demo:dev`, `demo:build`).
-- Update any test fixtures/import paths coupled to `examples/nurture-pet`.
-- Update GitHub Pages workflow artifact path from `examples/nurture-pet/dist` to `examples/product-demo/dist`.
-- Update `PUBLISHING.md` deployment instructions and verification steps to the new path/name.
+- Workspace folder renamed via `git mv` (history preserved).
+- Root npm scripts (`demo:install`, `demo:dev`, `demo:build`) point at the new path; `npm run e2e` proxies into the demo workspace's Playwright entry.
+- GitHub Pages workflow (`.github/workflows/pages.yml`) and CI workflow (`.github/workflows/ci.yml`) build + upload `examples/product-demo/dist`.
+- ESLint forbidden-import + determinism rules (per the design's DDD layering) enforce the new layered subpaths so downstream pillar PRs fail CI on a violation.
+- `examples/product-demo/playwright.config.ts` + empty `tests/e2e/` placeholder land here so all later pillar PRs can rely on `npm run e2e` exiting 0 from day 1.
+- Top-level docs (`README.md`, `CLAUDE.md`, `PUBLISHING.md`) and every non-archived `docs/**` reference were swept in the same diff.
+- Legacy `nurture-pet.*` and un-prefixed `demo.*` localStorage keys are purged on first load (per spec STO-3).
 
+### Acceptance criteria (met)
 
-### Documentation revisit/update mandate
-- This rename and demo evolution requires an explicit **documentation sweep** in the same delivery window.
-- Update top-level docs first: `README.md`, `CLAUDE.md`, `PUBLISHING.md`, and demo-facing docs under `docs/`.
-- Replace stale `examples/nurture-pet` references with `examples/product-demo` and re-validate commands/snippets.
-- Treat docs updates as release-blocking for the rename slice; rename is not considered done until docs are updated and verified.
-
-### GitHub Pages implications / release controls
-- Treat the rename + Pages workflow path update as one atomic delivery slice (no split merge).
-- Add a pre-merge dry run gate: build demo, confirm artifact upload path, confirm Pages deploy job resolves expected folder.
-- Require one explicit post-merge verification on the `demo` branch to ensure public URL serves the renamed workspace build.
-- If deploy fails, rollback by reverting the rename commit set as a unit (folder + scripts + workflow + docs).
-
-### Acceptance criteria
-- `npm run demo:dev` and `npm run demo:build` work with `examples/product-demo`.
+- `npm run demo:dev` and `npm run demo:build` work against the renamed workspace.
 - CI Pages workflow publishes from `examples/product-demo/dist` with no manual patching.
-- No stale `examples/nurture-pet` path references remain in tracked docs/scripts/workflows.
+- No stale path references remain in tracked docs / scripts / workflows (verified by `git grep` excluding `.worktrees/` and `docs/archive/`).
 
 ---
 
@@ -347,7 +334,7 @@ Canonical status. Update the **Status** and **PR** cells in the same diff that s
 
 | Wave | Pillar | Plan | Status | PR |
 |---|---|---|---|---|
-| 0 | Demo rename preflight | [`rename-preflight`](../plans/2026-04-26-pre-v1-demo-rename-preflight.md) | not started | — |
+| 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | in review | _Wave-0 PR_ |
 | A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | not started | — |
 | A | Cognition diff panel | [`cognition-diff-panel`](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md) | not started | — |
 | A | Determinism fingerprint | [`determinism-fingerprint`](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md) | not started | — |

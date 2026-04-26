@@ -12,13 +12,13 @@
 import * as tf from '@tensorflow/tfjs-core';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
+import { mountCognitionSwitcher } from '../../examples/product-demo/src/cognitionSwitcher.js';
 import {
   interpretSoftmax,
   setLearningAgent,
   SOFTMAX_SKILL_IDS,
-} from '../../examples/nurture-pet/src/cognition/learning.js';
-import { mountResetButton } from '../../examples/nurture-pet/src/ui.js';
+} from '../../examples/product-demo/src/cognition/learning.js';
+import { mountResetButton } from '../../examples/product-demo/src/ui.js';
 import { TEST_BACKEND } from '../setup/tfjsBackend.js';
 
 type FakeAgent = {

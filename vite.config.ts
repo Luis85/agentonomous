@@ -161,7 +161,7 @@ export default defineConfig({
     // time. Without this, vitest hits the root `package.json` exports
     // map (→ `./dist/*`), which requires a prior `npm run build` — but
     // CI runs tests *before* build (and `npm run verify` runs them in
-    // that order locally too). The demo files in `examples/nurture-pet/`
+    // that order locally too). The demo files in `examples/product-demo/`
     // intentionally import from `agentonomous` + its subpaths so they
     // stay consumer-realistic; the alias keeps the tests that exercise
     // those demo files working without a build artifact dependency.

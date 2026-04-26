@@ -11,6 +11,8 @@ docs/api
 !.vscode/settings.json
 examples/**/dist
 examples/**/node_modules
+examples/**/playwright-report
+examples/**/test-results
 .worktrees
 .review-fix-cache
 .claude/settings.local.json

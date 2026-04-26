@@ -2,7 +2,7 @@
 
 Plan date: 2026-04-26
 Wave: A → C
-Tracker PR: [#129](https://github.com/Luis85/agentonomous/pull/129) — every PR cut from this plan must include `Tracks: #129` in its body.
+Tracker issue: [#132](https://github.com/Luis85/agentonomous/issues/132) — every PR cut from this plan must include `Tracks: #132` in its body. (Originating PR [#129](https://github.com/Luis85/agentonomous/pull/129) landed the doc set; the live tracker is now the issue.)
 Companion docs:
 - Planning doc: [`docs/product/2026-04-26-pre-v1-demo-evolution-plan.md`](../product/2026-04-26-pre-v1-demo-evolution-plan.md) → §3 Determinism proof artifact
 - Design doc: [`docs/specs/2026-04-26-pre-v1-demo-evolution-design.md`](../specs/2026-04-26-pre-v1-demo-evolution-design.md) → Determinism fingerprint design
@@ -82,7 +82,7 @@ backed by a normalized run fingerprint.
 
 - Spec criteria P3-AC-1 through P3-AC-5 all met.
 - `minSampleFraction` final value chosen and recorded in Done log.
-- PR #129 tracker table row for "Determinism fingerprint" set to ✅
+- Planning-doc tracker table row for "Determinism fingerprint" set to ✅
   with every merged PR linked.
 
 ## Done log

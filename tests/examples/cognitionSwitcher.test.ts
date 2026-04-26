@@ -9,11 +9,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-// Path is relative from tests/examples/ to examples/nurture-pet/src/.
+// Path is relative from tests/examples/ to examples/product-demo/src/.
 // The switcher itself imports from 'agentonomous' (bare specifier) and
 // './cognition/index.js' — both resolve under vitest's default module
 // resolution.
-import { mountCognitionSwitcher } from '../../examples/nurture-pet/src/cognitionSwitcher.js';
+import { mountCognitionSwitcher } from '../../examples/product-demo/src/cognitionSwitcher.js';
 
 type FakeAgent = {
   setReasoner: Mock<(r: unknown) => void>;

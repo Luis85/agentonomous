@@ -2,7 +2,7 @@
 
 Plan date: 2026-04-26
 Wave: A → C
-Tracker PR: [#129](https://github.com/Luis85/agentonomous/pull/129) — every PR cut from this plan must include `Tracks: #129` in its body.
+Tracker issue: [#132](https://github.com/Luis85/agentonomous/issues/132) — every PR cut from this plan must include `Tracks: #132` in its body. (Originating PR [#129](https://github.com/Luis85/agentonomous/pull/129) landed the doc set; the live tracker is now the issue.)
 Companion docs:
 - Planning doc: [`docs/product/2026-04-26-pre-v1-demo-evolution-plan.md`](../product/2026-04-26-pre-v1-demo-evolution-plan.md) → §1 Guided walkthrough
 - Design doc: [`docs/specs/2026-04-26-pre-v1-demo-evolution-design.md`](../specs/2026-04-26-pre-v1-demo-evolution-design.md) → Cross-pillar contracts → `WalkthroughStep`
@@ -72,9 +72,9 @@ external narration.
 ## Definition of done
 
 - Spec criteria P1-AC-1 through P1-AC-5 all met.
-- PR #129 tracker table row for "Guided walkthrough" set to ✅ with
-  every merged PR linked.
-- Tracker PR #129 GH tasklist entries for slices 1.1 - 1.4 ticked.
+- Planning-doc tracker table row for "Guided walkthrough" set to ✅
+  with every merged PR linked.
+- Issue #132 GH tasklist entries for slices 1.1 - 1.4 ticked.
 
 ## Done log
 

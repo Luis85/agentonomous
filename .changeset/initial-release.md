@@ -20,4 +20,4 @@ Initial release. Phase A (M0–M15) ships a complete virtual-pet nurture library
 - `agentonomous/integrations/excalibur` subpath entry with Actor sync, remote
   controller, animation bridge.
 - Random events (`RandomEventTicker` + `defineRandomEvent`) with FX hints.
-- 245 tests across 45 files; MVP `examples/nurture-pet` demo.
+- 245 tests across 45 files; MVP `examples/product-demo` demo.

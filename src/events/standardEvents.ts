@@ -141,7 +141,7 @@ export const AGENT_TICKED = 'AgentTicked' as const;
  * equivalence under a fixed seed: identical input sequence produces
  * identical `AgentTicked` sequence (ordering, payloads).
  *
- * @see examples/nurture-pet/src/main.ts — reference consumer.
+ * @see examples/product-demo/src/main.ts — reference consumer.
  */
 export type AgentTickedEvent = DomainEvent & {
   type: typeof AGENT_TICKED;

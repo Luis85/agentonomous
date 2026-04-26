@@ -1,4 +1,4 @@
-# GitHub Pages — deploys the `examples/nurture-pet` demo.
+# GitHub Pages — deploys the `examples/product-demo` demo.
 #
 # Triggered by pushes to the long-lived `demo` branch and via manual
 # dispatch. Builds the library first (the demo consumes `dist/`),
@@ -42,21 +42,21 @@ jobs:
         run: npm run build
 
       - name: Install demo dependencies (npm ci)
-        working-directory: examples/nurture-pet
+        working-directory: examples/product-demo
         run: npm ci --no-audit --no-fund
 
       - name: Build demo (vite build, PAGES_BASE=/repo/)
-        working-directory: examples/nurture-pet
+        working-directory: examples/product-demo
         env:
           # GitHub Pages serves the repo from /<repo-name>/ by default.
           # The example's vite.config.ts reads PAGES_BASE to set the asset base.
           PAGES_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
-      - name: Upload Pages artifact (examples/nurture-pet/dist)
+      - name: Upload Pages artifact (examples/product-demo/dist)
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: examples/nurture-pet/dist
+          path: examples/product-demo/dist
 
   deploy:
     name: Deploy to GitHub Pages

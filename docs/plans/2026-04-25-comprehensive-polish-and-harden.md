@@ -434,11 +434,11 @@ X → Y" toast already shipped in PR #69.
 
 **Files:**
 
-- `examples/nurture-pet/src/cognitionSwitcher.ts` — pass
+- `examples/product-demo/src/cognitionSwitcher.ts` — pass
   `history.loss` to a new helper.
-- `examples/nurture-pet/src/lossSparkline.ts` (new) — pure-DOM SVG
+- `examples/product-demo/src/lossSparkline.ts` (new) — pure-DOM SVG
   renderer. No charting lib.
-- `examples/nurture-pet/index.html` — anchor `<svg
+- `examples/product-demo/index.html` — anchor `<svg
 id="loss-sparkline">`.
 - `tests/examples/lossSparkline.test.ts` (new, jsdom).
 
@@ -527,7 +527,7 @@ the model drifts from the bundled baseline as the user plays.
 
 **Steps:**
 
-1. In `examples/nurture-pet/src/cognition/learning.ts`, after
+1. In `examples/product-demo/src/cognition/learning.ts`, after
    `TfjsReasoner.fromJSON(...)`, build a sibling `TfjsLearner` with
    the same reasoner reference.
 2. Define `toTrainingPair(outcome)` projection — `SkillCompleted`
@@ -556,7 +556,7 @@ expected call cadence; no library code change.
   adapter already returned `dataSync()`-flattened arrays — so the
   bundle stays at the same byte budget. Minor bump (consumer-facing
   doc surface).
-- Demo: re-authored `examples/nurture-pet/src/cognition/learning.network.json`
+- Demo: re-authored `examples/product-demo/src/cognition/learning.network.json`
   at the new `[5, 16, 7]` topology — 5 need-level inputs → 16 sigmoid
   hidden → 7-way softmax over the active-care skills. The bundled
   baseline is generated via the new `scripts/seed-learning-network.ts`
@@ -602,7 +602,7 @@ layer stays reactive.
 
 **As shipped:**
 
-- `examples/nurture-pet/src/cognition/learning.ts` grew the feature
+- `examples/product-demo/src/cognition/learning.ts` grew the feature
   vector from 5 need levels to 13 dims:
   - 5 need levels (hunger / cleanliness / happiness / energy / health)
   - 4 mood one-hot dims indexed by `MOOD_KEYS = ['happy', 'sad',
@@ -627,7 +627,7 @@ layer stays reactive.
   dims from real outcomes.
 - `scripts/seed-learning-network.ts` now builds a `[13, 16, 7]`
   Sequential and pads training pairs with the same uniform-noise tail.
-  The bundled `examples/nurture-pet/src/cognition/learning.network.json`
+  The bundled `examples/product-demo/src/cognition/learning.network.json`
   was regenerated at the new shape.
 - Hydration guard in `learning.ts` already validated input + output
   dims (PR #94 P2); the upgrade to `FEATURE_DIM = 13` lets old
@@ -651,7 +651,7 @@ the `LearningOutcome.details` shape.
 
 **As shipped:**
 
-- `examples/nurture-pet/src/predictionStrip.ts` (new) — pure-DOM SVG
+- `examples/product-demo/src/predictionStrip.ts` (new) — pure-DOM SVG
   renderer with `renderPredictionStrip(host, output, opts)` +
   `clearPredictionStrip(host)`. Draws 7 vertical bars (one per
   `SOFTMAX_SKILL_IDS` column) inside a 200×60 viewBox, with a
@@ -807,7 +807,7 @@ Metadata-only change; pre-1.0 has no consumers, so no changeset.
    during row 20.
 
 4. **Row 15 LLM example placement.** `examples/llm-mock/` as a
-   sibling to `examples/nurture-pet/`, OR as a `tests/examples/`
+   sibling to `examples/product-demo/`, OR as a `tests/examples/`
    integration asserting deterministic replay? README points to it,
    so a sibling is more discoverable. Confirm during row 15.
 

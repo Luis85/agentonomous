@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   clearLossSparkline,
   renderLossSparkline,
-} from '../../examples/nurture-pet/src/lossSparkline.js';
+} from '../../examples/product-demo/src/lossSparkline.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
