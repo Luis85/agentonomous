@@ -153,14 +153,38 @@ Run weekly. For each `PENDING` row in scope (skipping `DIVERGENT` and
    (`format:check && lint && typecheck && test && build`). If it
    fails, jump to [Failure handling](#failure-handling).
 
-6. **Push and open one PR per run** with every applied bump in a
+6. **Commit every applied bump in a single commit.** The bumps live
+   only in the working tree until this step — push without committing
+   would publish an empty branch and `gh pr create` would fail with
+   no diff:
+
+   ```bash
+   git add .github/workflows/*.yml
+   git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
+   ```
+
+7. **Write the PR body to the cache file.** The routine assembled
+   `${BODY}` in memory while applying bumps (see
+   [PR body shape](#pr-body-shape) below for the required format).
+   Persist it before `gh pr create` so a `--body-file` reference has
+   something to read, AND so an `gh pr create` failure leaves a
+   re-submit-by-hand artifact (per
+   [Failure handling](#failure-handling)):
+
+   ```bash
+   mkdir -p .actions-bump-cache
+   BODY_FILE=".actions-bump-cache/pr-body-$(date -u +%F).md"
+   printf '%s\n' "${BODY}" > "${BODY_FILE}"
+   ```
+
+8. **Push and open one PR per run** with every applied bump in a
    single diff:
 
    ```bash
    git push -u origin "chore/actions-bump-$(date -u +%F)"
    gh pr create --base develop \
      --title "chore: bump pinned action SHAs ($(date -u +%F))" \
-     --body-file .actions-bump-cache/pr-body-$(date -u +%F).md
+     --body-file "${BODY_FILE}"
    ```
 
    The owner reviews and merges. The PR is the run's artifact —
