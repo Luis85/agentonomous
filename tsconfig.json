@@ -30,6 +30,12 @@
       "agentonomous/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*", "examples/product-demo/src/**/*.ts", "scripts/**/*.ts"],
+  "include": [
+    "src/**/*",
+    "tests/**/*",
+    "examples/product-demo/src/**/*.ts",
+    "examples/product-demo/test/**/*.ts",
+    "scripts/**/*.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }

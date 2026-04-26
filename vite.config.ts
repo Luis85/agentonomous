@@ -150,7 +150,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.ts', 'scripts/**/*.test.mjs'],
+    include: [
+      'tests/**/*.test.ts',
+      'scripts/**/*.test.mjs',
+      'examples/product-demo/test/**/*.test.ts',
+    ],
     // Activates the matrix-selected tfjs backend (see
     // `tests/setup/tfjsBackend.ts`) BEFORE any test file's static
     // imports run. No-op for non-tfjs tests — the import is cheap and

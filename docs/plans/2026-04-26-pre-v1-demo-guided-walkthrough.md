@@ -25,7 +25,7 @@ external narration.
 
 | # | Slice | Files | Spec FRs | Status | PR |
 |---|---|---|---|---|---|
-| 1.1 | Step-graph + completion-predicate domain module + headless tests | `examples/product-demo/src/demo-domain/walkthrough/{types.ts,graph.ts,predicates.ts}`, `examples/product-demo/test/demo-domain/walkthrough/*.test.ts` | P1-FR-2, P1-FR-3, P1-FR-4 | not started | — |
+| 1.1 | Step-graph + completion-predicate domain module + headless tests | `examples/product-demo/src/demo-domain/walkthrough/{types.ts,graph.ts,predicates.ts}`, `examples/product-demo/test/demo-domain/walkthrough/*.test.ts` | P1-FR-2, P1-FR-3, P1-FR-4 | ✅ shipped | [#140](https://github.com/Luis85/agentonomous/pull/140) |
 | 1.2 | `useTourProgress` view store + tour overlay component (chapter 1 only) | `examples/product-demo/src/stores/view/useTourProgress.ts`, `examples/product-demo/src/components/tour/{TourOverlay.vue,StepHighlight.vue}`, `examples/product-demo/test/stores/view/useTourProgress.test.ts` | P1-FR-1, P1-FR-3, P1-FR-5, P1-FR-6, P1-FR-8 | not started | — |
 | 1.3 | Chapters 2-5 wired end-to-end + restart/skip/resume + selector-handle registry | `examples/product-demo/src/demo-domain/walkthrough/chapters/{2..5}.ts`, `examples/product-demo/src/components/**/registerSelector.ts`, `examples/product-demo/src/views/TourView.vue` | P1-FR-2, P1-FR-4, P1-FR-5, P1-FR-6, P1-FR-7 | not started | — |
 | 1.4 | Playwright `tour-happy-path.spec.ts` | `examples/product-demo/tests/e2e/tour-happy-path.spec.ts`, `examples/product-demo/playwright.config.ts` (script wiring) | P1-AC-1, P1-AC-5 | not started | — |
@@ -81,4 +81,4 @@ external narration.
 
 ## Done log
 
-- (none yet)
+- 2026-04-26 — slice 1.1 (domain module + headless tests) shipped via [#140](https://github.com/Luis85/agentonomous/pull/140).
