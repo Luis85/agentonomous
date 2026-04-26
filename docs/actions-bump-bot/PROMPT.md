@@ -197,6 +197,21 @@ For each remaining `PENDING` row in scope:
    git fetch origin
    git switch develop
    git pull --ff-only origin develop
+   # Worktree-cleanliness assertion. On a persistent runner, a
+   # prior interrupted run (verify-fail before cleanup, kill -9,
+   # machine reboot) can leave tracked edits or untracked files
+   # under `.github/workflows/`. Step 6's `git add .github/workflows/`
+   # would silently stage them into the bump PR, polluting the diff
+   # with unrelated changes. Abort loudly here so the operator can
+   # `git status` and reset by hand — never auto-clean, since the
+   # leftover edits might be intentional in-progress work.
+   if ! git diff --quiet -- .github/workflows/ \
+      || ! git diff --cached --quiet -- .github/workflows/ \
+      || [ -n "$(git ls-files --others --exclude-standard -- .github/workflows/)" ]; then
+     echo "Abort: .github/workflows/ has uncommitted edits or untracked files." >&2
+     echo "Run \`git status -- .github/workflows/\` and clean by hand before retrying." >&2
+     exit 1
+   fi
    # Capture the run date ONCE so step 7's cache filename and
    # step 8's push + PR title cannot drift if the run crosses UTC
    # midnight during `npm ci && npm run verify` (which can run for
