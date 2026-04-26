@@ -516,8 +516,7 @@ Wraps:
   the would-be commit message and the `git diff --stat` output,
   then revert the in-tree edits with
   `git restore .github/workflows/` before exit so the working tree
-  ends clean (per the "zero filesystem side effects" contract
-  below).
+  ends clean (per the dry-run contract below).
 
 Reads (`gh pr list`, `gh pr view`, `gh issue list`,
 `node scripts/bump-actions.mjs`) MAY still run in dry-run mode —
@@ -526,10 +525,31 @@ they have no side effects.
 The local `npm ci && npm run verify` SHOULD still run in dry-run mode
 so the run produces realistic verify-pass / verify-fail signals — but
 under no circumstances trigger `git push`, `gh pr create`, or
-`gh issue create` from that path.
+`gh issue create` from that path. `npm ci` rewrites `node_modules/`
+and `npm run verify` populates `dist/` / `docs/api/`, but all three
+are gitignored build artifacts, not state the next run consumes —
+they fall outside the dry-run contract below.
 
-In dry-run mode, do NOT write any cache files. Dry runs leave zero
-filesystem side effects. Exit 0 after dumping.
+## Dry-run contract
+
+A dry run leaves **no commits, no remote-side writes, and no cache
+files** behind. Specifically, after a dry run:
+
+- The current branch is unchanged: no new commits, no `chore/actions-bump-<date>`
+  branch left behind, working tree clean (any in-tree edits made
+  while preparing the would-be commit are reverted with
+  `git restore` before exit).
+- Nothing was pushed, no PR was opened, no issue was opened, no
+  label was created — every `git push` / `gh pr create` /
+  `gh issue create` / `gh label create` was replaced with a stdout
+  dump.
+- No `.actions-bump-cache/FAILED-*.md` files were written. The cache
+  dir exists for non-dry-run failure recovery only.
+
+Gitignored workspace artifacts produced by `npm ci` (`node_modules/`)
+and `npm run verify` (`dist/`, `docs/api/`, vitest caches) are out
+of scope — they are routine workspace setup that any subsequent run
+re-derives idempotently. Exit 0 after dumping.
 
 # Failure handling
 
