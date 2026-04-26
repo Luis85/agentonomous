@@ -262,6 +262,37 @@ self-contained — once the user works through the checkboxes, the issue
 is closeable. A rolling tracker would balloon and obscure resolution
 state.
 
+## Dry-run mode
+
+If the env var `DRY_RUN` is set to anything non-empty, this entire
+persistence section is **read-only**. Every `gh issue create`, `gh
+issue comment`, `gh issue list`, and `gh label create` call below MUST
+be replaced with a stdout dump of the would-be call:
+
+```text
+[DRY_RUN] would call: gh <subcommand> <args…>
+[DRY_RUN] body:
+<verbatim body that would have been sent>
+```
+
+In dry-run mode, do NOT write `.docs-review-cache/FAILED-*.md` files
+either — the dry run is supposed to leave zero side effects beyond
+stdout. Exit 0 after dumping. Use this guard around every write:
+
+```bash
+if [ -n "${DRY_RUN:-}" ]; then
+  printf '[DRY_RUN] would call: gh issue create --title %q --label docs-review --body-file %q\n' \
+    "${TITLE}" "${BODY_FILE}"
+  printf '[DRY_RUN] body:\n'; cat "${BODY_FILE}"
+else
+  gh issue create --title "${TITLE}" --label docs-review --body-file "${BODY_FILE}"
+fi
+```
+
+Reads (`gh issue list`, `gh api .../issues/<N>/comments` for
+idempotency lookups) MAY still run in dry-run mode — they have no
+side effects.
+
 ## Issue spec
 
 - **Title:** `Docs review — YYYY-MM-DD (<head-sha>)`
@@ -278,10 +309,16 @@ state.
 ```bash
 TITLE="Docs review — $(date -u +%F) (${HEAD_SHA})"
 BODY_FILE=".docs-review-cache/issue-body-$(date -u +%F).md"
-gh issue create \
-  --title "${TITLE}" \
-  --label docs-review \
-  --body-file "${BODY_FILE}"
+if [ -n "${DRY_RUN:-}" ]; then
+  printf '[DRY_RUN] would call: gh issue create --title %q --label docs-review --body-file %q\n' \
+    "${TITLE}" "${BODY_FILE}"
+  printf '[DRY_RUN] body:\n'; cat "${BODY_FILE}"
+else
+  gh issue create \
+    --title "${TITLE}" \
+    --label docs-review \
+    --body-file "${BODY_FILE}"
+fi
 ```
 
 ## No-op handling
@@ -291,6 +328,10 @@ Instead, comment on the most recent open `docs-review` issue (if one
 exists) with a one-line `YYYY-MM-DD — clean run at <head-sha>` so the
 silence is visible. If no prior `docs-review` issue exists either, log
 the no-op to stdout and exit 0 without touching GitHub.
+
+The clean-run comment is also a write — wrap the `gh issue comment`
+call in the same `DRY_RUN` guard described above (dump the would-be
+comment body to stdout instead).
 
 ## Closing issues — NOT the bot's job
 
@@ -307,8 +348,11 @@ If today's run already opened a `docs-review` issue for the same
 do NOT open a duplicate. Either:
 
 - New findings vs the existing issue → comment them onto the existing
-  issue with a `Delta — re-run at $(date -u +%FT%TZ)` header.
+  issue with a `Delta — re-run at $(date -u +%FT%TZ)` header. Wrap the
+  `gh issue comment` call in the same `DRY_RUN` guard.
 - Same findings → exit 0 silently.
+
+`gh issue list` is read-only and runs unguarded in both modes.
 
 # Failure handling
 
@@ -316,11 +360,14 @@ do NOT open a duplicate. Either:
   `.docs-review-cache/FAILED-issue-body-<sha>-<timestamp>.md` and exit
   1 so the routine surfaces the error. Do NOT retry blindly.
 - `gh label create` fails because the label already exists → ignore
-  and continue.
+  and continue. Skip this call entirely in `DRY_RUN` mode (just dump
+  the would-be call to stdout per the Dry-run section).
 - Any `git`/`gh` command fails with auth → exit 1 with the verbatim
   error. Do not paper over it.
 - The cache dir `.docs-review-cache/` is gitignored — add it to
   `.gitignore` if missing (one-time setup, see README).
+- In `DRY_RUN` mode, do NOT write `FAILED-*.md` files. Dry runs leave
+  zero filesystem side effects beyond the existing cache reads.
 
 # Do NOT
 
