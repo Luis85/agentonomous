@@ -132,15 +132,29 @@ For each remaining `PENDING` row in scope:
    `BASE_SHA` is the develop-tip SHA at branch-cut. The
    [Failure-issue spec](#failure-issue-spec) uses its 7-char prefix
    for issue titles since the bump commit (step 6) may not exist yet
-   when actionlint or verify fails:
+   when actionlint or verify fails. The
+   [Dry-run mode](#dry-run-mode) contract requires zero filesystem
+   side effects — gate the actual `git switch -c` so a dry run on a
+   shared / persistent runner doesn't leave a stray
+   `chore/actions-bump-<date>` branch behind to contaminate later
+   runs:
 
    ```bash
    git fetch origin
    git switch develop
    git pull --ff-only origin develop
-   git switch -c "chore/actions-bump-$(date -u +%F)"
+   BRANCH="chore/actions-bump-$(date -u +%F)"
+   if [ -n "${DRY_RUN:-}" ]; then
+     printf '[DRY_RUN] would call: git switch -c %q\n' "${BRANCH}"
+   else
+     git switch -c "${BRANCH}"
+   fi
    BASE_SHA="$(git rev-parse HEAD)"
    ```
+
+   `BASE_SHA` resolves to the develop tip in both modes — in dry-run
+   `HEAD` is still on `develop`, in non-dry-run the new branch was
+   just cut from it.
 
 3. **Apply each bump.** For every pending row, edit the matching
    workflow file: replace the 40-char SHA with the freshly-resolved

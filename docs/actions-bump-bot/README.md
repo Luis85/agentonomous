@@ -63,17 +63,23 @@ weekly `dep-triage-bot`.
 
 ## Setup checklist (one-time)
 
-- [ ] Confirm the `actions-bump-bot` label exists on the repo:
+- [ ] Confirm the `actions-bump-bot` label exists on the repo. Bare
+      `gh label create` returns a non-zero error when the label
+      already exists (only `--force` updates an existing label,
+      which would clobber its description/color). Gate creation
+      behind an existence check:
+
       ```bash
-      gh label list --search actions-bump-bot
+      if ! gh label list --search actions-bump-bot --json name \
+           --jq '.[] | select(.name == "actions-bump-bot") | .name' \
+         | grep -q .; then
+        gh label create actions-bump-bot --color D93F0B \
+          --description "Failure issues from the weekly actions-bump cloud routine"
+      fi
       ```
-      If missing, create it:
-      ```bash
-      gh label create actions-bump-bot --color D93F0B \
-        --description "Failure issues from the weekly actions-bump cloud routine"
-      ```
-      (The label was added in the same increment that landed this
-      routine; re-creating it is a safe no-op if it's already there.)
+
+      The label was added in the same increment that landed this
+      routine, so the existence check usually short-circuits.
 - [ ] Add `.actions-bump-cache/` to `.gitignore` (one line). The
       routine writes `FAILED-pr-body-<date>.md` and
       `FAILED-issue-body-<date>.md` files there if `gh pr create`
