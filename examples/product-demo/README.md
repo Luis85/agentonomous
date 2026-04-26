@@ -1,8 +1,12 @@
-# Nurture pet demo
+# Product demo
 
-The MVP demo for the `agentonomous` library. A virtual pet you can nurture
-from birth to death — feed it, clean it, play, rest, scold, medicate —
-and watch it react and act autonomously between your inputs.
+The product demo for the `agentonomous` library. The current shippable
+baseline is a virtual-pet nurture loop — feed, clean, play, rest, scold,
+medicate — that reacts and acts autonomously between user inputs. The
+pre-v1 demo evolution increment expands this baseline into a multi-view
+interactive site (guided tour, cognition diff panel, replay report,
+JSON tuning, second scenario); see
+`docs/product/2026-04-26-pre-v1-demo-evolution-plan.md`.
 
 ## What it demonstrates
 
@@ -50,7 +54,7 @@ npm run build
 Then start the demo:
 
 ```bash
-cd examples/nurture-pet
+cd examples/product-demo
 npm install
 npm run dev
 ```

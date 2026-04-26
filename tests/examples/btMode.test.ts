@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { btMode } from '../../examples/nurture-pet/src/cognition/bt.js';
+import { btMode } from '../../examples/product-demo/src/cognition/bt.js';
 import type { DomainEvent } from '../../src/events/DomainEvent.js';
 import type { Intention } from '../../src/cognition/Intention.js';
 import type { IntentionCandidate } from '../../src/cognition/IntentionCandidate.js';

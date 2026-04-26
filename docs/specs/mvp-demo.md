@@ -5,7 +5,7 @@
 > and how we keep the story clear. Draft — iterated on throughout Phase A.
 >
 > **Status (2026-04-26):** chapters A–E (the 3-minute narrative below) are
-> all live in `examples/nurture-pet/`. Active polish work — explainability
+> all live in `examples/product-demo/`. Active polish work — explainability
 > HUD, learning-mode UX, prediction strip, backend picker — is tracked in
 > `docs/plans/2026-04-25-comprehensive-polish-and-harden.md`. Phase 1 / 2 /
 > 3 (foundation / explainability / public polish) below describe the

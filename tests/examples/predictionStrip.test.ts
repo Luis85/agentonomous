@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   clearPredictionStrip,
   renderPredictionStrip,
-} from '../../examples/nurture-pet/src/predictionStrip.js';
+} from '../../examples/product-demo/src/predictionStrip.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SOFTMAX_DIM = 7;

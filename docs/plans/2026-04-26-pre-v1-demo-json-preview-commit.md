@@ -2,7 +2,7 @@
 
 Plan date: 2026-04-26
 Wave: B
-Tracker PR: [#129](https://github.com/Luis85/agentonomous/pull/129) — every PR cut from this plan must include `Tracks: #129` in its body.
+Tracker issue: [#132](https://github.com/Luis85/agentonomous/issues/132) — every PR cut from this plan must include `Tracks: #132` in its body. (Originating PR [#129](https://github.com/Luis85/agentonomous/pull/129) landed the doc set; the live tracker is now the issue.)
 Companion docs:
 - Planning doc: [`docs/product/2026-04-26-pre-v1-demo-evolution-plan.md`](../product/2026-04-26-pre-v1-demo-evolution-plan.md) → §4 JSON tuning evolution
 - Design doc: [`docs/specs/2026-04-26-pre-v1-demo-evolution-design.md`](../specs/2026-04-26-pre-v1-demo-evolution-design.md) → Cross-pillar contracts → `ConfigDraft`
@@ -87,8 +87,8 @@ keyed off a whitelist of safely previewable fields.
 
 - Spec criteria P4-AC-1 through P4-AC-5 all met.
 - OQ-P4 (color cues) decision recorded.
-- PR #129 tracker table row for "JSON preview/commit" set to ✅ with
-  every merged PR linked.
+- Planning-doc tracker table row for "JSON preview/commit" set to ✅
+  with every merged PR linked.
 
 ## Done log
 

@@ -238,8 +238,8 @@ Pages via `.github/workflows/pages.yml` on every push to the long-lived
 
 - URL: `https://<owner>.github.io/agentonomous/`
 - Builds the library (`npm run build`), then the example (`cd
-examples/nurture-pet && npm install && npm run build`), then uploads
-  `examples/nurture-pet/dist` as the Pages artifact.
+examples/product-demo && npm install && npm run build`), then uploads
+  `examples/product-demo/dist` as the Pages artifact.
 - The example's `vite.config.ts` reads `PAGES_BASE` at build time so assets
   resolve under the `/agentonomous/` subpath.
 

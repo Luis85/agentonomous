@@ -1,5 +1,5 @@
 /**
- * One-shot seed script for `examples/nurture-pet/src/cognition/learning.network.json`.
+ * One-shot seed script for `examples/product-demo/src/cognition/learning.network.json`.
  *
  * Builds a `[13, 16, 7]` Sequential (13 input feature dims = 5 needs + 4
  * mood one-hot + 1 modifier-count + 3 recent-event counts → 16 sigmoid
@@ -57,7 +57,7 @@ const NEED_TO_SKILL_INDEX: ReadonlyArray<number> = [
 
 /**
  * Mood keys appended after the 5 need dims as a one-hot block. Must
- * match `MOOD_KEYS` in `examples/nurture-pet/src/cognition/learning.ts`.
+ * match `MOOD_KEYS` in `examples/product-demo/src/cognition/learning.ts`.
  */
 const MOOD_KEYS = ['happy', 'sad', 'sleepy', 'playful'] as const;
 
@@ -276,7 +276,7 @@ async function main(): Promise<void> {
     '..',
     '..',
     'examples',
-    'nurture-pet',
+    'product-demo',
     'src',
     'cognition',
     'learning.network.json',

@@ -5,7 +5,7 @@ testable, designed to nurture an agent from birth to death in the browser with
 zero configuration.
 
 **Status:** pre-release (`0.0.0` per `package.json`). The Phase A MVP — a
-virtual-pet nurture demo — ships in `examples/nurture-pet`.
+virtual-pet nurture demo — ships in `examples/product-demo`.
 
 **Demo:** https://luis85.github.io/agentonomous/
 
@@ -100,7 +100,7 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 ```
 
-That's the whole MVP surface. See `examples/nurture-pet` for a full browser
+That's the whole MVP surface. See `examples/product-demo` for a full browser
 demo with HUD, buffs, random events, and localStorage persistence.
 
 ### Interaction flow
@@ -185,7 +185,7 @@ the throw and the next tick, so replay stays deterministic.
 
 ### Running the example
 
-The `examples/nurture-pet` demo resolves `agentonomous` (and its
+The `examples/product-demo` demo resolves `agentonomous` (and its
 `cognition/adapters/*` subpaths) via Vite + tsconfig aliases that point at
 the library's built `dist/` — not via an npm dependency. That keeps the
 demo import shape identical to a real consumer while sidestepping npm's
@@ -199,7 +199,7 @@ npm install
 npm run build                       # → dist/ populated so the example can import
 
 # Install the example's own deps + start Vite dev server.
-cd examples/nurture-pet
+cd examples/product-demo
 npm install
 npm run dev
 ```

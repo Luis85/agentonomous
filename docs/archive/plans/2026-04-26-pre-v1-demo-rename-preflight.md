@@ -1,3 +1,5 @@
+> **Archived 2026-04-26.** Completed in the Wave-0 demo rename preflight PR; tracked under the umbrella issue [#132](https://github.com/Luis85/agentonomous/issues/132). The rename + script + workflow + ESLint rules + Playwright skeleton + doc sweep + legacy-key purge all shipped in that single atomic PR. Body left intact as the historical record.
+
 # Demo rename preflight — pre-v1 demo evolution
 
 Plan date: 2026-04-26

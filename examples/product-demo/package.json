@@ -1,15 +1,17 @@
 {
-  "name": "nurture-pet-demo",
+  "name": "product-demo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Nurture-pet MVP demo for the agentonomous library.",
+  "description": "Product demo for the agentonomous library (Phase A nurture-pet baseline; pre-v1 demo evolution v2 in progress).",
   "scripts": {
     "dev": "vite --open",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
     "@tensorflow/tfjs-backend-cpu": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@tensorflow/tfjs-backend-webgl": "^4.22.0",

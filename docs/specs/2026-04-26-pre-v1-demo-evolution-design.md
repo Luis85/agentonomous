@@ -1,7 +1,7 @@
 # Pre-v1 Demo Evolution — Design Document
 
 Spec date: 2026-04-26
-Tracker PR: [#129](https://github.com/Luis85/agentonomous/pull/129)
+Tracker issue: [#132](https://github.com/Luis85/agentonomous/issues/132) (originating PR [#129](https://github.com/Luis85/agentonomous/pull/129) landed the doc set; the live tracker is now the issue)
 Companion docs:
 - Planning doc: [`docs/product/2026-04-26-pre-v1-demo-evolution-plan.md`](../product/2026-04-26-pre-v1-demo-evolution-plan.md)
 - Spec: [`2026-04-26-pre-v1-demo-evolution-spec.md`](./2026-04-26-pre-v1-demo-evolution-spec.md)
@@ -87,9 +87,9 @@ examples/product-demo/src/
 └── styles/                    # tokens, layout, component overrides
 ```
 
-`examples/product-demo/` replaces `examples/nurture-pet/` per the rename
-preflight slice (Wave 0). Until that ships, treat the existing path as the
-working copy and apply this layout under the new name once renamed.
+`examples/product-demo/` is the renamed workspace as of Wave-0 (preflight
+shipped 2026-04-26). The old workspace name has been retired; the per-pillar
+plans below all assume `examples/product-demo/` from day 1.
 
 ### Build + dev commands (unchanged contract, renamed targets)
 
