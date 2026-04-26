@@ -318,32 +318,51 @@ embedded at the top of the routine's per-PR comment body:
 
 ## Skip check (run at the start of every PR's iteration)
 
-The marker is **only trusted when authored by the routine's own bot
-account**. Any collaborator (or accidental copy/paste of an old
-comment) could otherwise inject a `<!-- dep-triaged:<sha7>:* -->`
+The marker is **only trusted when authored by the configured
+routine login**. Any collaborator (or accidental copy/paste of an
+old comment) could otherwise inject a `<!-- dep-triaged:<sha7>:* -->`
 line into a human comment and silently suppress triage for that PR.
-The skip check therefore filters comment authors to `type == "Bot"`
-*and* a configured bot-login allowlist before reading the marker.
+The skip check therefore matches comment authors against a
+configured login allowlist before reading the marker.
 
-Set `ROUTINE_BOT_LOGIN` at scheduler-config time to the GitHub
-account the routine posts as (the App login, e.g. `claude[bot]` or
-the org's automation account). The check fails loudly if it is not
-set so a misconfigured run cannot accidentally trust unsigned
-markers.
+Set `ROUTINE_GH_LOGIN` at scheduler-config time to the GitHub login
+the routine actually posts as. Two common shapes:
+
+- **PAT-driven cloud routine.** The routine uses a Personal Access
+  Token belonging to a human (e.g. the repo owner). Comments are
+  authored by that human's login (e.g. `Luis85`) with
+  `user.type == "User"`. Set `ROUTINE_GH_LOGIN=<human-login>`.
+- **GitHub App / bot-account routine.** Comments are authored by
+  the App's bot identity (e.g. `claude[bot]`) with
+  `user.type == "Bot"`. Set `ROUTINE_GH_LOGIN=<bot-login>`.
+
+The skip check does NOT constrain `user.type` — a PAT-driven cloud
+routine is a legitimate setup, and constraining to `Bot` would
+silently disable triage idempotency on every PAT-based run. The
+login allowlist is the trust boundary. If anyone other than the
+routine's configured login posts a `<!-- dep-triaged:<sha7>:* -->`
+line, the marker is ignored and the PR is re-triaged on the next
+run — a re-triage is conservative (worst case: the bot posts a
+duplicate triage comment); a silently-skipped triage is dangerous
+(misses verify failures or auto-merge gates).
+
+The check fails loudly if `ROUTINE_GH_LOGIN` is unset so a
+misconfigured run cannot accidentally trust unsigned markers from
+arbitrary commenters.
 
 `gh api` accepts only `--jq <string>` for filtering — it does not
 forward jq CLI flags such as `--arg`. Pipe the raw response to a
-standalone `jq` invocation so SHA + bot-login values can be passed
-in via `--arg` (which jq escapes safely, avoiding shell-quoting
+standalone `jq` invocation so SHA + login values can be passed in
+via `--arg` (which jq escapes safely, avoiding shell-quoting
 pitfalls in the filter string).
 
 ```bash
-: "${ROUTINE_BOT_LOGIN:?ROUTINE_BOT_LOGIN must be set to the bot account login the routine posts as}"
+: "${ROUTINE_GH_LOGIN:?ROUTINE_GH_LOGIN must be set to the GitHub login the routine posts as}"
 HEAD_SHA7="$(gh pr view <pr> --json headRefOid --jq '.headRefOid[0:7]')"
 SKIP="$(gh api "repos/<owner>/<repo>/issues/<pr>/comments" \
-  | jq -r --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_BOT_LOGIN}" \
+  | jq -r --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_GH_LOGIN}" \
     '.[]
-     | select(.user.type == "Bot" and .user.login == $login)
+     | select(.user.login == $login)
      | select(.body | startswith("<!-- dep-triaged:" + $sha + ":"))
      | .body' \
   | head -n1)"
@@ -354,8 +373,9 @@ fi
 ```
 
 If a marker for the current head SHA exists **and was authored by
-the routine's bot account**, this PR was already triaged on a prior
-run with no Dependabot rebase since. Add it to the run footer's
+the configured routine login**, this PR was already triaged on a
+prior run with no Dependabot rebase since. Add it to the run
+footer's
 `Skipped` count and move on. A marker authored by anyone else is
 ignored.
 

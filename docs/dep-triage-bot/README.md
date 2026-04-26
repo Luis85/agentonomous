@@ -72,16 +72,25 @@ code-review bot.
       delta-append), and `contents:read` (clone + checkout PR
       branches). No `contents:write` — the routine never pushes a
       branch.
-- [ ] Set `ROUTINE_BOT_LOGIN` in the routine's env to the GitHub
-      login the routine posts as (e.g. `claude[bot]`, or whichever
-      App / automation account the org uses). The prompt's
+- [ ] Set `ROUTINE_GH_LOGIN` in the routine's env to the GitHub
+      login the routine actually posts as. Two common setups:
+      - **PAT-driven cloud routine** (e.g. Anthropic Cloud routine
+        running under your own Personal Access Token): set
+        `ROUTINE_GH_LOGIN=<your-github-username>` (the comments
+        will appear authored by that human user with
+        `user.type == "User"`).
+      - **GitHub App / dedicated bot account**: set
+        `ROUTINE_GH_LOGIN=<bot-login>` (e.g. `claude[bot]`).
+
+      The prompt's
       [Idempotency skip check](./PROMPT.md#skip-check-run-at-the-start-of-every-prs-iteration)
-      requires this to constrain the trusted-marker filter to
-      bot-authored comments only — without it, an unrelated
-      collaborator could inject a `<!-- dep-triaged:<sha7>:* -->`
-      line into a human comment and silently suppress triage for
-      that PR. The skip check exits non-zero if the env var is
-      unset.
+      uses this login as the trust boundary for accepting
+      `<!-- dep-triaged:<sha7>:* -->` markers. The check
+      deliberately does NOT constrain `user.type` — that would
+      silently disable triage idempotency on PAT-based runs. It
+      exits non-zero if the env var is unset, so a misconfigured
+      run cannot accidentally trust markers from arbitrary
+      commenters.
 - [ ] Confirm Dependabot is configured to group npm minor + patch
       updates per the `npm-non-major` blocks on both npm entries in
       [`.github/dependabot.yml`](../../.github/dependabot.yml).
