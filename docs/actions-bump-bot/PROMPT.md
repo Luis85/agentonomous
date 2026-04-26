@@ -145,9 +145,18 @@ For each remaining `PENDING` row in scope:
    git pull --ff-only origin develop
    BRANCH="chore/actions-bump-$(date -u +%F)"
    if [ -n "${DRY_RUN:-}" ]; then
-     printf '[DRY_RUN] would call: git switch -c %q\n' "${BRANCH}"
+     printf '[DRY_RUN] would call: git switch -C %q develop\n' "${BRANCH}"
    else
-     git switch -c "${BRANCH}"
+     # Use `-C` (force-create) instead of `-c` so a same-day retry
+     # works on a persistent runner: if a prior attempt aborted
+     # partway through (e.g. the documented `git push` failure path
+     # left the local branch behind, or `actionlint` / `npm run
+     # verify` failure left it deleted but a still-earlier retry left
+     # an older copy), `-C` resets the branch cleanly to the current
+     # `develop` tip. Anchored explicitly at `develop` so the new
+     # branch always starts from the freshly-pulled tip, never from
+     # whatever leftover commits the prior attempt left behind.
+     git switch -C "${BRANCH}" develop
    fi
    BASE_SHA="$(git rev-parse HEAD)"
    ```
