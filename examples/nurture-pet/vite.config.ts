@@ -1,6 +1,8 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { copyFileSync, readFileSync } from 'node:fs';
+import type { Plugin } from 'vite';
 
 /**
  * Asset base path. Respects `PAGES_BASE` so the CI Pages workflow can serve
@@ -11,6 +13,31 @@ const base = process.env.PAGES_BASE ?? '/';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const libDist = (subpath: string) => resolve(here, '..', '..', 'dist', subpath);
+
+const FAVICON_SRC = resolve(here, '..', '..', 'branding', 'favicon.svg');
+
+/**
+ * Serves the canonical agentonomous favicon (branding/favicon.svg) without
+ * committing a copy into the example's source tree.
+ *
+ * - Dev: middleware streams the file at /favicon.svg.
+ * - Build: closeBundle copies it into dist/favicon.svg so the deployed
+ *   bundle includes it.
+ */
+function brandFaviconPlugin(): Plugin {
+  return {
+    name: 'agentonomous:brand-favicon',
+    configureServer(server) {
+      server.middlewares.use('/favicon.svg', (_req, res) => {
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.end(readFileSync(FAVICON_SRC));
+      });
+    },
+    closeBundle() {
+      copyFileSync(FAVICON_SRC, resolve(here, 'dist', 'favicon.svg'));
+    },
+  };
+}
 
 /**
  * Resolve `agentonomous` and its adapter subpaths against the library's built
@@ -45,6 +72,7 @@ const agentonomousAliases = [
 export default defineConfig({
   base,
   server: { port: 5173 },
+  plugins: [brandFaviconPlugin()],
   resolve: {
     alias: agentonomousAliases,
   },
