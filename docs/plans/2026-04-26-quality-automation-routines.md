@@ -57,7 +57,7 @@ three cloud-routine prompts).
 | `stryker.config.mjs` | Stryker config (vitest runner, sane mutate globs, threshold). |
 | `examples/nurture-pet/playwright.config.ts` | Playwright config for the demo smoke spec. |
 | `examples/nurture-pet/tests/smoke/golden-path.spec.ts` | Click Feed/Pet/Sleep/Train; assert HUD updates + no console errors. |
-| `tests/determinism/replay.bench.ts` | Vitest-driven replay across N seeds; emits one `sha256(trace-stream)` per seed. |
+| `tests/determinism/replay.test.ts` | Vitest-driven replay across N seeds; emits one `sha256(trace-stream)` per seed. |
 | `tests/determinism/baseline.json` | Committed map `{ seedString: sha256 }` (ground truth). |
 | `tests/determinism/replay.ts` | Replay harness (pure function: seed → trace stream → sha). |
 | `docs/metrics/bundle-trend.jsonl` | Append-only JSONL: one row per weekly snapshot. Created by row 5. |
@@ -654,7 +654,7 @@ git commit -m "ci(metrics): weekly bundle-size trend snapshot"
 
 ---
 
-## Chunk 4: Determinism replay benchmark (row 6)
+## Chunk 4: Determinism replay (row 6)
 
 Rationale: the determinism rule (`SeededRng` + `ManualClock` ⇒ byte-
 identical `DecisionTrace`) is enforced statically by ESLint
@@ -667,8 +667,7 @@ inside a needs policy, etc.
 
 **Files:**
 - Create: `tests/determinism/replay.ts`
-- Create: `tests/determinism/replay.bench.ts` *(actually a vitest
-  test, not a bench — using `.bench.ts` would skew CI timing)*
+- Create: `tests/determinism/replay.test.ts`
 - Create: `tests/determinism/baseline.json`
 - Create: `.github/workflows/determinism.yml`
 - Modify: `package.json` — scripts `determinism:replay`,
@@ -722,7 +721,7 @@ The same file serves two modes:
   library change.
 
 ```ts
-// tests/determinism/replay.bench.ts
+// tests/determinism/replay.test.ts
 import { test, expect } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { REPLAY_SEEDS, replaySeed } from './replay.js';
@@ -756,7 +755,7 @@ if (writeMode) {
 - [ ] **Step 6.4: Run the assertion mode (red)**
 
 ```bash
-npx vitest run tests/determinism/replay.bench.ts
+npx vitest run tests/determinism/replay.test.ts
 ```
 
 Expected: FAIL — `baseline.json` does not exist yet, so the
@@ -766,10 +765,10 @@ Expected: FAIL — `baseline.json` does not exist yet, so the
   write mode**
 
 ```bash
-npx vitest run tests/determinism/replay.bench.ts -- --write-baseline
+npx vitest run tests/determinism/replay.test.ts -- --write-baseline
 ```
 
-Vitest transpiles `replay.ts` + `replay.bench.ts` itself, so no `tsx`
+Vitest transpiles `replay.ts` + `replay.test.ts` itself, so no `tsx`
 or extra harness script is needed. The `--write-baseline` token
 arrives in `process.argv`, the test file flips into write mode, and
 `baseline.json` is created. Inspect the result:
@@ -783,7 +782,7 @@ Expected: an 8-key JSON object, each value a 64-char hex digest.
 - [ ] **Step 6.6: Re-run the test (green)**
 
 ```bash
-npx vitest run tests/determinism/replay.bench.ts
+npx vitest run tests/determinism/replay.test.ts
 ```
 
 Expected: PASS for all 8 seeds.
@@ -791,7 +790,7 @@ Expected: PASS for all 8 seeds.
 - [ ] **Step 6.7: Run twice in the same shell to confirm stability**
 
 ```bash
-for i in 1 2 3; do npx vitest run tests/determinism/replay.bench.ts; done
+for i in 1 2 3; do npx vitest run tests/determinism/replay.test.ts; done
 ```
 
 Expected: PASS PASS PASS. Any flake means the harness is non-
@@ -801,8 +800,8 @@ deterministic — fix `replay.ts` rather than weakening the assertion.
 
 ```json
 // package.json — add to "scripts":
-"determinism:replay": "vitest run tests/determinism/replay.bench.ts",
-"determinism:baseline": "vitest run tests/determinism/replay.bench.ts -- --write-baseline"
+"determinism:replay": "vitest run tests/determinism/replay.test.ts",
+"determinism:baseline": "vitest run tests/determinism/replay.test.ts -- --write-baseline"
 ```
 
 Both scripts are pure `vitest run` invocations — no `tsx`, no
