@@ -116,9 +116,19 @@ share a scoped run during a live demo.
 
 ### Route guards
 
-- **Tour resumption guard** (`/tour`): if no active session exists,
-  initialize it deterministically from the tour's known-good seed before
-  rendering the step.
+- **Tour resumption guard** (`/tour`): the guard preserves any seed the
+  user already had. Resolution order on entry:
+  1. If `useTourProgress.lastStep` is set, hydrate the session from
+     `demo.v2.session.lastSeed.<activeScenarioId>` (the user's seed) and
+     render at the persisted step. Reload MUST NOT change the seed —
+     this is what backs spec **P1-AC-2**.
+  2. Else if the user is starting the tour cold from `/`'s
+     "Start guided tour" CTA, bootstrap the session from the tour's
+     known-good seed and persist it as the user's seed for the
+     duration of the tour.
+  3. Else (no progress and no cold-start CTA, e.g., a deep-link to
+     `/tour` in a fresh profile), redirect to `/` so the user enters
+     via the cold-start path.
 - **Scenario validity guard** (`/play/:scenarioId`): if the id is not in
   `useScenarioCatalog.list()`, redirect to `/play` and surface a
   one-tick toast.
@@ -148,10 +158,10 @@ Stores split along a strict line:
 
 | Store | Layer | Purpose | Public actions (selected) | Persists | Peer deps |
 |---|---|---|---|---|---|
-| `useAgentSession` | domain | Owns the live `Agent` + tick loop + control mode | `start`, `pause`, `resume`, `step(n)`, `setSpeed`, `replayFromSnapshot`, `subscribe` | `demo.v2.session.lastSeed`, `demo.v2.session.mode` | none |
+| `useAgentSession` | domain | Owns the live `Agent` + tick loop + control mode | `start`, `pause`, `resume`, `step(n)`, `setSpeed`, `replayFromSnapshot`, `subscribe` | `demo.v2.session.lastSeed.<scenarioId>`, `demo.v2.session.mode` | none |
 | `useScenarioCatalog` | domain | Registers + activates `Scenario` instances | `list`, `activeId`, `setActive(id)`, `getScopeKeyComponent()` | `demo.v2.scenario.activeId` | `useAgentSession` |
 | `useFingerprintRecorder` | domain | Records canonical run fingerprints + verdicts | `beginWindow(scope)`, `recordTick(trace)`, `verdict()`, `report()` | `demo.v2.fingerprint.knownGood` (per scope key) | `useAgentSession`, `useScenarioCatalog` |
-| `useConfigDraft` | domain | Holds the in-flight JSON config draft + preview state | `loadFromActive`, `setField(path, value)`, `preview`, `revert`, `commit` | `demo.v2.config.committed` | `useAgentSession` |
+| `useConfigDraft` | domain | Holds the in-flight JSON config draft + preview state | `loadFromActive`, `setField(path, value)`, `preview`, `revert`, `commit` | `demo.v2.config.committed.<scenarioId>` | `useAgentSession` |
 | `useTourProgress` | view | Step graph cursor + completion flags | `start`, `next`, `skip`, `restart`, `markComplete(stepId)` | `demo.v2.tour.progress` | reads `useAgentSession` |
 | `useDiffPanelView` | view | Panel collapse, metric selection | `toggleExpanded`, `setActiveMetricSet` | `demo.v2.diffView.collapsed` | reads `useFingerprintRecorder`, `useAgentSession` |
 | `useJsonEditorView` | view | Editor tab + diff-summary visibility | `setTab`, `toggleDiffSummary` | `demo.v2.jsonView.tab` | reads `useConfigDraft` |
@@ -200,7 +210,7 @@ left to component logic.
 | From | May not import |
 |---|---|
 | `components/**` | `agentonomous`, `examples/product-demo/src/demo-domain/**` |
-| `views/**` | `examples/product-demo/src/demo-domain/**` (use stores instead) |
+| `views/**` | `agentonomous`, `examples/product-demo/src/demo-domain/**` (use stores instead) |
 | `demo-domain/**` | `vue`, `pinia`, `vue-router`, `@vueuse/*`, anything DOM-aware |
 | `stores/view/**` | `agentonomous`, `demo-domain/**` |
 
@@ -372,11 +382,11 @@ them on first load and emits a one-line console notice in dev mode only.
 
 | Key | Owner | Shape | Reset behavior |
 |---|---|---|---|
-| `demo.v2.session.lastSeed` | `useAgentSession` | `number` | cleared by "new seed" UI |
+| `demo.v2.session.lastSeed.<scenarioId>` | `useAgentSession` | `number` (one entry per scenario id, no shared key) | cleared by "new seed" UI for the active scenario only |
 | `demo.v2.session.mode` | `useAgentSession` | `string` | persists across reloads |
 | `demo.v2.scenario.activeId` | `useScenarioCatalog` | `ScenarioId` | defaults to `pet-care` |
 | `demo.v2.fingerprint.knownGood` | `useFingerprintRecorder` | `Record<FingerprintScopeKey, string>` (digest) | per-scope eviction on commit |
-| `demo.v2.config.committed` | `useConfigDraft` | `NormalizedConfig` (per scenario) | overwritten by commit |
+| `demo.v2.config.committed.<scenarioId>` | `useConfigDraft` | `NormalizedConfig` (one entry per scenario id, no shared key) | overwritten by commit for the active scenario only |
 | `demo.v2.tour.progress` | `useTourProgress` | `{ lastStep, completedAt }` | cleared by restart |
 | `demo.v2.diffView.collapsed` | `useDiffPanelView` | `boolean` | UI-only |
 | `demo.v2.jsonView.tab` | `useJsonEditorView` | `string` | UI-only |

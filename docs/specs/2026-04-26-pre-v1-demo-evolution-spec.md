@@ -300,8 +300,8 @@ integrity explicit and testable. The legacy "restart-only apply" flow is
   - **Preview (session-only)** — applies the draft to the live session
     without persisting; reversible via `revert()`.
   - **Commit + Restart (persisted)** — persists the draft to
-    `demo.v2.config.committed`, restarts the session, and triggers a
-    fresh fingerprint window.
+    `demo.v2.config.committed.<activeScenarioId>`, restarts the
+    session, and triggers a fresh fingerprint window.
 - **P4-FR-4.** A diff summary renders before/after values for every
   changed field. Invalid edits surface inline with the failing
   validator's reason; `Preview` and `Commit` actions are disabled while
@@ -412,9 +412,14 @@ const companionNpc: Scenario = {
 - **P5-AC-3.** Given the user swaps `pet-care ↔ companion-npc` twice,
   each scenario's last-known seed and committed config are preserved
   independently.
-- **P5-AC-4.** A demo presenter can articulate "same core, different
-  behavior surface" in ≤ 20 seconds using only what is visible in the
-  UI.
+- **P5-AC-4.** Given a scenario swap to `<scenarioId>`, within ≤ 1
+  tick all of the following agree on the new id: the URL
+  (`/play/<scenarioId>`), the persisted `demo.v2.scenario.activeId`
+  value, and the shell header's primary heading (which renders the
+  scenario's `displayName` and one-line `narrative` from the
+  `Scenario` contract). The primary heading carries an ARIA label
+  restating the scenario id so the swap is observable to assistive
+  tech, not only colour/typography.
 - **P5-AC-5.** The Playwright `scenario-swap.spec.ts` passes on every
   CI run.
 

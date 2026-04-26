@@ -46,9 +46,12 @@ keyed off a whitelist of safely previewable fields.
 - `preview()` applies the draft to the live session via a domain-level
   patch action; `revert()` restores from the committed config; both must
   complete within ≤ 1 tick.
-- `commit()` writes `demo.v2.config.committed`, restarts the session,
-  and calls `useFingerprintRecorder.beginWindow(scope)` with a scope key
-  that includes the new `configHash` (per the design's coordination rules).
+- `commit()` writes `demo.v2.config.committed.<activeScenarioId>`,
+  restarts the session, and calls
+  `useFingerprintRecorder.beginWindow(scope)` with a scope key that
+  includes the new `configHash` (per the design's coordination rules).
+  The scenario-suffixed key shape matches the design's storage table —
+  no shared `demo.v2.config.committed` key.
 
 ### 4.3 — UI without leaks
 
@@ -61,8 +64,10 @@ keyed off a whitelist of safely previewable fields.
 
 - The rename preflight already deleted legacy keys on first load. This
   slice ensures the **shape** purge happens too: any pre-existing
-  `demo.v2.config.committed` value with `v !== 1` is discarded and
-  re-initialized from defaults (per spec STO-1).
+  `demo.v2.config.committed.<scenarioId>` value with `v !== 1` is
+  discarded and re-initialized from defaults (per spec STO-1). Any
+  legacy unsuffixed `demo.v2.config.committed` key from an earlier
+  iteration is also dropped on first load.
 
 ## Open question (OQ-P4)
 
