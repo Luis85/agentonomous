@@ -18,7 +18,11 @@ second scenario.
 ## Pre-flight
 
 - Blocked by: rename preflight + Pillar-1 slice 1.2a (the pet-care
-  modules already live under `demo-domain/scenarios/petCare/`).
+  species/constants/cognition/skills already live under
+  `demo-domain/scenarios/petCare/`) + Pillar-4 slice **4.1** (the
+  pet-care `config/` subfolder must exist before `scenario.ts` can
+  compose it as the `Scenario.configSchema` field — the relocation
+  is what 4.1 does).
 - The `Scenario` interface is locked in the design doc. Concept of the
   `companion-npc` scenario is **OQ-P5** — settle in the kickoff for
   slice 5.3.
@@ -27,14 +31,14 @@ second scenario.
   scenario id by the time slice 5.2 lands.
 - **Legacy recycle.** Pillar-1 slice 1.2a `git mv`-relocated the
   pet-care species, constants, cognition, and skills into
-  `examples/product-demo/src/demo-domain/scenarios/petCare/`, and introduced
-  `demo-domain/scenarios/petCare/buildAgent.ts` as the agent-construction recipe.
-  Slice 5.2 below is therefore a much lighter refactor than originally
-  scoped: it WRAPS the existing modules in the design's `Scenario`
-  contract rather than relocating them. Pillar-4 may also have already
-  ported `speciesConfig.ts`'s `applyOverride` into
-  `demo-domain/scenarios/petCare/config/` by the time 5.2 lands — consume that
-  if so.
+  `examples/product-demo/src/demo-domain/scenarios/petCare/`, and
+  introduced `demo-domain/scenarios/petCare/buildAgent.ts` as the
+  agent-construction recipe. Pillar-4 slice 4.1 then ported
+  `speciesConfig.ts`'s `validateEditableConfig` + `applyOverride`
+  into `demo-domain/scenarios/petCare/config/`. Slice 5.2 below is
+  therefore a much lighter refactor than originally scoped: it
+  WRAPS the existing modules in the design's `Scenario` contract
+  rather than relocating them.
 
 ## Roadmap
 

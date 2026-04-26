@@ -16,7 +16,13 @@ users see — not infer — what changed between modes.
 ## Pre-flight
 
 - Blocked by: rename preflight + Pillar-1 slice 1.2a (depends on
-  `useAgentSession` + `demo-domain/scenarios/petCare/cognition/` salvage).
+  `useAgentSession` + `demo-domain/scenarios/petCare/cognition/`
+  salvage) + Pillar-1 slice **1.2b** (slice 2.5 deletes
+  `src/cognitionSwitcher.ts`, `src/lossSparkline.ts`, and
+  `src/predictionStrip.ts`; the legacy `src/main.ts` imports those
+  modules and the Wave-0 bridge keeps `src/main.ts` live until 1.2b
+  swaps `src/app/main.ts` to mount Vue. Running 2.5 before 1.2b
+  would break the build).
 - `DiffMetric<T>` contract is fixed in the design doc; no per-pillar
   variant.
 - Initial confidence-label thresholds are placeholders (**OQ-P2**);

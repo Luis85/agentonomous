@@ -17,7 +17,13 @@ keyed off a whitelist of safely previewable fields.
 ## Pre-flight
 
 - Blocked by: rename preflight + Pillar-1 slice 1.2a (the
-  `useAgentSession` factory the editor patches into).
+  `useAgentSession` factory the editor patches into) + Pillar-1
+  slice **1.2b** (slice 4.3 deletes `src/speciesConfig.ts`; the
+  legacy `src/main.ts` imports `applyOverride` /
+  `loadConfigOverride` / `mountConfigPanel` from it and the Wave-0
+  bridge keeps `src/main.ts` live until 1.2b swaps
+  `src/app/main.ts` to mount Vue. Running 4.3 before 1.2b would
+  break the build).
 - Coordinates with **Pillar 3** — every commit triggers a fresh
   fingerprint window. Confirm the `useFingerprintRecorder` API is
   stable before slice 4.3 lands.
@@ -39,7 +45,7 @@ keyed off a whitelist of safely previewable fields.
 
 | # | Slice | Files | Spec FRs | Status | PR |
 |---|---|---|---|---|---|
-| 4.1 | Cross-scenario config engine (pure domain) + pet-care relocation: NEW `demo-domain/config/` engine (`ConfigPath`, `ValidationFinding`, `ConfigDraft` shape, schema-driven validator/diff framework) + RELOCATED `speciesConfig.ts`'s pure logic (`EditableSpeciesConfig` → `NormalizedConfig`, `validateEditableConfig` rules, `applyOverride`) into `demo-domain/scenarios/petCare/config/` plugged into the engine. Replaces the implicit allow-list with the design's explicit `{ path, kind: 'preview' \| 'commit' }` whitelist. | `examples/product-demo/src/demo-domain/config/{types.ts,validateEngine.ts,diff.ts}` (cross-scenario, new), `examples/product-demo/src/demo-domain/scenarios/petCare/config/{schema.ts,validate.ts,applyOverride.ts}` (per-scenario, recycled), `examples/product-demo/test/demo-domain/config/*.test.ts`, `examples/product-demo/test/demo-domain/scenarios/petCare/config/*.test.ts` | P4-FR-2, P4-FR-6 | not started | — |
+| 4.1 | Cross-scenario config engine (pure domain) + pet-care relocation: NEW `demo-domain/config/` engine (`ConfigPath`, `ValidationFinding`, `ConfigDraft` shape, the previewable-field whitelist schema TYPE per spec **P4-FR-2**, schema-driven validator/diff framework) + RELOCATED `speciesConfig.ts`'s pure logic (`EditableSpeciesConfig` → `NormalizedConfig`, `validateEditableConfig` rules, `applyOverride`) into `demo-domain/scenarios/petCare/config/` plugged into the engine. The pet-care SCHEMA INSTANCE (which fields are `preview` vs `commit`) lives in `scenarios/petCare/config/schema.ts`; the schema TYPE + whitelist registry helpers live in `demo-domain/config/schema.ts` to honour the spec's exact path. Replaces the implicit allow-list with the design's explicit `{ path, kind: 'preview' \| 'commit' }` whitelist. | `examples/product-demo/src/demo-domain/config/{types.ts,schema.ts,validateEngine.ts,diff.ts}` (cross-scenario, new — `schema.ts` matches spec P4-FR-2), `examples/product-demo/src/demo-domain/scenarios/petCare/config/{schema.ts,validate.ts,applyOverride.ts}` (per-scenario instance + rules, recycled), `examples/product-demo/test/demo-domain/config/*.test.ts`, `examples/product-demo/test/demo-domain/scenarios/petCare/config/*.test.ts` | P4-FR-2, P4-FR-6 | not started | — |
 | 4.2 | `useConfigDraft` domain store + preview lifecycle (headless) | `examples/product-demo/src/stores/domain/useConfigDraft.ts`, `examples/product-demo/test/stores/domain/useConfigDraft.test.ts` | P4-FR-1, P4-FR-3, P4-FR-5 | not started | — |
 | 4.3 | Editor view: Preview / Commit+Restart actions, diff summary, inline validation; **delete** legacy `examples/product-demo/src/speciesConfig.ts` once its mount logic is fully replaced | `examples/product-demo/src/views/JsonEditorView.vue`, `examples/product-demo/src/components/config/{EditorPanel.vue,DiffSummary.vue,ValidationList.vue,ActionRow.vue}`, `examples/product-demo/src/stores/view/useJsonEditorView.ts`, `examples/product-demo/eslint.config.js` (drop `speciesConfig.ts` from `ignores`) | P4-FR-3, P4-FR-4 | not started | — |
 | 4.4 | Storage migration cleanup + commit-triggers-fingerprint wiring | `examples/product-demo/src/app/main.ts` (legacy purge tick), `examples/product-demo/src/stores/domain/useConfigDraft.ts` (commit handshake with `useFingerprintRecorder`) | P4-FR-7, P4-AC-5 | not started | — |
@@ -52,13 +58,18 @@ keyed off a whitelist of safely previewable fields.
   All other fields are commit-only by default — explicit > implicit.
 - Validators return `ValidationFinding[]`; tests assert that an invalid
   draft never partially applies (P4-AC-4 evidence).
-- **Two-layer split:**
+- **Two-layer split (the spec's `demo-domain/config/schema.ts`
+  filename is honoured at the engine layer):**
   - `demo-domain/config/` (NEW, cross-scenario engine): `ConfigPath`,
-    `ValidationFinding`, `ConfigDraft` shape, generic schema-driven
-    validator + diff framework. No pet-care knowledge here.
+    `ValidationFinding`, `ConfigDraft` shape, the previewable-field
+    whitelist schema TYPE per spec P4-FR-2 (`schema.ts`), and the
+    generic schema-driven validator + diff framework. No pet-care
+    knowledge here.
   - `demo-domain/scenarios/petCare/config/` (RECYCLED from legacy
-    `speciesConfig.ts`): pet-care-specific schema + validator rules +
-    `applyOverride`, plugged into the engine above.
+    `speciesConfig.ts`): pet-care-specific schema INSTANCE
+    (`schema.ts` declaring which fields are `preview` vs `commit`),
+    validator rules, `applyOverride` — all plugged into the engine
+    above.
 - **Recycle from legacy `speciesConfig.ts`:** the existing
   `validateEditableConfig` already implements range checks, monotonic
   lifecycle ordering, and unknown-field rejection — port those rules
