@@ -334,7 +334,7 @@ Canonical status. Update the **Status** and **PR** cells in the same diff that s
 
 | Wave | Pillar | Plan | Status | PR |
 |---|---|---|---|---|
-| 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | in review | _Wave-0 PR_ |
+| 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | ✅ shipped | [#134](https://github.com/Luis85/agentonomous/pull/134) |
 | A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | not started | — |
 | A | Cognition diff panel | [`cognition-diff-panel`](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md) | not started | — |
 | A | Determinism fingerprint | [`determinism-fingerprint`](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md) | not started | — |
