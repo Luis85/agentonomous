@@ -39,7 +39,7 @@ keyed off a whitelist of safely previewable fields.
 
 | # | Slice | Files | Spec FRs | Status | PR |
 |---|---|---|---|---|---|
-| 4.1 | Whitelisted-field schema + validator (pure domain) — relocates `speciesConfig.ts`'s pure logic (`EditableSpeciesConfig`, `currentEditableConfig`, `validateEditableConfig`, `applyOverride`) into `demo-domain/scenarios/petCare/config/` and replaces the implicit list with the design's explicit `{ path, kind: 'preview' \| 'commit' }` whitelist | `examples/product-demo/src/demo-domain/scenarios/petCare/config/{types.ts,schema.ts,validate.ts,diff.ts,applyOverride.ts}`, `examples/product-demo/test/demo-domain/scenarios/petCare/config/*.test.ts` | P4-FR-2, P4-FR-6 | not started | — |
+| 4.1 | Cross-scenario config engine (pure domain) + pet-care relocation: NEW `demo-domain/config/` engine (`ConfigPath`, `ValidationFinding`, `ConfigDraft` shape, schema-driven validator/diff framework) + RELOCATED `speciesConfig.ts`'s pure logic (`EditableSpeciesConfig` → `NormalizedConfig`, `validateEditableConfig` rules, `applyOverride`) into `demo-domain/scenarios/petCare/config/` plugged into the engine. Replaces the implicit allow-list with the design's explicit `{ path, kind: 'preview' \| 'commit' }` whitelist. | `examples/product-demo/src/demo-domain/config/{types.ts,validateEngine.ts,diff.ts}` (cross-scenario, new), `examples/product-demo/src/demo-domain/scenarios/petCare/config/{schema.ts,validate.ts,applyOverride.ts}` (per-scenario, recycled), `examples/product-demo/test/demo-domain/config/*.test.ts`, `examples/product-demo/test/demo-domain/scenarios/petCare/config/*.test.ts` | P4-FR-2, P4-FR-6 | not started | — |
 | 4.2 | `useConfigDraft` domain store + preview lifecycle (headless) | `examples/product-demo/src/stores/domain/useConfigDraft.ts`, `examples/product-demo/test/stores/domain/useConfigDraft.test.ts` | P4-FR-1, P4-FR-3, P4-FR-5 | not started | — |
 | 4.3 | Editor view: Preview / Commit+Restart actions, diff summary, inline validation; **delete** legacy `examples/product-demo/src/speciesConfig.ts` once its mount logic is fully replaced | `examples/product-demo/src/views/JsonEditorView.vue`, `examples/product-demo/src/components/config/{EditorPanel.vue,DiffSummary.vue,ValidationList.vue,ActionRow.vue}`, `examples/product-demo/src/stores/view/useJsonEditorView.ts`, `examples/product-demo/eslint.config.js` (drop `speciesConfig.ts` from `ignores`) | P4-FR-3, P4-FR-4 | not started | — |
 | 4.4 | Storage migration cleanup + commit-triggers-fingerprint wiring | `examples/product-demo/src/app/main.ts` (legacy purge tick), `examples/product-demo/src/stores/domain/useConfigDraft.ts` (commit handshake with `useFingerprintRecorder`) | P4-FR-7, P4-AC-5 | not started | — |
@@ -52,13 +52,21 @@ keyed off a whitelist of safely previewable fields.
   All other fields are commit-only by default — explicit > implicit.
 - Validators return `ValidationFinding[]`; tests assert that an invalid
   draft never partially applies (P4-AC-4 evidence).
+- **Two-layer split:**
+  - `demo-domain/config/` (NEW, cross-scenario engine): `ConfigPath`,
+    `ValidationFinding`, `ConfigDraft` shape, generic schema-driven
+    validator + diff framework. No pet-care knowledge here.
+  - `demo-domain/scenarios/petCare/config/` (RECYCLED from legacy
+    `speciesConfig.ts`): pet-care-specific schema + validator rules +
+    `applyOverride`, plugged into the engine above.
 - **Recycle from legacy `speciesConfig.ts`:** the existing
   `validateEditableConfig` already implements range checks, monotonic
   lifecycle ordering, and unknown-field rejection — port those rules
-  verbatim into `validate.ts` (translate the ad-hoc error strings into
-  `ValidationFinding` codes per spec). `applyOverride` already handles
-  the partial-edit merge — port it into `applyOverride.ts` and add the
-  test guarantee that an invalid draft never half-applies. The legacy
+  verbatim into `scenarios/petCare/config/validate.ts` (translate the
+  ad-hoc error strings into `ValidationFinding` codes per spec).
+  `applyOverride` already handles the partial-edit merge — port it
+  into `scenarios/petCare/config/applyOverride.ts` and add the test
+  guarantee that an invalid draft never half-applies. The legacy
   `EditableSpeciesConfig` shape becomes the starting point for
   `NormalizedConfig` (rename + add `__brand` if needed).
 

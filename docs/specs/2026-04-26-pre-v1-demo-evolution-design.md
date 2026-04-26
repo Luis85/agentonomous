@@ -78,17 +78,24 @@ examples/product-demo/src/
 │       └── useShellLayout.ts
 ├── composables/               # cross-cutting hooks (router-aware, focus, a11y)
 ├── demo-domain/               # demo-specific domain modules (NOT in `agentonomous`)
-│   ├── scenarios/             # Scenario contract impls
+│   ├── scenarios/             # Scenario contract impls (each owns its species + skills + per-scenario config schema)
 │   │   ├── petCare/           # bootstrapped in Pillar-1 slice 1.2a (`git mv` from
-│   │   │                      # legacy `species.ts` / `constants.ts` / `cognition/*` /
-│   │   │                      # `skills/*` + new `buildAgent.ts` extracting random-event
-│   │   │                      # defs from legacy `main.ts`); wrapped in Scenario contract
-│   │   │                      # in Pillar-5 slice 5.2
+│   │   │   ├── species.ts     # legacy `species.ts` / `constants.ts` / `cognition/*` /
+│   │   │   ├── constants.ts   # `skills/*` + new `buildAgent.ts` extracting random-event
+│   │   │   ├── cognition/     # defs from legacy `main.ts`); wrapped in Scenario contract
+│   │   │   ├── skills/        # in Pillar-5 slice 5.2. Pillar-4 slice 4.1 also adds a
+│   │   │   ├── config/        # `config/` subfolder porting `speciesConfig.ts`'s
+│   │   │   ├── buildAgent.ts  # `validateEditableConfig` + `applyOverride` + the
+│   │   │   └── scenario.ts    # pet-care-specific schema (the cross-scenario engine
+│   │   │                      # lives in `demo-domain/config/` below).
 │   │   └── companionNpc/      # added in Pillar-5 slice 5.3
-│   ├── walkthrough/           # step-graph definitions + completion predicates
-│   ├── diff/                  # rolling-window metric helpers
-│   ├── fingerprint/           # normalizer + hash function
-│   └── config/                # whitelisted-field schema + validator
+│   ├── walkthrough/           # step-graph definitions + completion predicates (cross-scenario)
+│   ├── diff/                  # rolling-window metric helpers (cross-scenario)
+│   ├── fingerprint/           # normalizer + hash function (cross-scenario)
+│   └── config/                # cross-scenario engine: ConfigPath, ValidationFinding,
+│                              # ConfigDraft shape, schema/validator framework. Each
+│                              # scenario plugs its own per-scenario schema in via
+│                              # `demo-domain/scenarios/<id>/config/`.
 ├── copy/                      # English-only UI strings, grouped by pillar
 └── styles/                    # tokens, layout, component overrides
 ```
