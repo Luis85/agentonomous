@@ -61,10 +61,12 @@ Sections:
    or whose tracker issue is still labelled `in-progress`.
 4. **Output** — open one PR per run with archive moves, body lists
    each `(plan, last shipped row, archive reason)`. No moves needed:
-   post a one-line comment on the tracker issue `Plan reconciliation`
-   (label `plan-recon-bot`) and exit.
-5. **Failure handling** — same pattern as the other routines (rolling
-   issue, never push direct to `develop`, comment on failure).
+   open a fresh tracker issue
+   `Plan reconciliation YYYY-MM-DD — <sha7>` (label
+   `plan-recon-bot`) noting the no-op, then exit.
+5. **Failure handling** — same pattern as the other routines (one
+   issue per run, never push direct to `develop`, body notes the
+   failure).
 
 - [ ] **Step 3: Write `docs/plan-recon-bot/README.md`**
 

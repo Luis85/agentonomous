@@ -7,11 +7,12 @@ description: Ingests one or all open findings from a review-bot tracker issue (o
 
 ## Terminology
 
-- **Tracker issue** — any issue carrying the label `review-bot`.
+- **Tracker issue** — any open issue carrying the label `review-bot`.
   Each scheduled bot run opens its own issue; the body holds that
-  run's full findings block. Sweep mode targets the newest issue;
-  single mode scans every issue (open + closed) for the requested
-  finding ID. **Never closed by this skill.**
+  run's full findings block. Sweep mode targets the newest open
+  issue; single mode scans every open issue for the requested
+  finding ID. Closed issues are out of scope — they are treated as
+  archived and never re-opened by this skill.
 - **Finding** — one `[BLOCKER] / [MAJOR] / [MINOR] / [NIT]` checklist
   item inside a tracker issue's body.
 - **Finding ID** — `<head-sha[:7]>.<idx>` (e.g. `682b557.3`). Embedded
@@ -75,7 +76,7 @@ Confirm with the user:
 1. **Finding ID (single mode only)** — exact form `<sha7>.<idx>`. If
    they paste a free-text description instead, refuse and ask them to
    grab the ID from
-   `gh issue list --label review-bot --limit 5` then
+   `gh issue list --label review-bot --state open --limit 5` then
    `gh issue view <n>`. In sweep mode (no-arg invocation), skip this
    check.
 2. **Already shipped?** — if the tracker line for the chosen ID renders
@@ -110,19 +111,18 @@ The recipe below dodges four real footguns:
    sure the JSON shape is the issue list output (objects with
    `number`, `body`, `url`, `createdAt`), not the PR list.
 
-Fetch every review-bot issue once into the project-local cache:
+Fetch every open review-bot issue once into the project-local cache:
 
 ```bash
 mkdir -p .review-fix-cache
-gh issue list --label review-bot --state all \
+gh issue list --label review-bot --state open \
   --json number,body,url,createdAt --limit 50 \
   > .review-fix-cache/issues.json
 ```
 
 **Single-finding mode.** Pass the ID via `--id`. The parser scans
-every issue in the cache (newest first) for that marker, so backlog
-findings on older tracker issues stay reachable — sweep mode only
-ever picks the newest issue, but single mode must not.
+every issue in the cache (newest first) for that marker. Sweep mode
+only ever picks the newest issue.
 
 ```bash
 ID="<sha7>.<idx>"            # e.g. 682b557.3
@@ -135,11 +135,11 @@ Parser exit codes (single mode):
 
 - `0` → match written to `finding.json` as
   `{issueNumber, issueUrl, createdAt, finding: {…}}`.
-- `1` → ID not found in any review-bot issue. Refuse with
-  `Finding ${ID} not found in any review-bot issue`.
+- `1` → ID not found in any open review-bot issue. Refuse with
+  `Finding ${ID} not found in any open review-bot issue`.
 - `2` → bad CLI args (e.g. user pasted a free-text description).
   Refuse and ask them to grab the ID from
-  `gh issue list --label review-bot --limit 5`.
+  `gh issue list --label review-bot --state open --limit 5`.
 - `3` → ID found but already shipped. The script's stderr already
   says `Finding <id> already shipped in #<PR>`; surface it and stop.
 

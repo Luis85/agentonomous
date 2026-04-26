@@ -47,11 +47,11 @@ checkbox on the prior issue still flips when the eventual PR ships.
 ### Workflow
 
 ```text
-gh issue list --label review-bot --limit 5     # find the latest issue
-gh issue view <n>                              # read the body, pick a finding ID
-/review-fix pick <id>                          # creates worktree + plan
-/superpowers:writing-plans <plan>              # expand plan into chunked tasks
-/superpowers:executing-plans …                 # implement, verify, open PR
+gh issue list --label review-bot --state open --limit 5  # find the latest issue
+gh issue view <n>                                        # read the body, pick a finding ID
+/review-fix pick <id>                                    # creates worktree + plan
+/superpowers:writing-plans <plan>                        # expand plan into chunked tasks
+/superpowers:executing-plans …                           # implement, verify, open PR
 ```
 
 The PR body MUST contain, on its own line:
@@ -153,11 +153,11 @@ just noisy in the rolling issue.
 
 ## Known tradeoffs
 
-- **Issue list grows over time.** Each run opens an issue; close
-  them once every finding is shipped (or auto-close via a
-  separate routine if you want zero backlog). Active +
-  partially-shipped issues stay open and remain reachable to
-  `review-fix`.
+- **Issue list grows over time.** Each run opens an issue. Close
+  each issue once every finding it carries has shipped — closed
+  issues drop out of `review-fix`'s scope automatically. The
+  `review-fix-shipped` Action does not auto-close; do it manually
+  or wire a separate routine when the backlog warrants one.
 - **Doc PR still costs CI minutes** for `format-check`, `actionlint`,
   `audit`, and `ci-gate`. Acceptable — combined under a minute.
 - **Auto-merge requires green CI on `develop`'s protection rules.** If

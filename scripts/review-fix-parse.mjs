@@ -8,8 +8,8 @@
  *   - the most recent issue that contains finding markers (sweep
  *     mode, default), or
  *   - the issue whose body holds a specific finding ID (single mode,
- *     `--id <sha7>.<idx>`), scanning every issue in the input so
- *     backlog findings on older issues stay reachable.
+ *     `--id <sha7>.<idx>`), scanning every issue in the input
+ *     newest-first.
  *
  * Input shape — array of GitHub issue objects:
  *   [
@@ -19,7 +19,7 @@
  *   ]
  *
  * The caller fetches this via:
- *   gh issue list --label review-bot --state all \
+ *   gh issue list --label review-bot --state open \
  *     --json number,body,url,createdAt --limit 50 \
  *     > .review-fix-cache/issues.json
  *
@@ -105,7 +105,7 @@ const withFindings = issues
   .sort((a, b) => new Date(b.issue.createdAt) - new Date(a.issue.createdAt));
 
 if (withFindings.length === 0) {
-  stderr.write('No review-bot issue contains findings — nothing to sweep\n');
+  stderr.write('No open review-bot issue contains findings — nothing to sweep\n');
   exit(1);
 }
 
@@ -141,7 +141,7 @@ for (const { issue, findings } of withFindings) {
   exit(0);
 }
 
-stderr.write(`Finding ${targetId} not found in any review-bot issue\n`);
+stderr.write(`Finding ${targetId} not found in any open review-bot issue\n`);
 exit(1);
 
 function emit(obj) {
