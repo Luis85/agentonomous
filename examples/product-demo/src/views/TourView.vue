@@ -7,9 +7,11 @@
  * since `useAgentSession` is a Pinia store (not view-bound).
  *
  * Route-cursor reconciliation:
- *   - On mount, if the URL carries a known step id, fast-forward the
- *     cursor (forward-only) so a deep link survives the persisted
- *     progress check.
+ *   - On mount AND on every `route.params.step` change, fast-forward
+ *     the cursor (forward-only) so deep links + browser back/forward
+ *     keep the URL and active step in sync. After resume, push the
+ *     cursor's URL back so a no-op resume (URL upstream of cursor)
+ *     re-anchors the address bar to the active step.
  *   - On every `tour.lastStep` change, push the URL so the address
  *     bar tracks the active step.
  */
@@ -22,13 +24,17 @@ const tour = useTourProgress();
 const router = useRouter();
 const route = useRoute();
 
-onMounted(() => {
+function reconcileFromRoute(): void {
   const stepRaw = route.params['step'];
   if (typeof stepRaw === 'string' && stepRaw.length > 0) {
     tour.resumeFromRoute(stepRaw);
   }
   void tour.syncRoute(router);
-});
+}
+
+onMounted(reconcileFromRoute);
+
+watch(() => route.params['step'], reconcileFromRoute);
 
 watch(
   () => tour.lastStep,
