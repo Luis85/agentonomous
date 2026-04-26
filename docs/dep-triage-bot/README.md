@@ -72,6 +72,16 @@ code-review bot.
       delta-append), and `contents:read` (clone + checkout PR
       branches). No `contents:write` — the routine never pushes a
       branch.
+- [ ] Set `ROUTINE_BOT_LOGIN` in the routine's env to the GitHub
+      login the routine posts as (e.g. `claude[bot]`, or whichever
+      App / automation account the org uses). The prompt's
+      [Idempotency skip check](./PROMPT.md#skip-check-run-at-the-start-of-every-prs-iteration)
+      requires this to constrain the trusted-marker filter to
+      bot-authored comments only — without it, an unrelated
+      collaborator could inject a `<!-- dep-triaged:<sha7>:* -->`
+      line into a human comment and silently suppress triage for
+      that PR. The skip check exits non-zero if the env var is
+      unset.
 - [ ] Confirm Dependabot is configured to group npm minor + patch
       updates per the `npm-non-major` blocks on both npm entries in
       [`.github/dependabot.yml`](../../.github/dependabot.yml).

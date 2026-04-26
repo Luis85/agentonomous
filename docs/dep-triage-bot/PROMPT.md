@@ -318,10 +318,28 @@ embedded at the top of the routine's per-PR comment body:
 
 ## Skip check (run at the start of every PR's iteration)
 
+The marker is **only trusted when authored by the routine's own bot
+account**. Any collaborator (or accidental copy/paste of an old
+comment) could otherwise inject a `<!-- dep-triaged:<sha7>:* -->`
+line into a human comment and silently suppress triage for that PR.
+The skip check therefore filters comment authors to `type == "Bot"`
+*and* a configured bot-login allowlist before reading the marker.
+
+Set `ROUTINE_BOT_LOGIN` at scheduler-config time to the GitHub
+account the routine posts as (the App login, e.g. `claude[bot]` or
+the org's automation account). The check fails loudly if it is not
+set so a misconfigured run cannot accidentally trust unsigned
+markers.
+
 ```bash
+: "${ROUTINE_BOT_LOGIN:?ROUTINE_BOT_LOGIN must be set to the bot account login the routine posts as}"
 HEAD_SHA7="$(gh pr view <pr> --json headRefOid --jq '.headRefOid[0:7]')"
-SKIP="$(gh pr view <pr> --json comments \
-  --jq --arg sha "${HEAD_SHA7}" '.comments[] | select(.body | startswith("<!-- dep-triaged:" + $sha + ":")) | .body' \
+SKIP="$(gh api "repos/<owner>/<repo>/issues/<pr>/comments" \
+  --jq --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_BOT_LOGIN}" \
+  '.[]
+   | select(.user.type == "Bot" and .user.login == $login)
+   | select(.body | startswith("<!-- dep-triaged:" + $sha + ":"))
+   | .body' \
   | head -n1)"
 if [ -n "${SKIP}" ]; then
   echo "Skip #<pr> — already triaged at ${HEAD_SHA7}: ${SKIP}"
@@ -329,9 +347,11 @@ if [ -n "${SKIP}" ]; then
 fi
 ```
 
-If the marker exists for the current head SHA, this PR was already
-triaged on a prior run with no Dependabot rebase since. Add it to the
-run footer's `Skipped` count and move on.
+If a marker for the current head SHA exists **and was authored by
+the routine's bot account**, this PR was already triaged on a prior
+run with no Dependabot rebase since. Add it to the run footer's
+`Skipped` count and move on. A marker authored by anyone else is
+ignored.
 
 ## Marker format on the Dependabot PR
 
