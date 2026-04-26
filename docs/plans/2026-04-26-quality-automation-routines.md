@@ -38,9 +38,8 @@ five CI/cron jobs, three cloud-routine prompt directories.
   `docs/review-bot/` and `docs/docs-review-bot/`.
 - **No core library changes.** All additions live under `.github/`,
   `docs/`, `tests/determinism/`, and the demo workspace
-  (`examples/product-demo/`; renamed from `examples/nurture-pet/` in
-  PR #134 — see [Coordination with PR #129](#coordination-with-pr-129-demo-rename)).
-  No `src/**` edits. No changesets needed (tooling-only PRs).
+  (`examples/product-demo/`). No `src/**` edits. No changesets
+  needed (tooling-only PRs).
 
 ## Tech stack
 
@@ -58,20 +57,17 @@ five CI/cron jobs, three cloud-routine prompt directories.
 
 ---
 
-## Coordination with PR #129 (demo rename)
+## Coordination with PR #129 (demo rename) — RESOLVED
 
-PR [#129](https://github.com/Luis85/agentonomous/pull/129) is the
-umbrella tracker for the pre-v1 demo evolution increment. **Wave 0 of
-that increment was the atomic single-PR rename** of
-`examples/nurture-pet/` → `examples/product-demo/` (shipped in
-[PR #134](https://github.com/Luis85/agentonomous/pull/134)). The
-rename PR swept every path reference across the repo — scripts,
-GitHub Pages workflow, README, and CI.
-
-**Path policy across all chunk plans below:** every demo path uses
-`examples/product-demo/...`. Historical references to the prior
-`examples/nurture-pet/` path are preserved only in archived plans
-and the localStorage purge prefix (spec STO-3).
+> **Status (2026-04-26):** Wave 0 of PR #129 merged as
+> [#134](https://github.com/Luis85/agentonomous/pull/134). The
+> demo workspace lives at `examples/product-demo/` on `develop`.
+> Every chunk plan below now uses that path verbatim — no
+> pre-rename / post-rename sequencing logic remains.
+>
+> The original sequencing-rule section is preserved in git history
+> for context but no longer informs new work. Historical reading:
+> see `docs/archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md`.
 
 ---
 
@@ -129,6 +125,31 @@ Every PR cut from a chunk plan above MUST:
 7. **Codex review** runs automatically on open. Address findings per
    `MEMORY.md → feedback_pr_codex_polling.md` /
    `feedback_codex_signal_endpoints.md`.
+
+### Cloud-routine output convention (rows 2–4 + any future routine)
+
+Any chunk that introduces a scheduled cloud routine (cron-driven
+agent, not a CI workflow) MUST follow the same output shape so
+issues stay groupable and discoverable:
+
+- **Dedicated GitHub label per routine.** No shared `automation`
+  umbrella label, no cross-labelling. Existing labels:
+  `review-bot`, `docs-review`, `dep-triage-bot`. Future rows pick
+  a label that matches their `docs/<bot-name>/` directory (e.g.
+  `actions-bump-bot`, `plan-recon-bot`).
+- **No rolling tracker issues.** Every issue the routine opens is
+  a fresh per-run issue carrying its own findings / failure
+  payload. The owner closes it once everything it lists is
+  resolved. The `<label>` view groups every run's issues for that
+  routine.
+- **Quiet runs leave no trace.** No-op runs do NOT open an issue.
+  An empty label view should mean "nothing happened recently",
+  not "the routine forgot to write".
+- **Per-run state on the artifact, not on a shared tracker.** When
+  a routine triages an external object (e.g. a Dependabot PR),
+  per-object state lives as a comment marker on that object, not
+  in a rolling tracker body. Pattern:
+  `<!-- <bot-name>:<head-sha7>:<action> -->`.
 
 > **Why one-PR-per-chunk now, not one giant PR?** Earlier drafts of
 > this plan bundled all eight rows on a single branch (#130). After
@@ -232,9 +253,11 @@ before continuing.
   uses pinned SHAs. After each chunk merges, the next
   `actions-bump-bot` run will attempt to bump them. That's expected
   — review that bump PR like any other.
-- **Demo rename shipped (PR #134 / Wave 0 of #129).** Demo-smoke chunk
-  paths point at `examples/product-demo/` — the `examples/nurture-pet/`
-  directory no longer exists on `develop`.
+- **Demo rename — RESOLVED.** Wave 0 of PR #129 merged as #134
+  on 2026-04-26; the demo lives at `examples/product-demo/` on
+  `develop`. The demo-smoke chunk plan was rewritten to use that
+  path verbatim. Historical sequencing rule retired (see
+  [Coordination with PR #129](#coordination-with-pr-129-demo-rename--resolved)).
 
 ---
 

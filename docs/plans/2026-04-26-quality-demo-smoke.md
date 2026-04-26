@@ -16,15 +16,15 @@ catches runtime regressions that typecheck + bundle don't (tfjs
 backend probe, `base` URL handling, vite HTML transform regressions
 — see `MEMORY.md → feedback_vite_html_transform`).
 
-## Coordination with PR #129 (demo rename)
+## Coordination with PR #129 (demo rename) — RESOLVED
 
-> **Demo path:** the demo workspace is `examples/product-demo/`
-> (renamed from `examples/nurture-pet/` in
-> [PR #134](https://github.com/Luis85/agentonomous/pull/134), Wave 0
-> of [PR #129](https://github.com/Luis85/agentonomous/pull/129)). All
-> paths below use the post-rename name.
-> See [Coordination with PR #129](./2026-04-26-quality-automation-routines.md#coordination-with-pr-129-demo-rename)
-> in the umbrella plan for context.
+> Wave 0 of PR #129 merged as
+> [#134](https://github.com/Luis85/agentonomous/pull/134) on
+> 2026-04-26; the demo lives at `examples/product-demo/` on
+> `develop`. Every path below is the post-rename name verbatim — no
+> conditional sequencing remains. The umbrella's
+> [Coordination section](./2026-04-26-quality-automation-routines.md#coordination-with-pr-129-demo-rename--resolved)
+> is the historical reference.
 
 ## Files
 
@@ -250,9 +250,9 @@ Ticks row 8 of the umbrella tracker."
 - `.github/workflows/demo-smoke.yml` is actionlint-clean.
 - Tracker row 8 is `[x]`.
 
-## Rename-coordination follow-up
+## Rename-coordination — RESOLVED
 
-None required — Wave 0 of PR #129 (the rename to
-`examples/product-demo/`) shipped in
-[PR #134](https://github.com/Luis85/agentonomous/pull/134), so this
-row uses the post-rename path from the start.
+Wave 0 of PR #129 merged as
+[#134](https://github.com/Luis85/agentonomous/pull/134) on
+2026-04-26. This row uses `examples/product-demo/` paths verbatim;
+no follow-up rename PR is needed.

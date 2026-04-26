@@ -49,12 +49,17 @@ Key sections:
    [`resolve_action_sha` helper](./2026-04-26-quality-automation-routines.md#resolve-an-action-tag--commit-sha-peel-aware-helper));
    never alter the trailing `# vX.Y.Z` comment without matching the
    bumped tag.
-5. **Output** — single PR per run, body lists each `(action, old SHA,
-   new SHA, version label)`. No-op runs: open a fresh tracker issue
-   `Action SHA bumps YYYY-MM-DD — <sha7>` (label
-   `actions-bump-bot`) noting the no-op, then exit.
-6. **Failure handling** — verify fails → close branch, open a
-   tracker issue noting the failure.
+5. **Output** — primary sink is a single PR per run, body lists
+   each `(action, old SHA, new SHA, version label)`. **No-op runs
+   leave no trace**: no PR, no issue, exit cleanly. Same convention
+   as the refactored daily review-bot.
+6. **Failure handling** — verify fails after applying bumps → close
+   the branch, open a fresh `Action SHA bumps YYYY-MM-DD — <sha7>`
+   issue (label `actions-bump-bot`) with the failure tail in the
+   body. The owner triages from the `actions-bump-bot` label view.
+   Failure issues are the only ones this routine opens — they group
+   under the dedicated label so a non-empty label view is always a
+   real signal.
 
 - [ ] **Step 3: Write `docs/actions-bump-bot/README.md`**
 
