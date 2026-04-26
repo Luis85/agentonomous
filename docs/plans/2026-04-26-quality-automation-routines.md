@@ -568,13 +568,25 @@ Expected: PASS.
 
 - [ ] **Step 5.5: Create the empty trend file**
 
+`docs/metrics/` does not exist on `develop` yet, so `touch` alone
+fails with `No such file or directory`. Create the directory first:
+
 ```bash
+mkdir -p docs/metrics
 touch docs/metrics/bundle-trend.jsonl
 ```
 
 Add a 2-line preamble inside the file? **No.** JSONL by definition has
 no header; downstream tools assume one JSON value per line. Keep it
-empty.
+empty. To stop git from skipping the empty file under default Windows
+checkouts (an empty path is fine on POSIX, but some Windows filters
+elide zero-byte adds in their UI), confirm staging:
+
+```bash
+git add docs/metrics/bundle-trend.jsonl
+git status --short docs/metrics/
+# expected: A  docs/metrics/bundle-trend.jsonl
+```
 
 - [ ] **Step 5.6: Write `.github/workflows/bundle-size-trend.yml`**
 
