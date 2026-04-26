@@ -1,7 +1,7 @@
 import { defineSpecies, type SpeciesDescriptor } from 'agentonomous';
 
 /**
- * Canonical nurture-pet cat. Needs tuned so an unattended kitten grows
+ * Canonical product-demo pet-care cat. Needs tuned so an unattended kitten grows
  * hungry in ~45 s of wall time at the demo's base `timeScale` of 10 (so
  * "1×" = 10 virtual sec per wall sec), and the full lifecycle completes
  * in ~3 wall minutes for quick demo play.

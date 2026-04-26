@@ -37,9 +37,9 @@ five CI/cron jobs, three cloud-routine prompt directories.
   action-SHA bumps, plan reconciliation). Same shape as the existing
   `docs/review-bot/` and `docs/docs-review-bot/`.
 - **No core library changes.** All additions live under `.github/`,
-  `docs/`, `tests/determinism/`, and the demo workspace (currently
-  `examples/nurture-pet/`; see [Coordination with PR #129](#coordination-with-pr-129-demo-rename)).
-  No `src/**` edits. No changesets needed (tooling-only PRs).
+  `docs/`, `tests/determinism/`, and the demo workspace
+  (`examples/product-demo/`). No `src/**` edits. No changesets
+  needed (tooling-only PRs).
 
 ## Tech stack
 
@@ -57,44 +57,17 @@ five CI/cron jobs, three cloud-routine prompt directories.
 
 ---
 
-## Coordination with PR #129 (demo rename)
+## Coordination with PR #129 (demo rename) — RESOLVED
 
-PR [#129](https://github.com/Luis85/agentonomous/pull/129) is the
-umbrella tracker for the pre-v1 demo evolution increment. **Wave 0 of
-that increment is an atomic single-PR rename** of
-`examples/nurture-pet/` → `examples/product-demo/` (see
-`docs/plans/2026-04-26-pre-v1-demo-rename-preflight.md` once #129
-merges). The rename PR is responsible for sweeping every reference
-across the repo — scripts, GitHub Pages workflow, README, CI, and (if
-it lands after this increment's demo-smoke row) the Playwright wiring
-that row introduces.
-
-**Path policy across all chunk plans below:**
-
-| Section | What it uses today | After Wave 0 of #129 |
-| --- | --- | --- |
-| Demo-smoke chunk paths | `examples/nurture-pet/...` | `examples/product-demo/...` |
-| `.gitignore` rules touching the demo | `examples/nurture-pet/...` | `examples/product-demo/...` |
-
-**Sequencing rule (decide at the start of the demo-smoke row):**
-
-1. **If Wave 0 has merged into `develop` before the demo-smoke row
-   starts** — pull `develop`, resolve conflicts via
-   `git merge origin/develop` (NOT rebase, per
-   `MEMORY.md → feedback_parallel_pr_plan_conflicts.md`), then
-   substitute `examples/nurture-pet/` → `examples/product-demo/` in
-   every file that row creates or touches.
-2. **If Wave 0 has NOT merged before that row starts** — implement
-   verbatim against `examples/nurture-pet/`. The Wave 0 rename PR will
-   sweep this increment's additions the same way it sweeps every
-   other reference. Add a one-line note on the Wave 0 PR when it
-   opens calling out that this increment introduced new
-   `examples/nurture-pet/` paths so the sweep is complete.
-
-**Do not pre-rename in any chunk plan.** A single mechanical sed in
-the Wave 0 PR converges everything; pre-renaming half-and-half forces
-a manual reconciliation in two places and risks Codex re-flagging
-path mismatches between this plan and `develop` truth.
+> **Status (2026-04-26):** Wave 0 of PR #129 merged as
+> [#134](https://github.com/Luis85/agentonomous/pull/134). The
+> demo workspace lives at `examples/product-demo/` on `develop`.
+> Every chunk plan below now uses that path verbatim — no
+> pre-rename / post-rename sequencing logic remains.
+>
+> The original sequencing-rule section is preserved in git history
+> for context but no longer informs new work. Historical reading:
+> see `docs/archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md`.
 
 ---
 
@@ -152,6 +125,31 @@ Every PR cut from a chunk plan above MUST:
 7. **Codex review** runs automatically on open. Address findings per
    `MEMORY.md → feedback_pr_codex_polling.md` /
    `feedback_codex_signal_endpoints.md`.
+
+### Cloud-routine output convention (rows 2–4 + any future routine)
+
+Any chunk that introduces a scheduled cloud routine (cron-driven
+agent, not a CI workflow) MUST follow the same output shape so
+issues stay groupable and discoverable:
+
+- **Dedicated GitHub label per routine.** No shared `automation`
+  umbrella label, no cross-labelling. Existing labels:
+  `review-bot`, `docs-review`, `dep-triage-bot`. Future rows pick
+  a label that matches their `docs/<bot-name>/` directory (e.g.
+  `actions-bump-bot`, `plan-recon-bot`).
+- **No rolling tracker issues.** Every issue the routine opens is
+  a fresh per-run issue carrying its own findings / failure
+  payload. The owner closes it once everything it lists is
+  resolved. The `<label>` view groups every run's issues for that
+  routine.
+- **Quiet runs leave no trace.** No-op runs do NOT open an issue.
+  An empty label view should mean "nothing happened recently",
+  not "the routine forgot to write".
+- **Per-run state on the artifact, not on a shared tracker.** When
+  a routine triages an external object (e.g. a Dependabot PR),
+  per-object state lives as a comment marker on that object, not
+  in a rolling tracker body. Pattern:
+  `<!-- <bot-name>:<head-sha7>:<action> -->`.
 
 > **Why one-PR-per-chunk now, not one giant PR?** Earlier drafts of
 > this plan bundled all eight rows on a single branch (#130). After
@@ -255,13 +253,11 @@ before continuing.
   uses pinned SHAs. After each chunk merges, the next
   `actions-bump-bot` run will attempt to bump them. That's expected
   — review that bump PR like any other.
-- **Demo rename in flight (PR #129 / Wave 0).** Demo-smoke chunk
-  paths point at `examples/nurture-pet/`. If Wave 0 of PR #129 lands
-  first, every demo-smoke path becomes `examples/product-demo/`.
-  Follow the chunk plan's first step to detect, then substitute
-  mechanically. Do NOT ship `examples/product-demo/` paths from a
-  chunk before Wave 0 has merged — the directory does not exist on
-  `develop` yet.
+- **Demo rename — RESOLVED.** Wave 0 of PR #129 merged as #134
+  on 2026-04-26; the demo lives at `examples/product-demo/` on
+  `develop`. The demo-smoke chunk plan was rewritten to use that
+  path verbatim. Historical sequencing rule retired (see
+  [Coordination with PR #129](#coordination-with-pr-129-demo-rename--resolved)).
 
 ---
 

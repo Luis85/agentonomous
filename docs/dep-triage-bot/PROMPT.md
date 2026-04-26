@@ -36,12 +36,11 @@ gh pr list \
 ```
 
 Skip every PR whose head SHA was already triaged in a prior run (see
-[Idempotency](#idempotency) below — the "Last triaged SHAs" line on the
-rolling tracker is canonical state).
+[Idempotency](#idempotency) below — a per-PR comment marker is canonical
+state for that PR).
 
-If the search returns zero PRs: append a one-line `YYYY-MM-DD — no-op
-(no open Dependabot PRs)` comment to the rolling tracker and exit
-cleanly. Do NOT open a fresh tracker, do NOT push any branch.
+If the search returns zero PRs: do NOT open an issue, do NOT push any
+branch. Quiet runs leave no trace.
 
 # Triage policy
 
@@ -72,7 +71,7 @@ bumped package.
 | Peer-deps (any magnitude) | Never auto-merge. Comment for owner.                             |
 
 `dev-deps` = anything in `devDependencies` of `package.json` /
-`examples/nurture-pet/package.json`. `runtime` = anything in
+`examples/product-demo/package.json`. `runtime` = anything in
 `dependencies`. `peer` = anything in `peerDependencies`.
 
 A grouped Dependabot PR (per `.github/dependabot.yml` `groups:` block)
@@ -163,32 +162,50 @@ review the diff against <release-url> manually.
   always owner-reviewed.
 - **Never** drop or close a Dependabot PR without explanation. If a
   bump is permanently undesirable (e.g. abandoned package), comment
-  the rationale on the PR and on the rolling tracker, then close.
-- **Never** post `Closes #N` / `Fixes #N` referencing the rolling
-  tracker. The tracker is long-lived.
+  the rationale on the PR and on this run's `dep-triage-bot` issue,
+  then close the Dependabot PR (NOT the run issue — that closes
+  manually once every action it lists is resolved).
+- **Never** post `Closes #N` / `Fixes #N` referencing a
+  `dep-triage-bot` issue. Each per-run issue is a long-lived archive
+  of its own run; close it manually once everything is resolved.
 - **Never** weaken `.github/workflows/*.yml` or `package.json`
   scripts to make a bump pass. If a bump fails CI, the right fix is
   to comment + leave for owner — not to relax the gate.
 
-# Output — append to the rolling tracker
+# Output — open ONE dedicated issue per run
 
-Single rolling issue titled `Dependency triage — develop`, label
-`dep-triage-bot`. One comment per run. Body of the issue holds the
-canonical "Last triaged SHAs" mapping (PR number → triaged head SHA)
-so the next run knows what to skip.
+Each scheduled run opens its **own** issue. There is no rolling log
+and no append-to-existing-issue step. One issue = one triage run =
+one body containing every action taken that run.
 
-## Per-run comment shape
+Sibling pattern of `docs/review-bot/` (issue-per-run for code review)
+and `docs/docs-review-bot/` (issue-per-run for docs drift). The
+canonical per-PR triage state lives on the **Dependabot PR itself**
+as a comment marker (see [Idempotency](#idempotency)), not on the
+run issue.
 
-```
-## YYYY-MM-DD — <run-id>
-Run id: dep-triage-<UTC-iso8601>
-Open Dependabot PRs scanned: <N>
-Auto-merged: <N> | Approved (owner-merge): <N> | Blocked: <N> | Major (owner-review): <N>
+## Issue spec
 
-<per-PR table — see below>
+- **Title:** `Dependency triage — YYYY-MM-DD`
+- **Label:** `dep-triage-bot` (create the label once if missing:
+  `gh label create dep-triage-bot --color FBCA04 --description "Findings from the weekly dep-triage cloud routine"`).
+- **Body:** the full per-run output — header line, action counts,
+  per-PR table, run footer. Format:
 
-<run footer>
-```
+  ```
+  ## YYYY-MM-DD
+  Run id: dep-triage-<UTC-iso8601>
+  Open Dependabot PRs scanned: <N>
+  Auto-merged: <N> | Approved (owner-merge): <N> | Blocked: <N> | Major (owner-review): <N>
+
+  <per-PR table — see below>
+
+  <run footer>
+  ```
+
+- **Assignee:** none. The owner reviews the table, picks any blocked
+  / major / approval-only entries off the list, and closes the issue
+  manually once each row is resolved.
 
 ## Per-PR table
 
@@ -203,18 +220,56 @@ to 60 chars>` or `awaiting Dependabot rebase` — keep concise.
 
 ## Run footer
 
-End the comment with:
+End the issue body with:
 
 - Triaged: `<N>` PRs (`<auto-merged>` auto-merged, `<approved>` approved,
   `<blocked>` blocked, `<major>` major)
 - Skipped (already triaged on same head SHA): `<N>` PRs
 - Counter-argument check: `<which auto-merge tested, kept or reverted>`
-- Last triaged SHAs: `#<n>=<sha7>, #<m>=<sha7>, …` ← persist for next run
 - Not reviewed: `<PRs you skipped + reason>`
 
-The last line is canonical state. After writing the comment, edit the
-issue body so its `Last triaged SHAs:` line reflects the new mapping
-(replace the prior line in place, do NOT append).
+## Open command
+
+```bash
+TITLE="Dependency triage — $(date -u +%F)"
+BODY_FILE=".dep-triage-cache/issue-body-$(date -u +%F).md"
+if [ -n "${DRY_RUN:-}" ]; then
+  printf '[DRY_RUN] would call: gh issue create --title %q --label dep-triage-bot --body-file %q\n' \
+    "${TITLE}" "${BODY_FILE}"
+  printf '[DRY_RUN] body:\n'; cat "${BODY_FILE}"
+else
+  gh issue create \
+    --title "${TITLE}" \
+    --label dep-triage-bot \
+    --body-file "${BODY_FILE}"
+fi
+```
+
+## No-op handling
+
+If the run scans zero open Dependabot PRs, do NOT open an issue.
+Quiet runs leave no trace — same convention as the daily code-review
+bot.
+
+## Closing issues — NOT the bot's job
+
+The bot never closes a `dep-triage-bot` issue. The owner closes
+manually once every blocked / major / approval-only row in the run
+table is resolved. Each new run opens a NEW issue regardless of
+whether prior ones are still open.
+
+## Idempotency at the issue level
+
+If today's run already opened a `dep-triage-bot` issue for the same
+UTC date (search:
+`gh issue list --label dep-triage-bot --state open --search "$(date -u +%F)" --json number,title`),
+do NOT open a duplicate. Either:
+
+- New PRs vs the existing issue body → edit the existing issue body
+  in place to append the delta under a `## Delta — re-run at $(date -u +%FT%TZ)` header.
+- Same set of PRs (same actions on same head SHAs) → exit 0 silently.
+
+`gh issue list` is read-only and runs unguarded in both modes.
 
 ## Counter-argument check
 
@@ -229,9 +284,9 @@ comment. Same convention as the daily code-review bot.
 
 # Process gates
 
-- If the routine cannot reach the rolling tracker issue (auth,
-  network, missing label) → exit 1 with the verbatim error. Do NOT
-  silently auto-merge without a paper trail.
+- If `gh issue create` (the per-run issue) fails (auth, network,
+  missing label) → exit 1 with the verbatim error. Do NOT silently
+  auto-merge without a paper trail.
 - If `gh pr merge --auto` returns "auto-merge not enabled on this
   repo" → fall back to approval-comment for that PR and add a
   `[setup]` finding to the run footer pointing at
@@ -245,27 +300,114 @@ comment. Same convention as the daily code-review bot.
 
   Every login should be `dependabot[bot]` (or whichever bot account
   the org uses). Anything else → block.
-- If `examples/nurture-pet/` has been renamed (see umbrella plan
-  coordination with PR #129) — substitute the new path
-  (`examples/product-demo/`) in the `gh pr diff` filter above. Do
-  NOT pre-rename anywhere else; the rename PR sweeps mechanically.
 
 # Idempotency
 
-- Read `Last triaged SHAs:` from the rolling tracker issue body at
-  the start. Skip any PR whose current head SHA already appears in
-  that mapping for that PR number.
-- A PR's head SHA changes after a `@dependabot rebase` push — that
-  intentionally re-triages it on the next run.
-- If the rolling tracker doesn't exist yet, fall back to triaging
-  every open Dependabot PR (treat the SHA map as empty). Open the
-  tracker on the first run with body:
+Per-PR triage state is stored as a comment marker on the **Dependabot
+PR itself**, not on a rolling tracker. The marker is an HTML comment
+embedded at the top of the routine's per-PR comment body:
 
-  ```
-  Rolling tracker for the weekly `dep-triage-bot` cloud routine.
+```html
+<!-- dep-triaged:<head-sha7>:<action> -->
+```
 
-  Last triaged SHAs: <none>
-  ```
+- `<head-sha7>` is the seven-char prefix of the PR head SHA at the
+  moment the routine triaged it.
+- `<action>` is one of `auto-merged`, `approval-comment`,
+  `blocked-comment`, `major-comment`, `awaiting-rebase`.
+
+## Skip check (run at the start of every PR's iteration)
+
+The marker is **only trusted when authored by the configured
+routine login**. Any collaborator (or accidental copy/paste of an
+old comment) could otherwise inject a `<!-- dep-triaged:<sha7>:* -->`
+line into a human comment and silently suppress triage for that PR.
+The skip check therefore matches comment authors against a
+configured login allowlist before reading the marker.
+
+Set `ROUTINE_GH_LOGIN` at scheduler-config time to the GitHub login
+the routine actually posts as. Two common shapes:
+
+- **PAT-driven cloud routine.** The routine uses a Personal Access
+  Token belonging to a human (e.g. the repo owner). Comments are
+  authored by that human's login (e.g. `Luis85`) with
+  `user.type == "User"`. Set `ROUTINE_GH_LOGIN=<human-login>`.
+- **GitHub App / bot-account routine.** Comments are authored by
+  the App's bot identity (e.g. `claude[bot]`) with
+  `user.type == "Bot"`. Set `ROUTINE_GH_LOGIN=<bot-login>`.
+
+The skip check does NOT constrain `user.type` — a PAT-driven cloud
+routine is a legitimate setup, and constraining to `Bot` would
+silently disable triage idempotency on every PAT-based run. The
+login allowlist is the trust boundary. If anyone other than the
+routine's configured login posts a `<!-- dep-triaged:<sha7>:* -->`
+line, the marker is ignored and the PR is re-triaged on the next
+run — a re-triage is conservative (worst case: the bot posts a
+duplicate triage comment); a silently-skipped triage is dangerous
+(misses verify failures or auto-merge gates).
+
+The check fails loudly if `ROUTINE_GH_LOGIN` is unset so a
+misconfigured run cannot accidentally trust unsigned markers from
+arbitrary commenters.
+
+`gh api` accepts only `--jq <string>` for filtering — it does not
+forward jq CLI flags such as `--arg`. Pipe the raw response to a
+standalone `jq` invocation so SHA + login values can be passed in
+via `--arg` (which jq escapes safely, avoiding shell-quoting
+pitfalls in the filter string).
+
+```bash
+: "${ROUTINE_GH_LOGIN:?ROUTINE_GH_LOGIN must be set to the GitHub login the routine posts as}"
+HEAD_SHA7="$(gh pr view <pr> --json headRefOid --jq '.headRefOid[0:7]')"
+SKIP="$(gh api "repos/<owner>/<repo>/issues/<pr>/comments" \
+  | jq -r --arg sha "${HEAD_SHA7}" --arg login "${ROUTINE_GH_LOGIN}" \
+    '.[]
+     | select(.user.login == $login)
+     | select(.body | startswith("<!-- dep-triaged:" + $sha + ":"))
+     | .body' \
+  | head -n1)"
+if [ -n "${SKIP}" ]; then
+  echo "Skip #<pr> — already triaged at ${HEAD_SHA7}: ${SKIP}"
+  continue
+fi
+```
+
+If a marker for the current head SHA exists **and was authored by
+the configured routine login**, this PR was already triaged on a
+prior run with no Dependabot rebase since. Add it to the run
+footer's
+`Skipped` count and move on. A marker authored by anyone else is
+ignored.
+
+## Marker format on the Dependabot PR
+
+Every routine-authored comment on a Dependabot PR (approval, major,
+blocked) MUST start with the marker line, on its own line, before
+any human-readable text:
+
+```
+<!-- dep-triaged:<head-sha7>:<action> -->
+
+<rest of the comment body — approval text / changelog summary /
+verify-failure tail>
+```
+
+For the auto-merge path (where the routine merges the PR rather than
+leaving a comment), still leave the marker comment first, **then**
+call `gh pr merge --auto --squash`. The marker survives the merge
+because GitHub keeps PR comments after merge.
+
+## Re-triage on rebase
+
+A PR's head SHA changes after a `@dependabot rebase` push — that
+intentionally re-triages it on the next run because the new
+`<head-sha7>` won't match any prior marker.
+
+## First-ever run
+
+There is no first-run setup for idempotency. With zero markers on
+any Dependabot PR, the routine triages everything in scope, leaves
+markers, and exits.
 
 # Dry-run mode
 
@@ -281,10 +423,11 @@ with a stdout dump of the would-be call:
 Wraps:
 
 - `gh pr merge` (auto-merge)
-- `gh pr comment` (approval / major / blocked / `@dependabot rebase`)
-- `gh issue comment` (rolling tracker append)
-- `gh issue edit` (rolling tracker body update)
-- `gh issue create` (first-run rolling tracker)
+- `gh pr comment` (approval / major / blocked / `@dependabot rebase` /
+  marker comment)
+- `gh issue create` (per-run issue)
+- `gh issue edit` (delta-append on same-date re-runs, see
+  [Idempotency at the issue level](#idempotency-at-the-issue-level))
 - `gh label create` (first-run label setup)
 
 Reads (`gh pr list`, `gh pr view`, `gh pr diff`, `gh issue list`,
@@ -317,11 +460,13 @@ dumping.
 
 - `gh pr merge --auto` fails (network, perms) → retry once, then
   fall back to approval-comment. Append a footer note `auto-merge
-  retry failed: <err>` to the run comment.
-- `gh issue comment` on the rolling tracker fails → write the
-  intended comment body to `.dep-triage-cache/FAILED-comment-<run-id>.md`
-  and exit 1. Do NOT retry blindly. The cache dir is gitignored
-  (one-time setup, see README).
+  retry failed: <err>` to the run issue body.
+- `gh issue create` for the per-run issue fails → write the intended
+  body to `.dep-triage-cache/FAILED-issue-body-<run-id>.md` and exit 1.
+  Do NOT retry blindly. The cache dir is gitignored (one-time setup,
+  see README).
+- `gh label create` fails because the label already exists → ignore
+  and continue. Skip this call entirely in `DRY_RUN` mode.
 - Any `git`/`gh` command fails with auth → exit 1 with the verbatim
   error. Do not paper over it.
 - In `DRY_RUN` mode, do NOT write `FAILED-*.md` files. Dry runs
@@ -332,11 +477,12 @@ dumping.
 
 - Open PRs. The routine only comments + auto-merges existing
   Dependabot PRs. Never craft its own dependency-bump branch.
-- Edit `package.json` / `package-lock.json` / `examples/nurture-pet/
+- Edit `package.json` / `package-lock.json` / `examples/product-demo/
   package*.json` directly. Bumps come from Dependabot.
-- Post `Closes #N` / `Fixes #N` referencing the rolling tracker.
-- Comment on Dependabot PRs from a prior triaged head SHA (see
-  Idempotency).
+- Post `Closes #N` / `Fixes #N` referencing any `dep-triage-bot`
+  issue. Each per-run issue is a long-lived archive of its own run.
+- Comment on Dependabot PRs whose current head SHA already has a
+  `<!-- dep-triaged:<sha7>:* -->` marker (see Idempotency).
 - Touch `.changeset/*.md`. Dependency bumps don't get a changeset
   entry — they're chore-tier.
 - Bypass any of the Hard rules above to drain the queue faster.

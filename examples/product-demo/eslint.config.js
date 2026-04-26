@@ -4,10 +4,10 @@
 // determinism rules (spec NFR-D-1) on the layered subpaths the
 // pre-v1 demo evolution increment introduces (`components/`,
 // `views/`, `demo-domain/`, `stores/view/`, `stores/domain/`). The
-// existing nurture-pet baseline lives flat under `src/` and is
-// intentionally NOT linted by this config — pillar 5.2 refactors that
-// code into `demo-domain/scenarios/petCare/` and at that point it
-// inherits these rules.
+// existing product-demo baseline (the original pet-care loop) lives
+// flat under `src/` and is intentionally NOT linted by this config —
+// pillar 5.2 refactors that code into `demo-domain/scenarios/petCare/`
+// and at that point it inherits these rules.
 //
 // Rules table (mirrors the design doc):
 //
@@ -30,13 +30,13 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    // Build artefacts + legacy nurture-pet source files. The legacy files
-    // live flat under `src/` and are intentionally not linted by this
-    // config until pillar 5.2 refactors them into
-    // `src/demo-domain/scenarios/petCare/`. Listing them here keeps the
-    // existing baseline buildable while still enforcing the design's DDD
-    // rules on the new layered subpaths (`app/`, `components/`,
-    // `views/`, `demo-domain/`, `stores/`).
+    // Build artefacts + legacy product-demo source files (the original
+    // pet-care loop). The legacy files live flat under `src/` and are
+    // intentionally not linted by this config until pillar 5.2 refactors
+    // them into `src/demo-domain/scenarios/petCare/`. Listing them here
+    // keeps the existing baseline buildable while still enforcing the
+    // design's DDD rules on the new layered subpaths (`app/`,
+    // `components/`, `views/`, `demo-domain/`, `stores/`).
     ignores: [
       'dist',
       'node_modules',
