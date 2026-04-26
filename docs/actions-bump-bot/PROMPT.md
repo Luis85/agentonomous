@@ -491,9 +491,20 @@ issue per failed run:
   branch was cut). `BASE_SHA` is always available — failure issues
   open even when no bump commit exists yet (e.g. actionlint or
   `npm run verify` fails before [step 6](#process)).
-- **Label:** `actions-bump-bot` (already exists in this repo;
-  re-create idempotently if missing — `gh label create` no-ops on
-  conflict).
+- **Label:** `actions-bump-bot` (already exists in this repo). To
+  guard against a fresh fork or a cleaned-up label, gate creation
+  behind an existence check — bare `gh label create` returns a
+  non-zero error on conflict (only `--force` updates an existing
+  label, which would clobber its description/color):
+
+  ```bash
+  if ! gh label list --search actions-bump-bot --json name \
+       --jq '.[] | select(.name == "actions-bump-bot") | .name' \
+     | grep -q .; then
+    gh label create actions-bump-bot --color D93F0B \
+      --description "Failure issues from the weekly actions-bump cloud routine"
+  fi
+  ```
 - **Body:** the failure tail in fenced code, plus the would-be
   bump table that the PR body would have carried so the owner can
   reproduce the diff:
