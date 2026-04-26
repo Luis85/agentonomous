@@ -207,11 +207,16 @@ scheduled bot at the top of the hour). A reasonable cron in UTC:
   PRs before this routine starts editing the workflows they
   reference.
 
-The routine no-ops cleanly when `scripts/bump-actions.mjs` exits 0:
-no PR is opened, no issue is opened, no branch is pushed. If every
-pin matches its latest release for several weeks running, the
-`actions-bump-bot` label view simply shows nothing new landing —
-that's the desired silence.
+The routine no-ops cleanly when `scripts/bump-actions.mjs` exits 0
+**and** the column-6 status scan finds zero `no-releases` /
+`unresolved` rows: no PR is opened, no issue is opened, no branch
+is pushed. If every pin matches its latest release for several
+weeks running, the `actions-bump-bot` label view simply shows
+nothing new landing — that's the desired silence. Exit 0 with
+`no-releases` / `unresolved` rows still files an
+`Unresolved action pins YYYY-MM-DD` triage issue per the prompt's
+[Failure handling](./PROMPT.md#failure-handling) and exits 0 — the
+label view will reflect that drift even on otherwise-quiet weeks.
 
 ## Iteration workflow (changing the prompt)
 

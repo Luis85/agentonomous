@@ -203,8 +203,17 @@ For each remaining `PENDING` row in scope:
    # several minutes on a cold cache).
    RUN_DATE="$(date -u +%F)"
    BRANCH="chore/actions-bump-${RUN_DATE}"
+   # Branch creation is gated on DRY_RUN: dry-run mode prints the
+   # would-be `git switch -C` and resolves BASE_SHA from `develop`
+   # directly (HEAD is still on develop because we never switched);
+   # non-dry-run mode does the actual force-create and resolves
+   # BASE_SHA from the new branch's HEAD (which equals develop's
+   # tip because the branch was just cut from it). Both paths set
+   # BASE_SHA to the develop-tip SHA so the failure-issue title
+   # spec works identically in either mode.
    if [ -n "${DRY_RUN:-}" ]; then
      printf '[DRY_RUN] would call: git switch -C %q develop\n' "${BRANCH}"
+     BASE_SHA="$(git rev-parse develop)"
    else
      # Use `-C` (force-create) instead of `-c` so a same-day retry
      # works on a persistent runner: if a prior attempt aborted
@@ -216,8 +225,8 @@ For each remaining `PENDING` row in scope:
      # branch always starts from the freshly-pulled tip, never from
      # whatever leftover commits the prior attempt left behind.
      git switch -C "${BRANCH}" develop
+     BASE_SHA="$(git rev-parse HEAD)"
    fi
-   BASE_SHA="$(git rev-parse HEAD)"
    ```
 
    `BASE_SHA` resolves to the develop tip in both modes — in dry-run
@@ -500,19 +509,19 @@ PRs on top of an unmerged backlog:
 
 ```bash
 : "${ROUTINE_GH_LOGIN:?ROUTINE_GH_LOGIN must be set to the GitHub login the routine posts as}"
-EXISTING="$(gh pr list \
-  --base develop \
-  --state open \
-  --limit 1000 \
-  --search "author:${ROUTINE_GH_LOGIN}" \
-  --json number,title,headRefName,headRefOid \
-  --jq '[.[] | select(.headRefName | startswith("chore/actions-bump-"))][0]')"
 # `--limit 1000` is gh's hard cap per page — sufficient because the
 # `--search "author:..."` clause already scopes to a single login's
 # open PRs in this repo, which in practice is bounded well below
-# 1000. Without `--limit`, gh defaults to 30 and would silently miss
-# older open `chore/actions-bump-*` PRs once the per-author backlog
-# grows past 30, allowing the routine to open a duplicate.
+# 1000. Without an explicit `--limit`, gh defaults to 30 and would
+# silently miss older open `chore/actions-bump-*` PRs once the
+# per-author backlog grows past 30, allowing the routine to open a
+# duplicate. The argument is on the same line as `--search` (rather
+# than its own continuation line) to keep the limit visually
+# adjacent to the search filter that defines the candidate set.
+EXISTING="$(gh pr list --base develop --state open \
+  --limit 1000 --search "author:${ROUTINE_GH_LOGIN}" \
+  --json number,title,headRefName,headRefOid \
+  --jq '[.[] | select(.headRefName | startswith("chore/actions-bump-"))][0]')"
 if [ -n "${EXISTING}" ] && [ "${EXISTING}" != "null" ]; then
   echo "Skip — bump PR already open: ${EXISTING}"
   exit 0
