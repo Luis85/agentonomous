@@ -51,88 +51,93 @@ Confirm with the user:
 
 ### 1. Locate the finding(s)
 
-**Single-finding mode.** Substitute the user-provided finding ID
-(e.g. `682b557.3`) for `${ID}` below before running:
+Both modes share the same fetch + parse step. Node 22 is a hard
+project requirement (`.nvmrc`), so the parser is a checked-in script
+at `scripts/review-fix-parse.mjs`. **Do not** try to filter the
+comments JSON inline with `gh --jq`, `jq`, `node -e` heredocs, or
+`grep | sed`. The recipe below dodges five real footguns:
+
+1. `gh api --paginate --slurp --jq` is rejected by current `gh`
+   versions ("the `--slurp` option is not supported with `--jq` or
+   `--template`"). Slurp must run with no `--jq` filter.
+2. `--slurp` returns an array-of-pages (`[[...page1...], [...page2...]]`),
+   not a flat comment list. The script flattens; do not assume flat.
+3. `jq` is not installed by default on Windows or many CI images, so
+   the skill must not depend on it.
+4. Windows Git Bash maps `/tmp` for shell builtins but native Node
+   resolves the same path to `D:\tmp` (which usually does not exist).
+   Cache files therefore live under `.review-fix-cache/` in the repo
+   root (gitignored), not `/tmp` or `${HOME}`.
+5. Finding-marker text can appear inside another finding's
+   `<details>` body or quoted diff. The script only treats top-level
+   checklist lines (`^- \[[ x]\] `) as finding boundaries.
+
+```bash
+REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+mkdir -p .review-fix-cache
+gh api "repos/${REPO}/issues/87/comments" --paginate --slurp \
+  > .review-fix-cache/comments.json
+node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
+  > .review-fix-cache/parsed.json
+```
+
+`parsed.json` schema (one object — most recent comment with findings):
+
+```json
+{
+  "commentId": 4321324736,
+  "commentUrl": "https://github.com/<owner>/<repo>/issues/87#issuecomment-...",
+  "createdAt": "2026-04-26T05:21:55Z",
+  "findings": [
+    {
+      "id": "<sha7>.<idx>",
+      "shipped": false,
+      "shippedPr": null,
+      "severity": "BLOCKER" | "MAJOR" | "MINOR" | "NIT",
+      "path": "src/foo/Bar.ts:143",
+      "title": "<one-line title>",
+      "body": "<verbatim <details>...</details> chunk>"
+    }
+  ]
+}
+```
+
+The script exits 1 with `No comment on the tracker contains findings`
+if every comment is a no-op summary — surface that to the user and
+stop.
+
+**Single-finding mode.** Pick the entry whose `id` matches the
+user-provided ID:
 
 ```bash
 ID="<sha7>.<idx>"            # e.g. 682b557.3
-MARKER="<!-- f:${ID} -->"
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-gh api "/repos/${REPO}/issues/87/comments" --paginate \
-  --jq ".[] | select(.body | contains(\"${MARKER}\")) | {id, body}"
+node -e "const d=JSON.parse(require('fs').readFileSync('.review-fix-cache/parsed.json','utf8')); const f=d.findings.find(x=>x.id===process.argv[1]); if(!f){console.error('Finding '+process.argv[1]+' not found in #'+d.commentId);process.exit(1)} if(f.shipped){console.error('Finding '+f.id+' already shipped in #'+f.shippedPr);process.exit(2)} process.stdout.write(JSON.stringify(f,null,2))" "${ID}" \
+  > .review-fix-cache/finding.json
 ```
 
-If no match: hard-fail with `Finding ${ID} not found in #87 comments`.
+If the user pasted a free-text description instead of `<sha7>.<idx>`:
+refuse and ask them to grab the ID from the tracker comment (or
+`gh issue view 87 --comments`).
 
-**Sweep mode (no argument).** Pull the most recent comment that
-actually contains finding markers (the review bot is allowed to post
-no-op comments like `YYYY-MM-DD — no-op …` with zero findings; those
-must be skipped, not picked), then extract every finding ID from it.
-Three pagination / shape subtleties matter:
+**Sweep mode (no argument).** Iterate `.findings[]` from
+`parsed.json`. For each entry:
 
-1. Without `--slurp`, `gh api --paginate --jq '... | last'` runs the
-   filter once per page and returns one row per page (last-of-each-
-   page, not the global latest comment).
-2. With `--slurp`, `gh api` returns an array of pages (one entry per
-   page) rather than a flat list of comments, so `sort_by(.created_at)`
-   would be operating on an array-of-arrays. Pipe through `add` first
-   to concatenate the pages into a single flat array.
-3. The newest comment may be a no-op summary with no findings. Filter
-   to comments whose body contains `<!-- f:` _before_ taking `last`,
-   so sweep mode picks the most recent comment that has work to do.
-4. When `last` is applied to an empty array it returns `null`, but a
-   bare `| {id, body}` projection turns that into the misleading
-   `{"id":null,"body":null}` — i.e. truthy JSON. Guard the projection
-   with `if . == null then empty else {id, body} end` so an
-   "everything is no-op" run yields a genuinely empty `LAST_COMMENT`.
-5. Finding-marker text can legitimately appear inside a finding's
-   `<details>` body or diff block (the bot quotes other comments).
-   Parse IDs only from checklist lines (`- [ ]` / `- [x]`) so quoted
-   marker templates inside bodies are not mistaken for real findings.
-
-```bash
-REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-LAST_COMMENT="$(gh api "repos/${REPO}/issues/87/comments" \
-  --paginate --slurp \
-  --jq 'add
-        | map(select(.body | contains("<!-- f:")))
-        | sort_by(.created_at)
-        | last
-        | if . == null then empty else {id, body} end')"
-
-if [ -z "${LAST_COMMENT}" ] || [ "${LAST_COMMENT}" = "null" ]; then
-  echo "No comment on #87 contains findings — nothing to sweep" >&2
-  exit 1
-fi
-
-echo "${LAST_COMMENT}" | jq -r '.body' \
-  | grep -E '^- \[[ x]\] ' \
-  | grep -oE '<!-- f:[A-Za-z0-9]+\.[0-9]+ -->' \
-  | sed -E 's/<!-- f:(.+) -->/\1/'
-```
-
-For each ID returned:
-
-- Skip if its checklist line in the same comment body starts with
-  `- [x]` (already shipped — log `Skipping <id> (shipped in #N)` and
-  continue).
-- Skip if `.worktrees/fix-review-<slug>` already exists (log
-  `Skipping <id> (worktree exists at <path>)` and continue).
-- Otherwise, run steps 2 → 5 for that finding.
+- `shipped === true` → log `Skipping <id> (shipped in #<shippedPr>)`
+  and continue.
+- `.worktrees/fix-review-<slug>` already exists → log
+  `Skipping <id> (worktree exists at <path>)` and continue.
+- Otherwise run steps 2 → 5 for that finding.
 
 ### 2. Extract finding fields
 
-From the matched comment body, locate the line ending with
-`<!-- f:<sha7>.<idx> -->`. Pull:
+`scripts/review-fix-parse.mjs` already split the chosen finding into
+`{id, shipped, shippedPr, severity, path, title, body}`. Read those
+fields from `.review-fix-cache/finding.json` (single mode) or from
+`.review-fix-cache/parsed.json` `.findings[i]` (sweep mode). Do not
+re-parse the comment body by hand — the regex lives in the script.
 
-- **Severity** — the `**[…]**` token (`BLOCKER` / `MAJOR` / `MINOR` /
-  `NIT`).
-- **Path** — the backtick-quoted path immediately after.
-- **Title** — the text between `— ` and the HTML comment.
-- **Body** — the contents of the `<details>` block on the lines below.
-
-If the line shows `- [x]` instead of `- [ ]`: hard-fail
-`Finding <id> already shipped in #<PR>`.
+The parser already hard-fails single mode on `shipped === true`. In
+sweep mode, you must perform the equivalent skip yourself (step 1).
 
 ### 3. Compute slug + paths
 
