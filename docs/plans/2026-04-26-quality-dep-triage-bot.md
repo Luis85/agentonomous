@@ -27,10 +27,11 @@ cat docs/docs-review-bot/README.md
 cat .github/dependabot.yml
 ```
 
-The dep-triage routine MUST mirror the existing review-bot /
-docs-review-bot prose conventions: rolling tracker issue, append
-comments per run, idempotency via "last triaged SHA", never push
-direct to develop.
+The dep-triage routine MUST mirror the existing review-bot prose
+conventions: one tracker issue per scheduled run (label
+`dep-triage-bot`), findings/summary in the issue body, idempotency
+via "last triaged SHA" persisted to a committed daily doc, never
+push direct to develop.
 
 - [ ] **Step 2: Update `.github/dependabot.yml`**
 
@@ -72,19 +73,23 @@ Sections to include (mirror `docs/review-bot/PROMPT.md`):
 4. **Hard rules** — never merge a PR that touches `src/**` (means
    Dependabot generated more than a manifest bump, suspicious);
    never bypass `--no-verify`; never amend the Dependabot commit.
-5. **Output** — append a one-comment summary on a rolling tracker
-   issue `Dependency triage — develop` (label `dep-triage-bot`).
+5. **Output** — open one tracker issue per run titled
+   `Dependency triage YYYY-MM-DD — <head-sha[:7]>` (label
+   `dep-triage-bot`); the body holds that run's summary.
 6. **Failure handling** — verify fails → comment "verify failed:
-   \<err tail\>" on the Dependabot PR + tracker, do NOT merge.
+   \<err tail\>" on the Dependabot PR + create the tracker issue
+   noting the failure, do NOT merge.
 
 Use the same idempotency pattern as `docs/review-bot/PROMPT.md`
-(rolling issue, append comments, never push direct to develop).
+(one issue per run, body holds findings, last-triaged SHA lives in
+the committed daily doc, never push direct to develop).
 
 - [ ] **Step 4: Write `docs/dep-triage-bot/README.md`**
 
 Mirror `docs/review-bot/README.md`: how the routine consumes the
-prompt, where output lives (the rolling tracker issue), how to evolve
-the prompt (edit on a topic branch, open a PR, next run picks it up).
+prompt, where output lives (a fresh tracker issue per run), how to
+evolve the prompt (edit on a topic branch, open a PR, next run
+picks it up).
 
 - [ ] **Step 5: Verify**
 

@@ -20,8 +20,8 @@ Review commits on `develop` since the last reviewed SHA (or the last 24h
 if this is the first run).
 
 If no new commits: output `No new commits since <SHA>. Skipping.` and
-exit cleanly without writing a doc or opening a PR — only post a one-line
-no-op comment to the rolling issue.
+exit cleanly without writing a doc, opening a PR, or creating an issue.
+Quiet days leave no trace.
 
 Diff commands:
 
@@ -146,11 +146,16 @@ End the comment with the run footer:
 
 # Persistence (dual sink)
 
-## Sink 1: GitHub issue (rolling log)
+## Sink 1: GitHub issue (one per run)
 
-- Find or create the issue titled `Daily code review — develop` (label:
-  `review-bot`).
-- Append today's findings as a new comment, format:
+Each scheduled run opens its **own** issue. There is no rolling log
+and no append-to-existing-comment step. One issue = one review = one
+body containing every finding for that range.
+
+- Title: `Code review YYYY-MM-DD — <head-sha[:7]>`
+- Labels: `review-bot`
+- Body: same content the daily doc carries (header line, severity
+  counts, checklist of findings, run footer). Format:
 
   ```
   ## YYYY-MM-DD — <head-sha>
@@ -162,10 +167,10 @@ End the comment with the run footer:
   <run footer>
   ```
 
-- If no new commits: append a one-line comment
-  `YYYY-MM-DD — no-op (head still <sha>)`.
-- Update the issue body's `Last reviewed SHA: <head-sha>` line. This is
-  canonical state — read it at the start of the next run.
+- The `review-fix-shipped` Action edits this body in place when each
+  finding's PR merges (`- [ ]` → `- [x]` plus a `(shipped in #N)`
+  suffix). Do NOT post a new comment to record shipped state.
+- If no new commits: do NOT open an issue. Quiet days leave no trace.
 
 ## Sink 2: Daily review doc (committed)
 
@@ -181,43 +186,53 @@ End the comment with the run footer:
   majors: <N>
   minors: <N>
   nits: <N>
+  issue: <issue-number>
   ---
   ```
 
-- Body: full findings block (same content as the issue comment —
-  checklist of findings + run footer).
-- The daily doc is an immutable snapshot of that run; the
-  `review-fix-shipped` Action edits the rolling issue comment only,
-  never the daily doc.
+  The `range` end SHA is the canonical "Last reviewed SHA" the next
+  run reads to resume. The `issue` field cross-links the run's
+  GitHub issue — `review-fix` uses it as a fast lookup, but the
+  authoritative state lives in the file.
+- Body: full findings block (same checklist + run footer the issue
+  body carries).
+- The daily doc is an immutable snapshot; only the issue body is
+  edited post-merge by the `review-fix-shipped` Action.
 - If no new commits: skip file creation. Do NOT commit an empty doc.
 
 ## Commit + PR flow (NEVER push direct to develop)
 
 1. `git fetch origin && git switch -c chore/daily-review-YYYY-MM-DD origin/develop`
-2. Write `docs/daily-reviews/YYYY-MM-DD.md`.
-3. `git add docs/daily-reviews/YYYY-MM-DD.md`
-4. `git commit -m "docs(reviews): daily review YYYY-MM-DD"`
+2. `gh issue create --title "Code review YYYY-MM-DD — <sha7>" --label review-bot --body "<full findings block>"` → capture the new issue number.
+3. Write `docs/daily-reviews/YYYY-MM-DD.md` (include `issue: <n>` in frontmatter).
+4. `git add docs/daily-reviews/YYYY-MM-DD.md`
+5. `git commit -m "docs(reviews): daily review YYYY-MM-DD"`
    (no `--no-verify`, no `Co-Authored-By` unless the owner sets one).
-5. `git push -u origin chore/daily-review-YYYY-MM-DD`
-6. `gh pr create --base develop --title "docs(reviews): daily review YYYY-MM-DD" --body "Automated daily review. See <issue-link>#issuecomment-<id> for findings. Doc-only change, skip changeset."`
-7. If repo has auto-merge enabled, run `gh pr merge --auto --squash` on
+6. `git push -u origin chore/daily-review-YYYY-MM-DD`
+7. `gh pr create --base develop --title "docs(reviews): daily review YYYY-MM-DD" --body "Automated daily review. Findings tracked in #<issue-number>. Doc-only change, skip changeset."`
+8. If repo has auto-merge enabled, run `gh pr merge --auto --squash` on
    the PR. Otherwise leave it for the owner to merge.
 
 ## Idempotency
 
-- Read `Last reviewed SHA` from the issue body at the start. If unset,
-  fall back to `git log --since="24 hours ago" origin/develop`.
-- If `docs/daily-reviews/YYYY-MM-DD.md` already exists on `develop`,
-  today's run already happened — append the delta as a new comment to
-  the issue, but do NOT open a second PR for the same date. Either
-  reuse the existing branch with a follow-up commit or skip the doc
-  write.
+- Resolve `Last reviewed SHA` at start: read the most recent file
+  matching `docs/daily-reviews/*.md` on `origin/develop`, parse the
+  `range:` line in its frontmatter, take the SHA after `..`. If no
+  such doc exists, fall back to
+  `git log --since="24 hours ago" origin/develop`.
+- If `docs/daily-reviews/YYYY-MM-DD.md` already exists on `origin/develop`,
+  today's run already happened — exit cleanly without opening a
+  second issue or PR. The previous run's issue stays the
+  authoritative tracker for that date.
 
 ## Failure handling
 
-- `gh pr create` fails (e.g. no diff) → still post the issue comment
-  with findings; skip the PR.
-- `git push` fails (perm, network) → retry once, then post an issue
-  comment noting `doc commit failed: <err>`, continue.
-- Findings empty + no commits → single issue comment "no-op"; no
-  branch, no PR.
+- `gh issue create` fails → abort the run. Without an issue, the
+  `review-fix` skill cannot ingest findings; better to bail than
+  ship a daily doc whose `issue:` field points nowhere.
+- `gh pr create` fails (e.g. no diff) → keep the issue, log the
+  error, exit non-zero.
+- `git push` fails (perm, network) → retry once, then comment on the
+  freshly-created issue noting `doc commit failed: <err>` and exit
+  non-zero so the cron flags the run.
+- Findings empty + no commits → no issue, no branch, no PR.

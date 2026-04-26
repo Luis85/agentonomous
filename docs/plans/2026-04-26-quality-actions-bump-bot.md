@@ -50,10 +50,11 @@ Key sections:
    never alter the trailing `# vX.Y.Z` comment without matching the
    bumped tag.
 5. **Output** — single PR per run, body lists each `(action, old SHA,
-   new SHA, version label)`. No-op runs: post a one-line comment on
-   the tracker issue `Action SHA bumps — develop` and exit.
-6. **Failure handling** — verify fails → close branch, comment on
-   tracker.
+   new SHA, version label)`. No-op runs: open a fresh tracker issue
+   `Action SHA bumps YYYY-MM-DD — <sha7>` (label
+   `actions-bump-bot`) noting the no-op, then exit.
+6. **Failure handling** — verify fails → close branch, open a
+   tracker issue noting the failure.
 
 - [ ] **Step 3: Write `docs/actions-bump-bot/README.md`**
 
