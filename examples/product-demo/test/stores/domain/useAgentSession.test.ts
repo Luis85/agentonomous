@@ -6,6 +6,7 @@ import type { AgentTickedEvent, DomainEvent } from 'agentonomous';
 import { AGENT_TICKED } from 'agentonomous';
 import { useAgentSession } from '../../../src/stores/domain/useAgentSession.js';
 import { BASE_TIME_SCALE } from '../../../src/demo-domain/scenarios/petCare/buildAgent.js';
+import { catSpecies } from '../../../src/demo-domain/scenarios/petCare/species.js';
 
 const SEED_STORAGE_KEY = 'demo.v2.session.lastSeed.petCare';
 
@@ -144,6 +145,32 @@ describe('useAgentSession', () => {
     expect(session.seed).toBe('replay-seed');
     expect(session.running).toBe(true);
     expect(session.speedMultiplier).toBe(1);
+  });
+
+  it('replayFromSnapshot(null) reapplies the species override that init received', () => {
+    const session = useAgentSession();
+    session.init({ seed: 'override-seed', speciesOverride: catSpecies });
+    expect(session.lastSpeciesOverride?.id).toBe(catSpecies.id);
+    const firstAgent = session.agent;
+
+    session.replayFromSnapshot(null);
+    expect(session.agent).not.toBe(firstAgent);
+    // Override is retained across rebuild — without this the rebuilt
+    // agent would silently revert to the scenario default.
+    expect(session.lastSpeciesOverride?.id).toBe(catSpecies.id);
+    // Sanity: the rebuilt agent's needs reflect the override (catSpecies
+    // ships hunger / cleanliness / happiness / energy / health).
+    expect(Object.keys(session.agent?.getState().needs ?? {})).toEqual(
+      (catSpecies.needs ?? []).map((n) => n.id),
+    );
+  });
+
+  it('init() without a speciesOverride clears any previously stored override', () => {
+    const session = useAgentSession();
+    session.init({ seed: 'override-seed', speciesOverride: catSpecies });
+    expect(session.lastSpeciesOverride?.id).toBe(catSpecies.id);
+    session.init({ seed: 'plain-seed' });
+    expect(session.lastSpeciesOverride).toBeUndefined();
   });
 
   it('subscribe handles survive replayFromSnapshot — listener fires on the rebuilt agent', async () => {

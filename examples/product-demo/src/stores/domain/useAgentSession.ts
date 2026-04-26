@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { markRaw, ref } from 'vue';
-import type { Agent, DomainEvent } from 'agentonomous';
+import type { Agent, DomainEvent, SpeciesDescriptor } from 'agentonomous';
 import {
   BASE_TIME_SCALE,
   buildAgent,
@@ -70,6 +70,11 @@ export const useAgentSession = defineStore('agentSession', () => {
   const seed = ref<string>('');
   const speedMultiplier = ref<number>(1);
   const running = ref<boolean>(false);
+  // Last species override handed to `init`, retained so
+  // `replayFromSnapshot(null)` can rebuild the agent with the same
+  // configuration the user is currently running. Without this, reset /
+  // replay would silently revert to the scenario's default species.
+  const lastSpeciesOverride = ref<SpeciesDescriptor | undefined>(undefined);
   // Tracked outside the reactive state — Pinia must not traverse the
   // listener closures (and the Set's identity is stable across rebuilds).
   const subscribers = new Set<SubscriberRecord>();
@@ -95,6 +100,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     scenarioId.value = resolvedScenario;
     seed.value = resolvedSeed;
     speedMultiplier.value = 1;
+    lastSpeciesOverride.value = options.speciesOverride;
     const fresh = markRaw(
       buildAgent({
         seed: resolvedSeed,
@@ -178,7 +184,14 @@ export const useAgentSession = defineStore('agentSession', () => {
         'useAgentSession.replayFromSnapshot: snapshot deserialisation lands in slice 1.2b',
       );
     }
-    const fresh = markRaw(buildAgent({ seed: seed.value }));
+    const fresh = markRaw(
+      buildAgent({
+        seed: seed.value,
+        ...(lastSpeciesOverride.value !== undefined
+          ? { speciesOverride: lastSpeciesOverride.value }
+          : {}),
+      }),
+    );
     agent.value = fresh;
     setLearningAgent(fresh);
     rebindSubscribers(fresh);
@@ -214,6 +227,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     seed,
     speedMultiplier,
     running,
+    lastSpeciesOverride,
     init,
     tick,
     start,
