@@ -16,11 +16,22 @@ backed by a normalized run fingerprint.
 
 ## Pre-flight
 
-- Blocked by: rename preflight.
+- Blocked by: rename preflight + Pillar-1 slice 1.2a (consumes
+  `useAgentSession.subscribe(AGENT_TICKED)`).
 - Hash function (`sha-256` truncated to 128 bits) and normalized input
   set are fixed in the design — do not relitigate per slice.
 - `minSampleFraction` initial value `0.95` is **OQ-P3**; tune in slice
   3.4 after first soak.
+- **Legacy recycle.** The legacy `seed.ts loadSeed()` localStorage
+  helper was absorbed into `useAgentSession` in Pillar-1 slice 1.2a;
+  the storage key migrates from `agentonomous/seed` to
+  `demo.v2.session.lastSeed.<scenarioId>` per the design's STO
+  contract (no migration — pre-v1 clean break). The legacy
+  `mountSeedPanel` UI (copy-seed / new-seed / replay-from-seed buttons)
+  was deleted in 1.2b without an immediate Vue port; slice 3.3 below
+  reintroduces it as `<SeedPanel>` alongside the replay report. The
+  copy/new/replay button labels + behavior port verbatim from the
+  legacy module.
 
 ## Roadmap
 
@@ -28,7 +39,7 @@ backed by a normalized run fingerprint.
 |---|---|---|---|---|---|
 | 3.1 | Normalizer + hash function (pure domain) + scope-key encoder | `examples/product-demo/src/demo-domain/fingerprint/{types.ts,normalize.ts,hash.ts,scopeKey.ts}`, `examples/product-demo/test/demo-domain/fingerprint/*.test.ts` | P3-FR-1, P3-FR-6 | not started | — |
 | 3.2 | `useFingerprintRecorder` domain store + persistence shape | `examples/product-demo/src/stores/domain/useFingerprintRecorder.ts`, `examples/product-demo/test/stores/domain/useFingerprintRecorder.test.ts` | P3-FR-1, P3-FR-4, P3-FR-5 | not started | — |
-| 3.3 | `<FingerprintBadge>` + `<ReplayReport>` components + copy action | `examples/product-demo/src/components/fingerprint/{FingerprintBadge.vue,ReplayReport.vue,CopyReportButton.vue}`, `examples/product-demo/src/views/ReplayView.vue` | P3-FR-2, P3-FR-3 | not started | — |
+| 3.3 | `<FingerprintBadge>` + `<ReplayReport>` components + copy action + `<SeedPanel>` (port of legacy `mountSeedPanel`'s copy/new/replay buttons against `useAgentSession`) | `examples/product-demo/src/components/fingerprint/{FingerprintBadge.vue,ReplayReport.vue,CopyReportButton.vue}`, `examples/product-demo/src/components/shell/SeedPanel.vue`, `examples/product-demo/src/views/ReplayView.vue` | P3-FR-2, P3-FR-3 | not started | — |
 | 3.4 | Known-good script + Playwright `replay-determinism.spec.ts` + tuning | `examples/product-demo/src/demo-domain/fingerprint/knownGoodScripts.ts`, `examples/product-demo/tests/e2e/replay-determinism.spec.ts` | P3-FR-7, P3-AC-1, P3-AC-2, P3-AC-3, P3-AC-4, P3-AC-5 | not started | — |
 
 ## Slice notes

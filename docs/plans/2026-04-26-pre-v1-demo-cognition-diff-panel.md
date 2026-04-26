@@ -15,11 +15,29 @@ users see — not infer — what changed between modes.
 
 ## Pre-flight
 
-- Blocked by: rename preflight.
+- Blocked by: rename preflight + Pillar-1 slice 1.2a (depends on
+  `useAgentSession` + `demo-domain/scenarios/petCare/cognition/`
+  salvage) + Pillar-1 slice **1.2b** (slice 2.5 deletes
+  `src/cognitionSwitcher.ts`, `src/lossSparkline.ts`, and
+  `src/predictionStrip.ts`; the legacy `src/main.ts` imports those
+  modules and the Wave-0 bridge keeps `src/main.ts` live until 1.2b
+  swaps `src/app/main.ts` to mount Vue. Running 2.5 before 1.2b
+  would break the build).
 - `DiffMetric<T>` contract is fixed in the design doc; no per-pillar
   variant.
 - Initial confidence-label thresholds are placeholders (**OQ-P2**);
   tune in slice 2.4 after the first soak.
+- **Legacy recycle.** Pillar-1 slice 1.2a `git mv`-relocated the
+  pet-care cognition modes (`heuristic.ts`, `bt.ts`, `bdi.ts`,
+  `learning.ts`, `index.ts`, `learning.network.json`) into
+  `examples/product-demo/src/demo-domain/scenarios/petCare/cognition/`. The legacy
+  `cognitionSwitcher.ts` (46 KB; probe + dropdown + reasoner reconstruct
+  + train button + softmax viz), `lossSparkline.ts`, and
+  `predictionStrip.ts` are PRESERVED on `develop` after slice 1.2b
+  specifically so Pillar 2 can port them rather than rebuild. Slice 2.5
+  ports all three together: the SVG renderers as-is into thin Vue SFCs
+  (logic stays pure) and the switcher into a `<CognitionSwitcher>` SFC
+  whose mode-construction logic moves into `useAgentSession.setMode()`.
 
 ## Roadmap
 
@@ -29,6 +47,7 @@ users see — not infer — what changed between modes.
 | 2.2 | Domain-store wiring to `AGENT_TICKED` (no UI) | `examples/product-demo/src/stores/domain/useAgentSession.ts` (subscriber wiring), `examples/product-demo/src/stores/view/useDiffPanelView.ts`, `examples/product-demo/test/stores/**` | P2-FR-4, P2-FR-5 | not started | — |
 | 2.3 | Diff card component + "What changed" summary on mode swap | `examples/product-demo/src/components/diff/{DiffCard.vue,MetricRow.vue,WhatChangedSummary.vue}`, `examples/product-demo/src/views/DiffView.vue` | P2-FR-3, P2-FR-6 | not started | — |
 | 2.4 | Confidence labels, sample-window thresholds, soak-tuned defaults | `examples/product-demo/src/demo-domain/diff/confidence.ts`, tests + tuning notes in this plan's Done log | P2-FR-2, P2-AC-2 | not started | — |
+| 2.5 | Port legacy `cognitionSwitcher.ts` → `<CognitionSwitcher>` Vue SFC + `useAgentSession.setMode()` action; port `lossSparkline.ts` / `predictionStrip.ts` pure renderers into `<LossSparkline>` / `<PredictionStrip>` SFCs; **delete** `examples/product-demo/src/{cognitionSwitcher.ts,lossSparkline.ts,predictionStrip.ts}` | `examples/product-demo/src/components/cognition/{CognitionSwitcher.vue,LossSparkline.vue,PredictionStrip.vue,TrainButton.vue}`, `examples/product-demo/src/stores/domain/useAgentSession.ts` (extend with `setMode` + learner-readout polling), `examples/product-demo/test/components/cognition/*.test.ts`, `examples/product-demo/eslint.config.js` (drop deleted paths) | P2-FR-3, P2-FR-5 | not started | — |
 
 ## Slice notes
 
@@ -62,6 +81,26 @@ users see — not infer — what changed between modes.
   labels and tune the constants.
 - Document the chosen values in this plan's Done log so the rationale
   survives the PR description.
+
+### 2.5 — Legacy switcher port (recycle, do not rebuild)
+
+- The legacy `cognitionSwitcher.ts` is the largest single demo file
+  (46 KB). Don't rewrite it from scratch — port it. Keep the existing
+  semantics: peer-dep probe at mount, disabled-option tooltip
+  (`Install <peerName> to enable`), one-shot construct on selection,
+  learner-readout poll loop with `LEARNER_BATCH_SIZE = 50` +
+  `LEARNER_READOUT_POLL_MS = 200`, train button with synthetic dataset.
+- The pure SVG renderers (`lossSparkline.ts`, `predictionStrip.ts`) are
+  already DOM-pure — extract their compute helpers (polyline points,
+  bar heights) into `examples/product-demo/src/demo-domain/scenarios/petCare/
+  cognition/{lossSparkline,predictionStrip}.ts` and let the Vue SFCs
+  consume them. The SFCs render the SVG via `<template>` markup.
+- Mode-construction logic moves to `useAgentSession.setMode(modeId)` —
+  the action probes, constructs, swaps the agent's reasoner, and
+  emits a `COGNITION_SWITCHED` event so the diff panel (slice 2.3) and
+  fingerprint scope (Pillar 3) react.
+- Delete the legacy three files in this PR; update
+  `examples/product-demo/eslint.config.js` `ignores` accordingly.
 
 ## Verification gates
 

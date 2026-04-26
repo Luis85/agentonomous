@@ -122,6 +122,46 @@ This increment is intentionally **pre-v1**. We optimize for a clean architecture
 - No requirement to keep transitional APIs if a cleaner API exists.
 - Determinism and testability remain non-negotiable; compatibility is negotiable.
 
+## Legacy code recycling (cross-cutting)
+
+"Pre-v1" does **not** mean "rewrite everything from scratch". The legacy
+vanilla-TS demo on `develop` (post-Wave-0) contains a substantial body
+of pure domain logic — species descriptor, cognition mode probes +
+reasoner constructors + softmax helpers, skill, random-event defs,
+config validator, SVG renderers — that is fully reusable under the new
+Vue/Pinia/Router shell.
+
+**Pillar-1 slice 1.2a** does the bulk of the salvage via `git mv`
+(history preserved): `species.ts`, `constants.ts`, `cognition/**`,
+`skills/**` move into `examples/product-demo/src/demo-domain/scenarios/petCare/`,
+and a new `buildAgent.ts` factory extracts the random-event +
+agent-construction recipe from the legacy `main.ts` verbatim.
+
+**Pillar-1 slice 1.2b** ports the DOM-mount UI (`mountHud`,
+`mountTraceView`) into Vue SFCs that reuse the legacy data tables
+(`INTERACTION_BUTTONS`, `STAGE_LABELS`, `LIFETIME_COUNTERS`, per-need
+bar markup) verbatim, then deletes the now-orphaned legacy mount files.
+
+**Pillar 2** ports `cognitionSwitcher.ts` (46 KB) into
+`<CognitionSwitcher>` + `useAgentSession.setMode()`, and the pure SVG
+renderers (`lossSparkline.ts`, `predictionStrip.ts`) into thin Vue SFCs
+that consume compute helpers extracted into `demo-domain/scenarios/petCare/cognition/`.
+
+**Pillar 4** ports `speciesConfig.ts`'s `EditableSpeciesConfig` +
+`validateEditableConfig` + `applyOverride` into
+`demo-domain/scenarios/petCare/config/` (validator + apply rules
+verbatim), and the `mountConfigPanel` mount becomes the `<JsonEditor>`
+SFC family.
+
+**Pillar 5 slice 5.2** is much lighter than originally scoped: the
+pet-care modules already live under `demo-domain/scenarios/petCare/`
+thanks to slice 1.2a, so 5.2 just wraps them in the design's
+`Scenario` contract rather than relocating them.
+
+The full per-module recycle map (with destination paths and timing)
+lives in the design doc under `Legacy code recycling`; per-pillar
+plans repeat the relevant rows in their `Pre-flight` and slice notes.
+
 ## 1) Guided walkthrough mode (from optional docs flow to in-product flow)
 
 ### Outcome
