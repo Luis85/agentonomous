@@ -295,16 +295,24 @@ behaviour change, silences the TS 7.0 deprecation note.
 
 ## Recommended order
 
-1. **3A.1** (demo js-son-agent ambient shim) — one-line tsconfig change, gets the demo's local tsc clean.
-2. **3.2** (DRY release) + **3.3** (size-limit comment) — tiny, make CI loop tighter immediately.
-3. **2.3** (loss toast) + **2.5** (Untrain button) — XS wins, ship one demo PR.
-4. **2.1** (loss curve) — makes training a feature, not plumbing.
-5. **2.2** (epoch progress) — polish on top of 2.1.
-6. **1.2** (multi-output softmax) + **2.4** (richer features) — bundled PR; changes what the network *is*.
-7. **1.1** (`TfjsLearner`) — closes the Learner seam.
-8. **1.5** (snapshot versioning of weights) — gated on R-08.
-9. **1.6** (WebGL backend) + **2.7** (backend picker) — bundled PR.
-10. **3.4** (`npm audit` gate) — ship once we have a stable transitive tree.
-11. **3.6** + **3.7** (matrix / OS) — nice-to-haves for pre-1.0.
+> **Status (2026-04-26):** the bulk of this list has shipped on
+> `develop` and now lives in
+> `docs/plans/2026-04-25-comprehensive-polish-and-harden.md` (see its
+> "What's already shipped" section). This spec is kept as the original
+> design brief that fed that roadmap. Items still genuinely out is
+> **1.5** (R-08 weight versioning, deferred) and **3.7**
+> (Windows / macOS-only runners — `3.6` already shipped the OS x backend
+> matrix in PR #113). Everything else has merged.
 
-Everything except (8) can land on `develop` today. (8) waits on R-08.
+1. **3A.1** (demo js-son-agent ambient shim) — ✓ shipped (PR #61).
+2. **3.2** (DRY release) + **3.3** (size-limit comment) — ✓ shipped (PR #76).
+3. **2.3** (loss toast) + **2.5** (Untrain button) — ✓ shipped (demo polish batch).
+4. **2.1** (loss curve) — ✓ shipped (PR #83).
+5. **2.2** (epoch progress) — ✓ shipped (PR #84).
+6. **1.2** (multi-output softmax) + **2.4** (richer features) — ✓ shipped (PRs #94 + #96).
+7. **1.1** (`TfjsLearner`) — ✓ shipped (PR #91).
+8. **1.5** (snapshot versioning of weights) — **deferred**, gated on R-08.
+9. **1.6** (WebGL backend) + **2.7** (backend picker) — ✓ shipped (PR #104).
+10. **3.4** (`npm audit` gate) — ✓ shipped (PR #77).
+11. **3.6** (OS × backend matrix) — ✓ shipped (PR #113). **3.7** (extra
+    OS runners) — still nice-to-have, not on the active roadmap.

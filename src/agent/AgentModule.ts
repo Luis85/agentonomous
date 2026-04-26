@@ -8,7 +8,7 @@ import type { AgentFacade } from './AgentFacade.js';
  * `AgentFacade` verbs.
  *
  * @experimental — shape may change in 1.1 when the composable kernel
- * lands (see `docs/plans/2026-04-19-v1-comprehensive-plan.md#11--composable-kernel`).
+ * lands (see `docs/archive/plans/2026-04-19-v1-comprehensive-plan.md#11--composable-kernel`).
  * Additions to this interface are minor bumps, not major.
  */
 export type ReactiveHandler = {

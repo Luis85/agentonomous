@@ -320,4 +320,5 @@ the vision. Changes to this document require:
 3. A corresponding update to `docs/specs/roadmap.md` showing how the
    change propagates.
 
-Last reviewed: 2026-04-19. Next review: at V1.0.0 release.
+Last reviewed: 2026-04-26. Next review: when the pre-1.0 polish-and-harden
+roadmap closes (see `docs/plans/2026-04-25-comprehensive-polish-and-harden.md`).
