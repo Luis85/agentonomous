@@ -171,12 +171,19 @@ After every move is staged:
   `not started` / `in flight` / `in review` → leave alone, full stop.
   **Sole exception:** a plan that explicitly links to a successor in
   `docs/plans/` via `Superseded by` / `Replaces` / `Successor:` markers
-  (see [Cross-check 4](#cross-checks-run-before-deciding-b)) is
-  archived regardless of tracker state — the successor inherits the
-  unfinished work.
+  (see [Cross-check 4](#cross-checks-run-before-deciding-b)) AND whose
+  tracker issue passes the next hard rule (closed or
+  `closed`/`complete`/`archived` label) is archived — the successor
+  inherits the unfinished rows. The successor link does NOT override
+  the tracker-issue rule below; both gates must pass before a
+  superseded predecessor archives.
 - **Never archive a plan whose tracker issue is still open without a
   closed-state label.** The umbrella tracker is the durable record;
-  if it's still gathering child PRs, the plan is still active.
+  if it's still gathering child PRs, the plan is still active. This
+  rule has **no** exceptions — including for superseded predecessors,
+  per the previous bullet — because an open umbrella tracker means
+  the umbrella intent is still active even when one constituent plan
+  was superseded.
 - **Never archive a plan whose latest commit on `origin/develop` is
   < 14 days old.** Give human work time to settle before archiving.
   This guards against "all rows ticked yesterday, archive today" foot-
