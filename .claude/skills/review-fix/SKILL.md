@@ -22,14 +22,47 @@ description: Ingests one or all open findings from the rolling daily-code-review
 
 - **Single-finding mode** — user supplies a finding ID (`682b557.3`).
   Runs steps 1 → 6 once for that ID. Default and primary path.
+  Step 7 (post-merge cleanup) is user-driven and happens after the
+  PR ships.
 - **Sweep mode** — user invokes the skill with no argument. Pull the
   most recent comment on `#87` that contains finding markers (skip
   no-op comments), parse every `<!-- f:<id> -->` marker, skip ones
   already rendered `- [x]`, and run steps 2 → 5 once per remaining
   finding. Each finding still gets its own worktree + branch + plan
   (one finding = one branch = one PR — sweep just batches the _setup_,
-  not the findings themselves). At the end, print a single hand-off
-  summary listing every plan written.
+  not the findings themselves). Step 6 prints one combined hand-off
+  block; step 7 cleanup is per-finding and runs as each PR ships.
+
+## Workflow at a glance
+
+`review-fix` only owns the **plan-creation** stage. The full lifecycle
+of a tracker finding looks like this — the user drives steps 2-6 in
+their own shell after this skill hands off, and step 7 is the cleanup
+they run after the PR merges:
+
+```text
+1. /review-fix [<id>]               ← this skill
+     fetches tracker → picks finding → cuts worktree + branch → writes plan
+
+2. cd <worktree>
+   /superpowers:writing-plans <plan-path>
+     refine plan into chunked tasks
+
+3. /superpowers:executing-plans <plan-path>
+     TDD implementation, one task at a time
+
+4. npm run verify                   ← pre-PR gate
+
+5. gh pr create --base develop ...
+     PR body MUST include the magic line: Refs #87 finding:<id>
+
+6. Codex review → resolve threads → owner merges PR to develop
+
+7. Post-merge cleanup (this skill, §7 below)
+     prune worktree · delete branch · refresh develop
+     `review-fix-shipped` Action ticks the tracker line and appends
+     `(shipped in #<PR>)` automatically — do NOT edit the comment.
+```
 
 ## Before you start
 
@@ -233,33 +266,101 @@ From `#87` comment <comment-id>, finding `<id>`:
 
 ### 6. Hand off
 
-**Single-finding mode.** Print exactly:
+The hand-off message has three sections so the user always knows
+what's been done, what they do next, and what runs automatically.
+Use these exact headings — they're what the user scans for.
+
+**Single-finding mode.** Print:
 
 ```text
-Plan written to <plan-path> on branch <branch> in <worktree-dir>.
-Next: cd <worktree-dir> && /superpowers:writing-plans <plan-path>
+✅ Done by /review-fix:
+  - Cached tracker comments to .review-fix-cache/comments.json
+  - Picked finding <id> from comment <comment-id> (<commentUrl>)
+  - Cut branch <branch> off origin/develop
+  - Created worktree at <worktree-dir> (npm install complete)
+  - Wrote plan at <plan-path>
+
+▶ You do next:
+  1. cd <worktree-dir>
+  2. /superpowers:writing-plans <plan-path>
+  3. /superpowers:executing-plans <plan-path>          (TDD loop)
+  4. npm run verify                                    (pre-PR gate)
+  5. gh pr create --base develop  --title "..."  --body "..."
+       PR body MUST include this line on its own:
+         Refs #87 finding:<id>
+  6. After PR merges: run the cleanup commands in §7 of the skill
+     (or re-invoke /review-fix; the skill prints them again).
+
+ℹ️ What happens automatically:
+  - The `review-fix-shipped` Action ticks the tracker line `[x]` and
+    appends `(shipped in #<your-pr>)` once the PR merges. Do NOT
+    edit the tracker comment yourself.
 ```
 
-**Sweep mode.** Print one summary block listing every plan written
-plus every finding skipped (and why). Format:
+**Sweep mode.** One block listing every plan + every skip:
 
 ```text
 Sweep of #87 latest comment: <N> findings processed.
 
-Plans written:
+✅ Plans written:
   - <id-1>  →  <plan-path-1>  (branch <branch-1>, worktree <worktree-dir-1>)
   - <id-2>  →  <plan-path-2>  (branch <branch-2>, worktree <worktree-dir-2>)
 
-Skipped:
+⏭  Skipped:
   - <id-3>  (shipped in #N)
   - <id-4>  (worktree exists at <path>)
 
-Next: pick a worktree and run /superpowers:writing-plans <plan-path>
-inside it. One PR per finding.
+▶ You do next: pick one worktree at a time and run the same 6-step
+  loop documented in single-finding hand-off. One PR per finding.
+  Run /verify and open each PR in parallel; do NOT batch findings.
+
+ℹ️ Post-merge cleanup is per-finding too — see §7.
 ```
 
 **Do not** invoke `superpowers:writing-plans` automatically. The user
 runs it after reviewing each plan.
+
+### 7. Post-merge cleanup
+
+After a PR for a finding merges, the user runs these commands from
+the **main repo** (`D:\Projects\agent-library`), NOT from the
+worktree (you can't remove a worktree you're sitting inside). The
+skill should print this block verbatim with `<slug>` and `<branch>`
+substituted for the finding being cleaned up.
+
+```bash
+# 1. Hop back to the main repo and refresh develop
+cd <main-repo-root>
+git switch develop
+git pull --ff-only origin develop
+
+# 2. Drop the worktree (frees the path under .worktrees/)
+git worktree remove .worktrees/fix-review-<slug>
+
+# 3. Delete the local topic branch (already merged via squash)
+git branch -d fix/review-bot-<slug>
+
+# 4. Delete the remote topic branch — only if GitHub didn't already
+#    auto-delete it on merge. Safe to ignore the error if it's gone.
+git push origin --delete fix/review-bot-<slug> 2>/dev/null \
+  || echo "Remote branch already removed (auto-delete on merge)."
+
+# 5. Prune stale tracking refs so `git branch -a` stays clean
+git fetch --prune origin
+```
+
+**Sweep cleanup.** If multiple PRs merged in a batch, repeat the
+block above per `<slug>`. The user can list candidate worktrees
+with `git worktree list` and cross-check against `gh pr list
+--state merged --search "Refs #87 finding:" --limit 20`.
+
+**What the skill does NOT touch:**
+
+- The tracker comment on `#87`. The `review-fix-shipped` Action edits
+  it post-merge. Manual edits race the Action and corrupt the
+  `(shipped in #N)` rendering.
+- The `.review-fix-cache/` directory. It's gitignored and cheap to
+  rebuild on the next run; leaving it speeds up the next sweep.
 
 ## Do not
 
