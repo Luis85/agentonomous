@@ -3,9 +3,15 @@
  * review-fix tracker comment parser.
  *
  * Reads the raw `gh api ... --paginate --slurp` output for issue #87
- * comments and emits a structured JSON description of the most recent
- * comment that contains finding markers. Used by the `review-fix`
- * skill to sidestep platform-specific shell pitfalls:
+ * comments and emits a structured JSON description of either:
+ *   - the most recent comment that contains finding markers (sweep
+ *     mode, default), or
+ *   - the comment that contains a specific finding ID (single mode,
+ *     `--id <sha7>.<idx>`), searching the full comment history so
+ *     backlog findings on older comments stay reachable.
+ *
+ * Used by the `review-fix` skill to sidestep platform-specific shell
+ * pitfalls:
  *   - Windows Git Bash maps `/tmp` to `D:\tmp` for native binaries,
  *     breaking Node `fs.readFileSync('/tmp/...')`.
  *   - `gh --paginate --slurp` rejects `--jq` / `--template` flags.
@@ -18,38 +24,69 @@
  * Usage:
  *   gh api "repos/<owner>/<repo>/issues/87/comments" --paginate --slurp \
  *     > .review-fix-cache/comments.json
+ *
+ *   # Sweep mode — newest comment with markers
  *   node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
  *     > .review-fix-cache/parsed.json
  *
- * Output schema (single JSON object):
+ *   # Single mode — specific finding ID, any comment in history
+ *   node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
+ *     --id 682b557.3 \
+ *     > .review-fix-cache/finding.json
+ *
+ * Sweep-mode output:
  *   {
- *     "commentId": <number>,
+ *     "commentId":  <number>,
  *     "commentUrl": <string>,
- *     "createdAt": <iso8601>,
- *     "findings": [
- *       {
- *         "id":        "<sha7>.<idx>",
- *         "shipped":   <bool>,
- *         "shippedPr": <number|null>,
- *         "severity":  "BLOCKER" | "MAJOR" | "MINOR" | "NIT",
- *         "path":      "<repo-relative path[:line]>",
- *         "title":     "<one-line>",
- *         "body":      "<raw verbatim body chunk, may include diff blocks>"
- *       }
- *     ]
+ *     "createdAt":  <iso8601>,
+ *     "findings":   [Finding, ...]
  *   }
  *
- * Exits 1 with a stderr message if no comment in the input contains
- * finding markers (the bot may post no-op summary comments — those
- * are skipped).
+ * Single-mode output:
+ *   {
+ *     "commentId":  <number>,
+ *     "commentUrl": <string>,
+ *     "createdAt":  <iso8601>,
+ *     "finding":    Finding
+ *   }
+ *
+ * Finding shape:
+ *   {
+ *     "id":        "<sha7>.<idx>",
+ *     "shipped":   <bool>,
+ *     "shippedPr": <number|null>,
+ *     "severity":  "BLOCKER" | "MAJOR" | "MINOR" | "NIT",
+ *     "path":      "<repo-relative path[:line]>",
+ *     "title":     "<one-line>",
+ *     "body":      "<raw verbatim body chunk, may include diff blocks>"
+ *   }
+ *
+ * Exit codes:
+ *   0  success
+ *   1  no comment / no finding matched
+ *   2  bad CLI arguments
+ *   3  finding matched but already shipped (single mode only)
  */
 
 import { readFileSync } from 'node:fs';
 import { argv, exit, stderr, stdout } from 'node:process';
 
-const inputPath = argv[2];
+const args = argv.slice(2);
+const inputPath = args[0];
+let targetId = null;
+for (let i = 1; i < args.length; i += 1) {
+  if (args[i] === '--id') {
+    targetId = args[i + 1];
+    i += 1;
+  }
+}
+
 if (!inputPath) {
-  stderr.write('usage: review-fix-parse.mjs <comments.json>\n');
+  stderr.write('usage: review-fix-parse.mjs <comments.json> [--id <sha7>.<idx>]\n');
+  exit(2);
+}
+if (targetId !== null && !/^[A-Za-z0-9]+\.[0-9]+$/.test(targetId)) {
+  stderr.write(`--id expects <sha7>.<idx> shape (e.g. 682b557.3), got "${targetId}"\n`);
   exit(2);
 }
 
@@ -63,24 +100,53 @@ const withFindings = comments
   .filter((c) => typeof c.body === 'string' && c.body.includes('<!-- f:'))
   .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-const last = withFindings[withFindings.length - 1];
-if (!last) {
+if (withFindings.length === 0) {
   stderr.write('No comment on the tracker contains findings — nothing to sweep\n');
   exit(1);
 }
 
-const findings = parseFindings(last.body);
-const payload = JSON.stringify(
-  {
-    commentId: last.id,
-    commentUrl: last.html_url,
-    createdAt: last.created_at,
-    findings,
-  },
-  null,
-  2,
-);
-stdout.write(`${payload}\n`);
+if (targetId === null) {
+  // Sweep: emit every finding from the newest comment that has any.
+  const newest = withFindings[withFindings.length - 1];
+  emit({
+    commentId: newest.id,
+    commentUrl: newest.html_url,
+    createdAt: newest.created_at,
+    findings: parseFindings(newest.body),
+  });
+  exit(0);
+}
+
+// Single: scan the full history (newest first) for the marker so a
+// backlog finding on an older comment stays reachable. The first
+// match wins; duplicate IDs across comments would only happen if the
+// review bot re-emitted an old finding, in which case the freshest
+// occurrence is what the user wants.
+const marker = `<!-- f:${targetId} -->`;
+for (let i = withFindings.length - 1; i >= 0; i -= 1) {
+  const comment = withFindings[i];
+  if (!comment.body.includes(marker)) continue;
+  const match = parseFindings(comment.body).find((f) => f.id === targetId);
+  if (!match) continue;
+  if (match.shipped) {
+    stderr.write(`Finding ${targetId} already shipped in #${match.shippedPr ?? '?'}\n`);
+    exit(3);
+  }
+  emit({
+    commentId: comment.id,
+    commentUrl: comment.html_url,
+    createdAt: comment.created_at,
+    finding: match,
+  });
+  exit(0);
+}
+
+stderr.write(`Finding ${targetId} not found in any tracker comment\n`);
+exit(1);
+
+function emit(obj) {
+  stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
+}
 
 /**
  * Parses one comment body into individual finding entries.

@@ -51,11 +51,11 @@ Confirm with the user:
 
 ### 1. Locate the finding(s)
 
-Both modes share the same fetch + parse step. Node 22 is a hard
-project requirement (`.nvmrc`), so the parser is a checked-in script
-at `scripts/review-fix-parse.mjs`. **Do not** try to filter the
-comments JSON inline with `gh --jq`, `jq`, `node -e` heredocs, or
-`grep | sed`. The recipe below dodges five real footguns:
+Both modes share the same fetch step. Node 22 is a hard project
+requirement (`.nvmrc`), so the parser is a checked-in script at
+`scripts/review-fix-parse.mjs`. **Do not** try to filter the comments
+JSON inline with `gh --jq`, `jq`, `node -e` heredocs, or `grep | sed`.
+The recipe below dodges five real footguns:
 
 1. `gh api --paginate --slurp --jq` is rejected by current `gh`
    versions ("the `--slurp` option is not supported with `--jq` or
@@ -72,55 +72,52 @@ comments JSON inline with `gh --jq`, `jq`, `node -e` heredocs, or
    `<details>` body or quoted diff. The script only treats top-level
    checklist lines (`^- \[[ x]\] `) as finding boundaries.
 
+Fetch every comment once into the project-local cache:
+
 ```bash
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 mkdir -p .review-fix-cache
 gh api "repos/${REPO}/issues/87/comments" --paginate --slurp \
   > .review-fix-cache/comments.json
+```
+
+**Single-finding mode.** Pass the ID via `--id`. The parser searches
+the **full comment history** (newest first) for that marker, so
+backlog findings on older tracker comments stay reachable — sweep
+mode only ever picks the newest comment, but single mode must not.
+
+```bash
+ID="<sha7>.<idx>"            # e.g. 682b557.3
+node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
+  --id "${ID}" \
+  > .review-fix-cache/finding.json
+```
+
+Parser exit codes (single mode):
+
+- `0` → match written to `finding.json` as
+  `{commentId, commentUrl, createdAt, finding: {…}}`.
+- `1` → ID not found in any comment. Refuse with
+  `Finding ${ID} not found in #87 comments`.
+- `2` → bad CLI args (e.g. user pasted a free-text description).
+  Refuse and ask them to grab the ID from
+  `gh issue view 87 --comments`.
+- `3` → ID found but already shipped. The script's stderr already
+  says `Finding <id> already shipped in #<PR>`; surface it and stop.
+
+**Sweep mode (no argument).** Run the parser without `--id` to get
+every finding from the most recent comment that contains markers:
+
+```bash
 node scripts/review-fix-parse.mjs .review-fix-cache/comments.json \
   > .review-fix-cache/parsed.json
 ```
 
-`parsed.json` schema (one object — most recent comment with findings):
+Sweep output: `{commentId, commentUrl, createdAt, findings: [Finding, …]}`.
+Exit 1 with `No comment on the tracker contains findings` if every
+comment is a no-op summary — surface that to the user and stop.
 
-```json
-{
-  "commentId": 4321324736,
-  "commentUrl": "https://github.com/<owner>/<repo>/issues/87#issuecomment-...",
-  "createdAt": "2026-04-26T05:21:55Z",
-  "findings": [
-    {
-      "id": "<sha7>.<idx>",
-      "shipped": false,
-      "shippedPr": null,
-      "severity": "BLOCKER" | "MAJOR" | "MINOR" | "NIT",
-      "path": "src/foo/Bar.ts:143",
-      "title": "<one-line title>",
-      "body": "<verbatim <details>...</details> chunk>"
-    }
-  ]
-}
-```
-
-The script exits 1 with `No comment on the tracker contains findings`
-if every comment is a no-op summary — surface that to the user and
-stop.
-
-**Single-finding mode.** Pick the entry whose `id` matches the
-user-provided ID:
-
-```bash
-ID="<sha7>.<idx>"            # e.g. 682b557.3
-node -e "const d=JSON.parse(require('fs').readFileSync('.review-fix-cache/parsed.json','utf8')); const f=d.findings.find(x=>x.id===process.argv[1]); if(!f){console.error('Finding '+process.argv[1]+' not found in #'+d.commentId);process.exit(1)} if(f.shipped){console.error('Finding '+f.id+' already shipped in #'+f.shippedPr);process.exit(2)} process.stdout.write(JSON.stringify(f,null,2))" "${ID}" \
-  > .review-fix-cache/finding.json
-```
-
-If the user pasted a free-text description instead of `<sha7>.<idx>`:
-refuse and ask them to grab the ID from the tracker comment (or
-`gh issue view 87 --comments`).
-
-**Sweep mode (no argument).** Iterate `.findings[]` from
-`parsed.json`. For each entry:
+For each entry in `parsed.json` `.findings[]`:
 
 - `shipped === true` → log `Skipping <id> (shipped in #<shippedPr>)`
   and continue.
@@ -128,16 +125,32 @@ refuse and ask them to grab the ID from the tracker comment (or
   `Skipping <id> (worktree exists at <path>)` and continue.
 - Otherwise run steps 2 → 5 for that finding.
 
+`Finding` shape (both modes):
+
+```json
+{
+  "id": "<sha7>.<idx>",
+  "shipped": false,
+  "shippedPr": null,
+  "severity": "BLOCKER" | "MAJOR" | "MINOR" | "NIT",
+  "path": "src/foo/Bar.ts:143",
+  "title": "<one-line title>",
+  "body": "<verbatim <details>...</details> chunk>"
+}
+```
+
 ### 2. Extract finding fields
 
 `scripts/review-fix-parse.mjs` already split the chosen finding into
 `{id, shipped, shippedPr, severity, path, title, body}`. Read those
-fields from `.review-fix-cache/finding.json` (single mode) or from
-`.review-fix-cache/parsed.json` `.findings[i]` (sweep mode). Do not
-re-parse the comment body by hand — the regex lives in the script.
+fields from `.review-fix-cache/finding.json` `.finding` (single mode)
+or from `.review-fix-cache/parsed.json` `.findings[i]` (sweep mode).
+Do not re-parse the comment body by hand — the regex lives in the
+script.
 
-The parser already hard-fails single mode on `shipped === true`. In
-sweep mode, you must perform the equivalent skip yourself (step 1).
+The parser already hard-fails single mode on `shipped === true`
+(exit 3). In sweep mode, you must perform the equivalent skip
+yourself (step 1).
 
 ### 3. Compute slug + paths
 
