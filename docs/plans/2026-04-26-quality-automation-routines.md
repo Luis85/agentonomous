@@ -22,7 +22,8 @@ three cloud-routine prompts).
   triage, action SHA bumps, plan reconciliation). Same shape as the
   existing `docs/review-bot/` and `docs/docs-review-bot/`.
 - **No core library changes.** All additions live under `.github/`,
-  `docs/`, `tests/determinism/`, and `examples/nurture-pet/`. No
+  `docs/`, `tests/determinism/`, and the demo workspace (currently
+  `examples/nurture-pet/`; see "Coordination with PR #129" below). No
   `src/**` edits. No changesets needed (tooling-only PR).
 
 **Tech stack:**
@@ -40,6 +41,51 @@ three cloud-routine prompts).
   (2026-04-26).
 - Type-coverage report, license/SBOM audit, mutation testing on
   examples — punt to a future plan if value materializes.
+
+---
+
+## Coordination with PR #129 (demo rename)
+
+PR [#129](https://github.com/Luis85/agentonomous/pull/129) is the
+umbrella tracker for the pre-v1 demo evolution increment. **Wave 0 of
+that increment is an atomic single-PR rename** of
+`examples/nurture-pet/` → `examples/product-demo/` (see
+`docs/plans/2026-04-26-pre-v1-demo-rename-preflight.md` once #129
+merges). The rename PR is responsible for sweeping every reference
+across the repo — scripts, GitHub Pages workflow, README links, CI,
+and (if it lands after Task 8 here) the Playwright wiring this plan
+introduces.
+
+**Path policy for this plan:**
+
+| Section | What it uses today | After Wave 0 of #129 |
+| --- | --- | --- |
+| File-structure tables (below) | `examples/nurture-pet/...` | `examples/product-demo/...` |
+| Task 8 Playwright spec + workflow | `examples/nurture-pet/...` | `examples/product-demo/...` |
+| `.gitignore` rules | `examples/nurture-pet/playwright-report/` etc. | `examples/product-demo/playwright-report/` etc. |
+
+**Sequencing rule (decide at the start of Task 8):**
+
+1. **If Wave 0 has merged into `develop` before Task 8 begins** — pull
+   `develop`, resolve any conflicts on this branch via
+   `git merge origin/develop` (NOT rebase, per
+   `MEMORY.md → feedback_parallel_pr_plan_conflicts.md`), then
+   substitute `examples/nurture-pet/` → `examples/product-demo/` in
+   every file you create or touch under Task 8 before proceeding.
+   Update the `git add` paths in Step 8.9 accordingly.
+2. **If Wave 0 has NOT merged before Task 8 begins** — implement
+   Task 8 against `examples/nurture-pet/` exactly as written below.
+   The Wave 0 rename PR will sweep this plan's additions (Playwright
+   config, smoke spec, workflow, `.gitignore` lines) the same way it
+   sweeps every other reference. Add a one-line note on the rename PR
+   when it opens calling out that PR #130 introduced new
+   `examples/nurture-pet/` paths so the sweep is complete.
+
+**Do not pre-rename in this plan.** Keeping `examples/nurture-pet/` as
+the literal value across all eight rows means a single mechanical sed
+in the Wave 0 PR converges everything. Pre-renaming half-and-half
+would force a manual reconciliation in two places and risks Codex
+re-flagging path mismatches between this plan and `develop` truth.
 
 ---
 
@@ -1020,12 +1066,34 @@ runtime regressions that typecheck + bundle don't (tfjs backend probe,
 
 ### Task 8: Playwright golden-path smoke
 
+> **Demo path:** every `examples/nurture-pet/...` reference in this
+> task uses the pre-rename name. If Wave 0 of PR
+> [#129](https://github.com/Luis85/agentonomous/pull/129) has merged
+> into `develop` before this task starts, swap to
+> `examples/product-demo/...` everywhere (file paths, `cd` targets,
+> `working-directory` keys, `.gitignore` entries, the `git add` lines
+> in Step 8.9). See "Coordination with PR #129" near the top of this
+> plan for the decision rule.
+
 **Files:**
 - Create: `examples/nurture-pet/playwright.config.ts`
 - Create: `examples/nurture-pet/tests/smoke/golden-path.spec.ts`
 - Create: `.github/workflows/demo-smoke.yml`
 - Modify: `examples/nurture-pet/package.json` — devDep + script
 - Modify: `.gitignore`
+
+- [ ] **Step 8.0: Decide demo path before doing anything else**
+
+```bash
+git fetch origin
+git ls-tree --name-only origin/develop examples/ | sort
+```
+
+If the listing contains `product-demo` (and not `nurture-pet`), Wave 0
+has landed — substitute the path everywhere in this task before
+running any subsequent step. If the listing still contains
+`nurture-pet`, proceed verbatim and note the coordination follow-up
+on the Wave 0 PR when it opens.
 
 - [ ] **Step 8.1: Add Playwright to the demo**
 
@@ -1301,6 +1369,14 @@ findings come back, address per
   rows on this branch. Project default (`one PR, one concern`) does
   not apply here. If a reviewer flags split-required, point them to
   this plan section.
+- **Demo rename in flight (PR #129 / Wave 0).** Task 8 paths point at
+  `examples/nurture-pet/`. If Wave 0 of PR #129 lands first, every
+  Task 8 path becomes `examples/product-demo/`. Follow Step 8.0 to
+  detect, then substitute mechanically. If Task 8 lands first, the
+  Wave 0 rename PR sweeps it. Do NOT attempt to ship `examples/
+  product-demo/` paths from this branch before Wave 0 has merged —
+  the directory does not exist on `develop` yet, so the Playwright
+  config and workflow would reference a missing path.
 
 ---
 
