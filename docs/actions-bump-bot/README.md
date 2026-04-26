@@ -163,16 +163,20 @@ user message):
 >    how to detect pending bumps, the hard rules, the PR shape,
 >    failure handling, idempotency, and dry-run rules. Do not
 >    re-derive any of that from this message.
-> 3. After opening the bump PR (or recognizing a no-op run when
->    `scripts/bump-actions.mjs` exits 0 and exiting cleanly without
->    opening anything), exit cleanly. The script's exit code — NOT
->    "zero `PENDING` rows" — is the no-op signal: the script also
->    exits non-zero for `DIVERGENT` and `ERROR` states even when
->    `PENDING` is zero, and those still require a failure issue
->    per the prompt's [Failure handling](./PROMPT.md#failure-handling).
->    Do NOT merge the PR yourself. Do NOT push to `develop`, `main`,
->    or `demo`. Do NOT edit anything outside `.github/workflows/`
->    (both `*.yml` and `*.yaml`) in the bump branch.
+> 3. After opening the bump PR (or recognizing a no-op run and
+>    exiting cleanly without opening anything), exit cleanly. A true
+>    no-op requires `scripts/bump-actions.mjs` to exit 0 **and** the
+>    column-6 status scan to find zero `no-releases` / `unresolved`
+>    rows — exit code alone is not sufficient. The script also exits
+>    non-zero for `DIVERGENT` and `ERROR` states even when `PENDING`
+>    is zero, and exits 0 with `no-releases` / `unresolved` rows
+>    that still require a triage issue. All of those paths are
+>    covered by the prompt's
+>    [Failure handling](./PROMPT.md#failure-handling) and
+>    [No-op detection](./PROMPT.md#no-op-detection) sections. Do
+>    NOT merge the PR yourself. Do NOT push to `develop`, `main`, or
+>    `demo`. Do NOT edit anything outside `.github/workflows/` (both
+>    `*.yml` and `*.yaml`) in the bump branch.
 >
 > If `docs/actions-bump-bot/PROMPT.md` does not exist on `develop`
 > for some reason, abort with a clear error — do not improvise a

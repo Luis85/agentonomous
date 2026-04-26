@@ -188,10 +188,21 @@ For each remaining `PENDING` row in scope:
    runs:
 
    ```bash
+   # `git fetch / switch develop / pull --ff-only` is idempotent
+   # workspace setup — the dry-run contract ([Dry-run contract](#dry-run-contract))
+   # forbids commits, remote-side writes, and cache files, none of
+   # which these commands produce. They only update the local
+   # `develop` ref to match origin, which any subsequent run
+   # re-derives. Run them in both modes.
    git fetch origin
    git switch develop
    git pull --ff-only origin develop
-   BRANCH="chore/actions-bump-$(date -u +%F)"
+   # Capture the run date ONCE so step 7's cache filename and
+   # step 8's push + PR title cannot drift if the run crosses UTC
+   # midnight during `npm ci && npm run verify` (which can run for
+   # several minutes on a cold cache).
+   RUN_DATE="$(date -u +%F)"
+   BRANCH="chore/actions-bump-${RUN_DATE}"
    if [ -n "${DRY_RUN:-}" ]; then
      printf '[DRY_RUN] would call: git switch -C %q develop\n' "${BRANCH}"
    else
@@ -213,11 +224,28 @@ For each remaining `PENDING` row in scope:
    `HEAD` is still on `develop`, in non-dry-run the new branch was
    just cut from it.
 
-3. **Apply each bump.** For every pending row, edit the matching
-   workflow file: replace the 40-char SHA with the freshly-resolved
-   one and update the trailing `# vX.Y.Z` comment to match the new
-   tag exactly. Touch nothing else — no whitespace fixes, no
-   reordering, no logic changes.
+3. **Apply each bump across every workflow file that pins it.** For
+   every pending row, edit **all** matching workflow files: replace
+   the 40-char SHA with the freshly-resolved one and update the
+   trailing `# vX.Y.Z` comment to match the new tag exactly. Touch
+   nothing else — no whitespace fixes, no reordering, no logic
+   changes.
+
+   > The script's PENDING summary line shows only the **first**
+   > source file (`# peel + verify, then edit <workflow-path>`) per
+   > row, but the same `<owner>/<repo>` pinned at the same SHA can
+   > appear in multiple workflow files (the script aggregates them
+   > into one variant with `.sources = [file1, file2, …]`). Editing
+   > only the printed source leaves the rest stale and produces a
+   > self-inflicted `DIVERGENT` row on the next run that blocks the
+   > normal bump flow. Find every file via:
+   >
+   > ```bash
+   > grep -lE "uses:[[:space:]]+<owner>/<repo>(/[^@[:space:]]+)?@<old-sha>" \
+   >   .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null
+   > ```
+   >
+   > Apply the SHA + label edit to each file in that list.
 
 4. **Run `actionlint` clean.** Locally:
 
@@ -268,10 +296,10 @@ For each remaining `PENDING` row in scope:
    if [ -n "${DRY_RUN:-}" ]; then
      printf '[DRY_RUN] would call: git add .github/workflows/\n'
      printf '[DRY_RUN] would call: git commit -m %q\n' \
-       "chore: bump pinned action SHAs ($(date -u +%F))"
+       "chore: bump pinned action SHAs (${RUN_DATE})"
    else
      git add .github/workflows/
-     git commit -m "chore: bump pinned action SHAs ($(date -u +%F))"
+     git commit -m "chore: bump pinned action SHAs (${RUN_DATE})"
    fi
    ```
 
@@ -297,7 +325,7 @@ For each remaining `PENDING` row in scope:
    gate this step:
 
    ```bash
-   BODY_FILE=".actions-bump-cache/pr-body-$(date -u +%F).md"
+   BODY_FILE=".actions-bump-cache/pr-body-${RUN_DATE}.md"
    if [ -n "${DRY_RUN:-}" ]; then
      printf '[DRY_RUN] would write PR body to %q (skipped — dry-run forbids cache writes)\n' \
        "${BODY_FILE}"
@@ -313,15 +341,14 @@ For each remaining `PENDING` row in scope:
 
    ```bash
    if [ -n "${DRY_RUN:-}" ]; then
-     printf '[DRY_RUN] would call: git push -u origin %q\n' \
-       "chore/actions-bump-$(date -u +%F)"
+     printf '[DRY_RUN] would call: git push -u origin %q\n' "${BRANCH}"
      printf '[DRY_RUN] would call: gh pr create --base develop --title %q --body-file <inline>\n' \
-       "chore: bump pinned action SHAs ($(date -u +%F))"
+       "chore: bump pinned action SHAs (${RUN_DATE})"
      printf '[DRY_RUN] body:\n%s\n' "${BODY}"
    else
-     git push -u origin "chore/actions-bump-$(date -u +%F)"
+     git push -u origin "${BRANCH}"
      gh pr create --base develop \
-       --title "chore: bump pinned action SHAs ($(date -u +%F))" \
+       --title "chore: bump pinned action SHAs (${RUN_DATE})" \
        --body-file "${BODY_FILE}"
    fi
    ```
@@ -439,11 +466,16 @@ can hit. Four distinct issue title shapes:
 See [Failure handling](#failure-handling) for the exact body shape
 of each.
 
-**No-op runs leave no trace.** If `scripts/bump-actions.mjs` exits 0,
-exit cleanly without opening a PR or issue. An empty
-`actions-bump-bot` label view AND no recent
+**No-op runs leave no trace.** A run is a true no-op only when
+`scripts/bump-actions.mjs` exits 0 **and** the column-6 status scan
+in [No-op detection](#no-op-detection) finds zero `no-releases` /
+`unresolved` rows. In that case, exit cleanly without opening a PR
+or issue. An empty `actions-bump-bot` label view AND no recent
 `chore/actions-bump-<date>` PR mean nothing happened recently —
-that's the desired silence.
+that's the desired silence. Exit 0 with `no-releases` / `unresolved`
+rows present is **not** a no-op: the routine still files an
+`Unresolved action pins YYYY-MM-DD` triage issue per
+[Failure handling](#failure-handling) and exits 0.
 
 ## Per-run state — none on a shared tracker
 
@@ -626,15 +658,20 @@ re-derives idempotently. Exit 0 after dumping.
   status table to detect them.
 
 - **`actionlint` fails after applying bumps** → revert the bump
-  edits (`git restore .github/workflows/`), close the bump branch
-  locally (`git switch develop && git branch -D
-  chore/actions-bump-<date>`), open a failure issue per the spec
-  below, and exit 1.
+  edits (`git restore .github/workflows/`); in non-dry-run mode also
+  close the bump branch locally (`git switch develop && git branch
+-D "${BRANCH}"`); open a failure issue per the spec below, and exit
+  1. The branch-delete step MUST be gated on `[ -z "${DRY_RUN:-}" ]`
+  because [step 2](#process) skipped `git switch -C` in dry-run mode
+  — `git branch -D` against a nonexistent branch errors out and
+  short-circuits the rest of the failure path (the issue file would
+  never get opened).
 
 - **`npm run verify` fails after applying bumps** → revert the bump
-  edits, close the bump branch locally (do NOT push it), open a
-  failure issue per the spec below, and exit 1. Never `--no-verify`
-  the bump PR.
+  edits; in non-dry-run mode also close the bump branch locally (do
+  NOT push it — same DRY_RUN gate as the `actionlint` bullet
+  above); open a failure issue per the spec below, and exit 1.
+  Never `--no-verify` the bump PR.
 
 - **`git push` fails** (auth, network) → exit 1 with the verbatim
   error. Do NOT silently retry without a paper trail.
