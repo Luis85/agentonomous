@@ -78,7 +78,13 @@ For each candidate to archive:
 4. **Successor link.** Search the plan body for
    `Superseded by` / `Replaces` / `Successor:` markers. If a
    successor plan exists and lives in `docs/plans/`, archive the
-   predecessor regardless of tracker state.
+   predecessor regardless of tracker state. **Precedence:** an
+   explicit successor link is the **only** path that overrides the
+   "[Never archive a plan with open roadmap rows](#hard-rules)" hard
+   rule below. Predecessors that name their successor in-body are
+   intentionally left with stale unfinished rows when the work moves;
+   archiving them is correct. Every other "open rows" plan stays
+   exactly as the hard rule says: leave alone, full stop.
 
 # Process
 
@@ -155,6 +161,11 @@ After every move is staged:
   filename verbatim — never rename in the move.
 - **Never archive a plan with open roadmap rows.** `[ ]` /
   `not started` / `in flight` / `in review` → leave alone, full stop.
+  **Sole exception:** a plan that explicitly links to a successor in
+  `docs/plans/` via `Superseded by` / `Replaces` / `Successor:` markers
+  (see [Cross-check 4](#cross-checks-run-before-deciding-b)) is
+  archived regardless of tracker state — the successor inherits the
+  unfinished work.
 - **Never archive a plan whose tracker issue is still open without a
   closed-state label.** The umbrella tracker is the durable record;
   if it's still gathering child PRs, the plan is still active.
@@ -217,13 +228,19 @@ issue, exit cleanly. Same "quiet runs leave no trace" convention as
 
 ```bash
 TITLE="docs(archive): plan reconciliation $(date -u +%F)"
-BODY_FILE=".plan-recon-cache/pr-body-$(date -u +%F).md"
+# BODY is built in memory by the routine using the templates in the
+# Output section above (Per-archive entry / Ambiguous / footer). Keep
+# the assembled string in this shell variable — do NOT write it to
+# disk in dry-run mode.
 if [ -n "${DRY_RUN:-}" ]; then
   printf '[DRY_RUN] would call: git push -u origin %q\n' "${BRANCH}"
-  printf '[DRY_RUN] would call: gh pr create --base develop --title %q --body-file %q\n' \
-    "${TITLE}" "${BODY_FILE}"
-  printf '[DRY_RUN] body:\n'; cat "${BODY_FILE}"
+  printf '[DRY_RUN] would call: gh pr create --base develop --title %q --body-file <inline>\n' \
+    "${TITLE}"
+  printf '[DRY_RUN] body:\n%s\n' "${BODY}"
 else
+  BODY_FILE=".plan-recon-cache/pr-body-$(date -u +%F).md"
+  mkdir -p "$(dirname "${BODY_FILE}")"
+  printf '%s\n' "${BODY}" > "${BODY_FILE}"
   git push -u origin "${BRANCH}"
   gh pr create \
     --base develop \
@@ -231,6 +248,12 @@ else
     --body-file "${BODY_FILE}"
 fi
 ```
+
+The cache file is written **only** in non-dry-run mode so the routine
+leaves a re-submit-by-hand artifact if `gh pr create` fails after the
+file write. Dry-run keeps the body in `${BODY}` and never touches
+disk — the prompt's own "[Dry-run mode](#dry-run-mode)" rule requires
+zero filesystem side effects.
 
 ## No-op handling
 
@@ -398,12 +421,17 @@ unstage the moves on the recon branch, open a failure issue, and exit
 
 ```bash
 TITLE="Plan reconciliation $(date -u +%F) — ${HEAD_SHA7}"
-BODY_FILE=".plan-recon-cache/FAILED-issue-body-$(date -u +%F)-${HEAD_SHA7}.md"
+# BODY is the failure-issue body assembled in memory (failure tail +
+# context). Same in-memory pattern as the PR-open snippet — do NOT
+# write a cache file in dry-run mode.
 if [ -n "${DRY_RUN:-}" ]; then
-  printf '[DRY_RUN] would call: gh issue create --title %q --label plan-recon-bot --body-file %q\n' \
-    "${TITLE}" "${BODY_FILE}"
-  printf '[DRY_RUN] body:\n'; cat "${BODY_FILE}"
+  printf '[DRY_RUN] would call: gh issue create --title %q --label plan-recon-bot --body-file <inline>\n' \
+    "${TITLE}"
+  printf '[DRY_RUN] body:\n%s\n' "${BODY}"
 else
+  BODY_FILE=".plan-recon-cache/FAILED-issue-body-$(date -u +%F)-${HEAD_SHA7}.md"
+  mkdir -p "$(dirname "${BODY_FILE}")"
+  printf '%s\n' "${BODY}" > "${BODY_FILE}"
   gh issue create \
     --title "${TITLE}" \
     --label plan-recon-bot \
