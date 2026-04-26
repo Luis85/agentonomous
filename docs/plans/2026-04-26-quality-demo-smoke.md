@@ -126,14 +126,28 @@ test('golden path: feed → pet → sleep updates HUD without console errors', a
 
 - [ ] **Step 4: Run locally to wire selectors**
 
+The `playwright.config.ts` from Step 2 already declares a `webServer`
+block that spawns `npm run preview ...` and waits for port 4173
+before Playwright sends any request. **Do NOT background `npm run
+preview` yourself** — that races the playwright runner against
+vite's startup (`npm run build && npm run preview &` returns as
+soon as the shell forks the chain, not when the port is bound).
+Just build the demo synchronously first, then hand control to
+playwright:
+
 ```bash
 cd examples/nurture-pet
-npm run build && npm run preview &
-PREVIEW_PID=$!
+npm run build
 npx playwright test --headed --project=chromium
-kill $PREVIEW_PID
 cd -
 ```
+
+Playwright spawns the preview server itself, polls
+`http://127.0.0.1:4173` until it responds, then runs the spec.
+With `reuseExistingServer: !process.env.CI` (Step 2 config), it
+also reuses an already-running `npm run preview` if you've left
+one open in another terminal — but you do NOT need to start one
+manually for this step.
 
 Iterate on selectors until the spec passes. **If the demo lacks
 stable testids on the HUD, add them in this same row** (not a
