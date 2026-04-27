@@ -445,7 +445,17 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       // that gap scored outcomes from the new reasoner against the
       // old learner — training observations from the first N ticks
       // after a switch into `learning` mode were silently discarded.
-      const learner = await buildLearner(mode.id, reasoner);
+      //
+      // Dispose `reasoner` on a buildLearner throw: the outer catch
+      // doesn't see it (no `agent.setReasoner` adoption yet) so a
+      // failure here would otherwise orphan a fresh TfjsReasoner.
+      let learner: DisposableLearner;
+      try {
+        learner = await buildLearner(mode.id, reasoner);
+      } catch (err) {
+        disposeIfOwned(reasoner);
+        throw err;
+      }
       if (disposed || myEpoch !== changeEpoch) {
         disposeLearner(learner);
         disposeIfOwned(reasoner);
@@ -689,7 +699,17 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       // it; the commit pair below applies setReasoner + setLearner
       // atomically so a failure in the former rolls back without
       // leaking the new learner onto the agent.
-      const learner = await buildLearner('learning', reasoner);
+      //
+      // Inner try/catch on buildLearner mirrors onChange — without
+      // it, a `buildLearningLearner` rejection skips straight to the
+      // outer catch and orphans the fresh `TfjsReasoner`.
+      let learner: DisposableLearner;
+      try {
+        learner = await buildLearner('learning', reasoner);
+      } catch (err) {
+        disposeIfOwned(reasoner);
+        throw err;
+      }
       if (disposed || myEpoch !== changeEpoch) {
         disposeLearner(learner);
         disposeIfOwned(reasoner);
