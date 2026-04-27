@@ -21,14 +21,14 @@ import {
 import { setLearningAgent } from '../../demo-domain/scenarios/petCare/cognition/learning.js';
 import type { AgentSessionSnapshot, SessionEvent } from '../../demo-domain/walkthrough/types.js';
 
-const DEFAULT_SCENARIO_ID = 'petCare';
+export const DEFAULT_SCENARIO_ID = 'petCare';
 const SEED_STORAGE_KEY_PREFIX = 'demo.v2.session.lastSeed.';
 
 function seedStorageKey(scenarioId: string): string {
   return `${SEED_STORAGE_KEY_PREFIX}${scenarioId}`;
 }
 
-function readPersistedSeed(scenarioId: string): string | null {
+export function readPersistedSeed(scenarioId: string): string | null {
   try {
     const stored = globalThis.localStorage?.getItem(seedStorageKey(scenarioId));
     return typeof stored === 'string' && stored.length > 0 ? stored : null;

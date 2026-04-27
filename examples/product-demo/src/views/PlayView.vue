@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue';
-import { useAgentSession } from '../stores/domain/useAgentSession.js';
+import {
+  DEFAULT_SCENARIO_ID,
+  readPersistedSeed,
+  useAgentSession,
+} from '../stores/domain/useAgentSession.js';
 import HudPanel from '../components/shell/HudPanel.vue';
 import SpeedPicker from '../components/shell/SpeedPicker.vue';
 import ResetButton from '../components/shell/ResetButton.vue';
@@ -8,22 +12,11 @@ import ExportImportPanel from '../components/shell/ExportImportPanel.vue';
 import TracePanel from '../components/trace/TracePanel.vue';
 import TourOverlay from '../components/tour/TourOverlay.vue';
 
-const SEED_PERSIST_KEY = 'demo.v2.session.lastSeed.petCare';
-
 const session = useAgentSession();
 
 let raf = 0;
 let last = 0;
 let stopped = false;
-
-function readPersistedSeed(): string | null {
-  try {
-    const raw = globalThis.localStorage?.getItem(SEED_PERSIST_KEY);
-    return typeof raw === 'string' && raw.length > 0 ? raw : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Generate a fresh seed string. Non-determinism is intentional here —
@@ -53,7 +46,7 @@ async function loop(now: number): Promise<void> {
 // `onMounted` would silently overwrite persisted controls (notably
 // SpeedPicker's saved speed / pause) that children re-apply on their own
 // mount.
-const initialSeed = readPersistedSeed() ?? generateSeed();
+const initialSeed = readPersistedSeed(DEFAULT_SCENARIO_ID) ?? generateSeed();
 session.init({ seed: initialSeed });
 
 onMounted(() => {
