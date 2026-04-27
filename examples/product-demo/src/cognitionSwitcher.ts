@@ -454,16 +454,29 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       const previousReasoner = activeReasoner;
       const previousLearner = activeLearner;
       // Atomic commit: setReasoner is sync — if it throws, dispose
-      // both the just-built learner and the orphan reasoner before
-      // re-throwing so the live agent stays on its previous pair and
-      // the outer catch handles the UI rollback. setReasoner +
-      // maybeSetLearner must land in the same synchronous block; no
-      // tick can be observed between them.
+      // the just-built learner and re-throw so the outer catch
+      // handles the UI rollback. setReasoner + maybeSetLearner must
+      // land in the same synchronous block; no tick can be observed
+      // between them.
+      //
+      // Reasoner disposal on throw is conditional: `Agent.setReasoner`
+      // assigns `this.reasoner = reasoner` BEFORE calling
+      // `reasoner.reset()`. If `reset()` throws, the agent has
+      // already adopted `reasoner` — disposing it here would tear
+      // down the live cognition. Compare against `agent.getReasoner()`
+      // and only dispose when adoption never landed (pre-mutation
+      // validation throw). When adoption landed despite the failure,
+      // the outer catch logs + flashes the error but leaves the new
+      // reasoner installed; the UI rollback to `activeModeId` shows a
+      // stale mode label for one render — acceptable, setReasoner
+      // failures are exceptional.
       try {
         agent.setReasoner(reasoner);
       } catch (err) {
         disposeLearner(learner);
-        disposeIfOwned(reasoner);
+        if (agent.getReasoner() !== reasoner) {
+          disposeIfOwned(reasoner);
+        }
         throw err;
       }
       maybeSetLearner(agent, learner);
@@ -684,11 +697,18 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       }
       const previousReasoner = activeReasoner;
       const previousLearner = activeLearner;
+      // See onChange's commit block for the full rationale on the
+      // conditional reasoner disposal: `Agent.setReasoner` assigns
+      // before calling `reset()`, so a `reset()` throw leaves the
+      // agent already pointing at `reasoner`. Disposing it here would
+      // tear down the live cognition.
       try {
         agent.setReasoner(reasoner);
       } catch (err) {
         disposeLearner(learner);
-        disposeIfOwned(reasoner);
+        if (agent.getReasoner() !== reasoner) {
+          disposeIfOwned(reasoner);
+        }
         throw err;
       }
       maybeSetLearner(agent, learner);
