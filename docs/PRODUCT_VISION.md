@@ -1,9 +1,7 @@
 # agentonomous — Product Vision
 
-> Companion to `docs/specs/overview.md` (technical spec) and
-> `docs/specs/roadmap.md` (phased delivery). This document answers the
-> "why" — the problem we solve, who we serve, and the invariants that
-> guide every trade-off.
+> This document answers the "why" — the problem we solve, who we serve,
+> and the invariants that guide every trade-off.
 
 ## Vision statement
 
@@ -410,14 +408,6 @@ is weighed against that feeling.
 
 ## Relationship to other docs
 
-- **`docs/specs/overview.md`** — the technical spec. How each of
-  these pillars is implemented.
-- **`docs/specs/roadmap.md`** — the phased path from today to the
-  24-month horizon.
-- **`docs/plans/review-remediation.md`** — the specific work needed
-  to close the gap between current state and V1.0.0.
-- **`/root/.claude/plans/i-want-to-create-warm-matsumoto.md`** — the
-  internal planning document that drove the initial build.
 - **[`agentic-workflow`](https://github.com/luis85/agentic-workflow)** —
   external companion repo. Defines the structured
   software-development workflow (tasks + roles) that v2 / Phase B
@@ -466,8 +456,6 @@ the vision. Changes to this document require:
 
 1. A pull request with rationale.
 2. Sign-off from project owner.
-3. A corresponding update to `docs/specs/roadmap.md` showing how the
-   change propagates.
 
 Last reviewed: 2026-04-26 (refined to introduce the v1 → v2 arc and
 the [`agentic-workflow`](https://github.com/luis85/agentic-workflow)

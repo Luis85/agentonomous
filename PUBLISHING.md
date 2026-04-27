@@ -32,10 +32,14 @@ Baseline (all three):
 
 - Require a pull request before merging; require at least 1 approving
   review.
-- Require status checks to pass before merging; include every job in the
-  `CI` workflow (`Format (Prettier)`, `Lint (ESLint)`,
-  `Typecheck (tsc --noEmit)`, `Test (Vitest + coverage)`,
-  `Build & size budget`).
+- Require status checks to pass before merging; add the `CI gate (required
+check)` job — it is the terminal aggregator that depends on every other
+  required job in the workflow, so adding only this one check is sufficient.
+  (For reference, the full leaf-job list as of d9b4b85: `Format (Prettier)`,
+  `Lint (ESLint)`, `Typecheck (tsc --noEmit)`, `Lint workflows (actionlint)`,
+  `Audit production deps (npm audit)`, `API docs (typedoc)`,
+  `Test core (Vitest, ubuntu-latest)`, `Test tfjs (cpu on ubuntu-latest)`,
+  `Build & size budget`, `Demo build (examples/product-demo)`.)
 - Require branches to be up to date before merging.
 - Disallow force pushes. Disallow deletions.
 - Do **not** allow bypass for administrators (hold yourself to the same bar).

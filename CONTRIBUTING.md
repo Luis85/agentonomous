@@ -140,9 +140,9 @@ feat(persistence): add LocalStorage adapter
 
 - Target: always `develop` (except hotfixes → `main`).
 - Title: short, imperative, no period. "Add markdown memory adapter".
-- Body: summary + test plan. Link to relevant R-XX or issue numbers.
+- Body: summary + test plan. Link to relevant issue or PR numbers (`#NNN`).
 - Required gates before merge: `npm run verify` (= format:check + lint +
-  typecheck + test + build), GitHub Actions CI green. CI runs on every
+  lint:demo + typecheck + test + build + docs), GitHub Actions CI green. CI runs on every
   push to and PR against `develop`, `main`, or `demo` (see
   `.github/workflows/ci.yml`).
 - Reviews: at least one approving review for anything beyond a
