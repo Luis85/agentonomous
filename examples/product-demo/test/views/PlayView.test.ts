@@ -54,4 +54,18 @@ describe('<PlayView>', () => {
     expect(session.running).toBe(true);
     wrapper.unmount();
   });
+
+  // Reads the same `demo.v2.session.lastSeed.<scenarioId>` key the store
+  // writes via `useAgentSession.init`. Tripwire for review-bot finding
+  // d9b4b85.1: if PlayView ever drifts back to a hardcoded key, the
+  // persisted seed silently misses and a fresh seed is generated on
+  // every mount.
+  it('reuses the seed persisted under the store-owned key', async () => {
+    globalThis.localStorage.setItem('demo.v2.session.lastSeed.petCare', 'persisted-seed-x');
+    const session = useAgentSession();
+    const wrapper = mount(PlayView);
+    await nextTick();
+    expect(session.seed).toBe('persisted-seed-x');
+    wrapper.unmount();
+  });
 });
