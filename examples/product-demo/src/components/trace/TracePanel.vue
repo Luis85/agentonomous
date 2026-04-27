@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import type { IntentionCandidate } from 'agentonomous';
 import { useAgentSession } from '../../stores/domain/useAgentSession.js';
 import { projectCandidates, projectSelectionRows } from '../../composables/useTraceSelectors.js';
+import { useRegisterSelector } from '../../composables/useRegisterSelector.js';
 
 type NeedDef = { readonly id: string; readonly label: string };
 
@@ -19,6 +20,7 @@ const VISIBILITY_STORAGE_KEY = 'demo.v2.trace.visible';
 
 const session = useAgentSession();
 const visible = ref(readVisible());
+useRegisterSelector('trace.panel');
 
 function readVisible(): boolean {
   try {
@@ -37,8 +39,15 @@ function writeVisible(next: boolean): void {
 }
 
 function toggle(): void {
-  visible.value = !visible.value;
-  writeVisible(visible.value);
+  const next = !visible.value;
+  visible.value = next;
+  writeVisible(next);
+  // Tour-aware UI signal pair: chapter-2's `trace-open` predicate
+  // (`flagOpen('TracePanelOpened', 'TracePanelClosed')`) checks which
+  // event landed most recently to model "panel currently visible".
+  // Emit BOTH transitions so closing the panel revokes the flag and
+  // a stale historical open doesn't keep auto-advancing the chapter.
+  session.recordUiEvent(next ? 'TracePanelOpened' : 'TracePanelClosed');
 }
 
 const allCandidates = computed<readonly IntentionCandidate[]>(() => {
@@ -108,11 +117,18 @@ function levelText(needId: string): string {
 onMounted(() => {
   // No subscription needed — `session.lastTrace` / `lastTickNumber`
   // update reactively from useAgentSession's internal listener.
+  //
+  // Tour-aware UI signal: if the panel was restored visible from
+  // `demo.v2.trace.visible` (returning user), emit `TracePanelOpened`
+  // here so chapter-2's `trace-open` predicate doesn't get stuck
+  // waiting for a hidden→visible toggle that already happened in a
+  // previous session.
+  if (visible.value) session.recordUiEvent('TracePanelOpened');
 });
 </script>
 
 <template>
-  <section class="trace-panel" :data-visible="String(visible)">
+  <section class="trace-panel" data-tour-handle="trace.panel" :data-visible="String(visible)">
     <button
       type="button"
       class="trace-panel__toggle"

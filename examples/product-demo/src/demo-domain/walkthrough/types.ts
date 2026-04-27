@@ -56,6 +56,13 @@ export type RouteContext = {
 export type TourCtx = {
   readonly session: AgentSessionSnapshot;
   readonly route: RouteContext;
+  /**
+   * `session.tickIndex` captured at the moment the cursor entered the
+   * current step. Used by relative-time predicates (`eventEmittedSinceStep`,
+   * `ticksSinceStepAtLeast`) so chapter 2-5 conditions don't auto-complete
+   * from events emitted before the user reached that step.
+   */
+  readonly stepBaselineTick: number;
 };
 
 /** A predicate observes the current `TourCtx` and returns true once satisfied. */

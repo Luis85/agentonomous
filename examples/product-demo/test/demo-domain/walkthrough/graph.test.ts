@@ -55,7 +55,7 @@ function makeCtx(overrides: { tickIndex?: number; path?: string } = {}): TourCtx
     scenarioId: null,
     tourStep: null,
   };
-  return { session, route };
+  return { session, route, stepBaselineTick: 0 };
 }
 
 describe('defineWalkthroughGraph', () => {

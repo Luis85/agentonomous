@@ -54,6 +54,52 @@ export function eventEmittedSince(type: string, sinceTick: number): CompletionPr
     ctx.session.recentEvents.some((e) => e.type === type && e.tickIndex >= sinceTick);
 }
 
+/**
+ * True when an event of `type` has been emitted at or after the tick the
+ * current step started. Used by chapter 2-5 predicates so events
+ * emitted before the user reached the step don't auto-complete it.
+ */
+export function eventEmittedSinceStep(type: string): CompletionPredicate {
+  return (ctx: TourCtx) =>
+    ctx.session.recentEvents.some((e) => e.type === type && e.tickIndex >= ctx.stepBaselineTick);
+}
+
+/**
+ * True once at least `n` ticks have elapsed since the current step
+ * started. Used to give the user a minimum dwell time on a chapter
+ * (e.g. "wait two ticks so you can read the trace") without coupling
+ * to absolute tick counts.
+ */
+export function ticksSinceStepAtLeast(n: number): CompletionPredicate {
+  return (ctx: TourCtx) => ctx.session.tickIndex - ctx.stepBaselineTick >= n;
+}
+
+/**
+ * True when the most recent matching event in `recentEvents` is the
+ * "open" type rather than the "close" type. Used to model a binary
+ * UI flag (e.g. "trace panel currently visible") through the same
+ * event stream that drives the other predicates: the producing
+ * component emits `openType` on hidden→visible and `closeType` on
+ * visible→hidden, and this predicate scans the buffer in reverse
+ * to find the latest of either.
+ *
+ * Returns `false` if no matching event of either type has been
+ * recorded yet (cold-start case). Bounded by the buffer's
+ * `RECENT_EVENT_LIMIT` cap on the upstream side.
+ */
+export function flagOpen(openType: string, closeType: string): CompletionPredicate {
+  return (ctx: TourCtx) => {
+    const events = ctx.session.recentEvents;
+    for (let i = events.length - 1; i >= 0; i -= 1) {
+      const e = events[i];
+      if (e === undefined) continue;
+      if (e.type === openType) return true;
+      if (e.type === closeType) return false;
+    }
+    return false;
+  };
+}
+
 /** Logical AND across `predicates`. An empty list returns `true`. */
 export function combineAll(...predicates: ReadonlyArray<CompletionPredicate>): CompletionPredicate {
   return (ctx: TourCtx) => predicates.every((p) => p(ctx));

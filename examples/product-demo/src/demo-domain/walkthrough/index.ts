@@ -28,10 +28,13 @@ export {
   combineAll,
   combineAny,
   eventEmittedSince,
+  eventEmittedSinceStep,
+  flagOpen,
   not,
   onRoute,
   onRoutePrefix,
   tickAtLeast,
+  ticksSinceStepAtLeast,
 } from './predicates.js';
 
 export type { WalkthroughGraph } from './graph.js';

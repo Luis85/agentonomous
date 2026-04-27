@@ -13,13 +13,21 @@ const ctaLabel = computed(() => {
 
 function startTour(): void {
   if (tour.completedAt !== null) tour.restart();
-  void router.push('/play');
+  // Reflect the active step in the URL so a hard reload mid-tour
+  // resumes via `useTourProgress.resumeFromRoute(...)` (P1-FR-6).
+  const step = tour.currentStep;
+  void router.push(step === null ? '/play' : `/tour/${step.id}`);
 }
 
 function skipTour(): void {
-  // Mark the tour skipped so the overlay does not pop on /play.
+  // Mark the whole tour complete so `<TourOverlay>` does not pop on
+  // /play. `restart()` clears any partial-run skip set, then
+  // `complete()` walks every step → end and sets `completedAt` in
+  // one shot. (Slice 1.3 expanded the tour past chapter 1, so a
+  // single `skip()` would only advance one chapter and leave
+  // `completedAt === null`.)
   tour.restart();
-  tour.skip();
+  tour.complete();
   void router.push('/play');
 }
 </script>

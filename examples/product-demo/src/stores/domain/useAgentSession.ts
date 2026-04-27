@@ -14,6 +14,10 @@ import {
   buildAgent,
   type BuildAgentOptions,
 } from '../../demo-domain/scenarios/petCare/buildAgent.js';
+import {
+  COGNITION_MODES,
+  type CognitionModeSpec,
+} from '../../demo-domain/scenarios/petCare/cognition/index.js';
 import { setLearningAgent } from '../../demo-domain/scenarios/petCare/cognition/learning.js';
 import type { AgentSessionSnapshot, SessionEvent } from '../../demo-domain/walkthrough/types.js';
 
@@ -110,6 +114,13 @@ export const useAgentSession = defineStore('agentSession', () => {
   // step. Both reset on `init` / `replayFromSnapshot`.
   const tickIndex = ref<number>(0);
   const recentEvents = ref<SessionEvent[]>([]);
+  // Monotonic write counter for `recentEvents`. The buffer is capped at
+  // `RECENT_EVENT_LIMIT` and trimmed on every push past the cap, so
+  // `recentEvents.length` saturates and stops changing — watchers keyed
+  // on the length silently miss UI events once the buffer is full.
+  // Subscribers (`<TourOverlay>`'s predicate re-evaluator) watch this
+  // counter instead so every push is visible regardless of trim.
+  const recentEventsVersion = ref<number>(0);
   const cognitionModeId = ref<string>('heuristic');
   // Reactive last-tick projection for `<TracePanel>`. Updated inside the
   // internal AGENT_TICKED listener so the panel never needs its own
@@ -128,6 +139,12 @@ export const useAgentSession = defineStore('agentSession', () => {
   // current. Stored separately from user `subscribers` so it survives
   // agent rebuilds via the same rebind path.
   let internalDetach: () => void = () => {};
+  // Monotonic token for stale-completion detection in async cognition
+  // swaps. Bumped on every agent rebuild + at the start of each
+  // `setCognitionMode` so an in-flight probe/construct that resolves
+  // after a rebuild or a competing swap drops its result instead of
+  // overwriting newer state.
+  let cognitionToken = 0;
 
   function attachInternalListener(target: Agent): void {
     internalDetach();
@@ -149,6 +166,7 @@ export const useAgentSession = defineStore('agentSession', () => {
       if (recentEvents.value.length > RECENT_EVENT_LIMIT) {
         recentEvents.value.splice(0, recentEvents.value.length - RECENT_EVENT_LIMIT);
       }
+      recentEventsVersion.value += 1;
     });
   }
 
@@ -177,6 +195,13 @@ export const useAgentSession = defineStore('agentSession', () => {
     recentEvents.value = [];
     lastTrace.value = null;
     lastTickNumber.value = 0;
+    // `buildAgent` returns a fresh agent on the default heuristic
+    // reasoner. Without resetting `cognitionModeId` here, a previously-
+    // selected mode (e.g. `'bt'`) would persist on the new agent's HUD
+    // readout and silently auto-fire chapter-3's
+    // `not(cognitionModeIs('heuristic'))` predicate after a reset/
+    // import, advancing the tour without a real swap.
+    cognitionModeId.value = 'heuristic';
     lastSpeciesOverride.value = options.speciesOverride;
     const fresh = markRaw(
       buildAgent({
@@ -196,6 +221,7 @@ export const useAgentSession = defineStore('agentSession', () => {
     attachInternalListener(fresh);
     rebindSubscribers(fresh);
     running.value = true;
+    cognitionToken += 1;
     writePersistedSeed(resolvedScenario, resolvedSeed);
   }
 
@@ -232,6 +258,70 @@ export const useAgentSession = defineStore('agentSession', () => {
       // unpaused while `running` is false — control state inconsistent.
       if (!wasRunning && agent.value !== null) agent.value.setTimeScale(0);
     }
+  }
+
+  /**
+   * Push a synthetic UI event onto the recent-events ring buffer. Used
+   * by tour-aware components (`<TracePanel>`, `<ExportImportPanel>`,
+   * the JSON-preview placeholder in `<HudPanel>`) to record a moment
+   * the user can act on — chapter predicates use `eventEmittedSinceStep`
+   * to detect the moment without coupling to UI internals.
+   *
+   * UI events share the same `SessionEvent` projection as agent-emitted
+   * events, so chapter predicates don't need to know the difference. The
+   * `recentEvents` ring buffer stays bounded at `RECENT_EVENT_LIMIT`.
+   */
+  function recordUiEvent(type: string): void {
+    recentEvents.value.push({ type, tickIndex: tickIndex.value });
+    if (recentEvents.value.length > RECENT_EVENT_LIMIT) {
+      recentEvents.value.splice(0, recentEvents.value.length - RECENT_EVENT_LIMIT);
+    }
+    recentEventsVersion.value += 1;
+  }
+
+  /**
+   * Swap the live agent's reasoner to the requested cognition mode.
+   * Probes the mode's peer dep before constructing a reasoner; throws
+   * with a peer-install hint when probe fails. Callers (the cognition
+   * toggle in `<HudPanel>`) should surface the error to the user.
+   *
+   * Slice 1.3 wires this so chapter 3's predicate can observe a real
+   * swap; the full per-mode UI (loss sparkline, prediction strip,
+   * train button) is Pillar-2's slice 2.5.
+   *
+   * Stale-completion guard: `probe()` and `construct()` are async
+   * (peer-dep modes do dynamic imports), so a parallel `init()` /
+   * `replayFromSnapshot()` / second `setCognitionMode()` can land
+   * before this call's awaits resolve. The token bumped here +
+   * stamped on every agent rebuild means a stale completion drops
+   * its result on the floor instead of overwriting the newer state
+   * (and silently emitting a misleading `CognitionModeChanged`).
+   */
+  async function setCognitionMode(modeId: CognitionModeSpec['id']): Promise<void> {
+    const mode = COGNITION_MODES.find((m) => m.id === modeId);
+    if (mode === undefined) {
+      throw new Error(`useAgentSession.setCognitionMode: unknown mode "${String(modeId)}".`);
+    }
+    const targetAgent = agent.value;
+    if (targetAgent === null) {
+      throw new Error('useAgentSession.setCognitionMode: no live agent (call init() first).');
+    }
+    cognitionToken += 1;
+    const myToken = cognitionToken;
+    const available = await mode.probe();
+    if (myToken !== cognitionToken || agent.value !== targetAgent) return;
+    if (!available) {
+      const hint =
+        mode.peerName === null
+          ? `mode "${modeId}" unavailable.`
+          : `mode "${modeId}" unavailable — install ${mode.peerName} to enable.`;
+      throw new Error(`useAgentSession.setCognitionMode: ${hint}`);
+    }
+    const reasoner = await mode.construct();
+    if (myToken !== cognitionToken || agent.value !== targetAgent) return;
+    targetAgent.setReasoner(reasoner);
+    cognitionModeId.value = modeId;
+    recordUiEvent('CognitionModeChanged');
   }
 
   function setSpeed(multiplier: number): void {
@@ -275,6 +365,12 @@ export const useAgentSession = defineStore('agentSession', () => {
    * the rebuild; callers don't need to scrub them up-front.
    */
   async function replayFromSnapshot(snapshot: AgentSnapshot | null = null): Promise<void> {
+    // Capture the user's currently-selected cognition mode BEFORE the
+    // rebuild. The reset path (`snapshot === null`) discards it; the
+    // import path (`snapshot !== null`) re-applies it to the fresh
+    // agent so chapter-5's deterministic-replay flow uses the same
+    // decision policy as the exported run.
+    const previousMode = cognitionModeId.value;
     const fresh = markRaw(
       buildAgent({
         seed: seed.value,
@@ -313,6 +409,29 @@ export const useAgentSession = defineStore('agentSession', () => {
     recentEvents.value = [];
     lastTrace.value = null;
     lastTickNumber.value = 0;
+    // The fresh agent boots on the default heuristic reasoner; sync
+    // the readout to match. The import path below re-applies the
+    // user's previous mode (so deterministic replay matches the
+    // exported run's policy); the reset path leaves it at heuristic.
+    cognitionModeId.value = 'heuristic';
+    // Drop any in-flight `setCognitionMode` request — its `setReasoner`
+    // call would land on the new agent under the old user's intent.
+    cognitionToken += 1;
+
+    if (snapshot !== null && previousMode !== 'heuristic') {
+      // Re-apply the user's active cognition mode to the fresh agent
+      // so chapter-5 replay reproduces the exported run's behaviour.
+      // If the peer dep is no longer available (uninstalled between
+      // export and import), `setCognitionMode` throws — swallow here
+      // so the import itself succeeds; cognitionModeId already
+      // reflects 'heuristic' (the agent's actual reasoner) and the
+      // user can retry the swap manually via the HUD picker.
+      try {
+        await setCognitionMode(previousMode as CognitionModeSpec['id']);
+      } catch {
+        // intentional swallow — see comment above.
+      }
+    }
   }
 
   /**
@@ -359,11 +478,18 @@ export const useAgentSession = defineStore('agentSession', () => {
     running,
     tickIndex,
     recentEvents,
+    recentEventsVersion,
     cognitionModeId,
     lastTrace,
     lastTickNumber,
     sessionSnapshot,
     lastSpeciesOverride,
+    // Re-export the scenario's cognition mode registry so the HUD's
+    // picker can render labels + per-mode probes without taking a
+    // runtime import on `demo-domain/scenarios/...` (lint:demo's
+    // no-restricted-imports rule keeps presentation/view layers off
+    // the domain module).
+    cognitionModes: COGNITION_MODES,
     init,
     tick,
     start,
@@ -371,7 +497,11 @@ export const useAgentSession = defineStore('agentSession', () => {
     resume,
     step,
     setSpeed,
+    setCognitionMode,
+    recordUiEvent,
     replayFromSnapshot,
     subscribe,
   };
 });
+
+export type { CognitionModeSpec };

@@ -15,5 +15,15 @@
 import { defineWalkthroughGraph } from './graph.js';
 import type { WalkthroughGraph } from './graph.js';
 import { chapter1Steps } from './chapters/1.js';
+import { chapter2Steps } from './chapters/2.js';
+import { chapter3Steps } from './chapters/3.js';
+import { chapter4Steps } from './chapters/4.js';
+import { chapter5Steps } from './chapters/5.js';
 
-export const petCareWalkthroughGraph: WalkthroughGraph = defineWalkthroughGraph([...chapter1Steps]);
+export const petCareWalkthroughGraph: WalkthroughGraph = defineWalkthroughGraph([
+  ...chapter1Steps,
+  ...chapter2Steps,
+  ...chapter3Steps,
+  ...chapter4Steps,
+  ...chapter5Steps,
+]);

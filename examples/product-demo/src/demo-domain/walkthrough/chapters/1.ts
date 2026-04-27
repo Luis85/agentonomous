@@ -1,30 +1,32 @@
 /**
  * Chapter 1 — autonomy. The agent acts on its own.
  *
- * The single shipped step waits for the demo to advance enough ticks
- * AND emit at least one `AGENT_TICKED` event since session start. That
- * combination proves the rAF / virtual-clock pipeline is alive AND the
- * reasoner is producing decisions — both are required to demo
- * "autonomous" behaviour. Predicate primitives come from slice 1.1.
+ * The single shipped step waits for `AUTONOMY_TICK_THRESHOLD` agent
+ * ticks AND at least one `AGENT_TICKED` event since the cursor entered
+ * THIS step (not since session start). The step-scoped variants are
+ * what `tour.restart()` relies on: a long-running session that gets
+ * restarted has plenty of historical ticks + AgentTicked events in
+ * the buffer, and session-scoped predicates would auto-satisfy the
+ * chapter immediately, pushing the user back to chapter 2 without
+ * the actual replay-from-the-start experience.
  *
  * Subsequent chapters (2-5) fan out in slice 1.3.
  */
 
 import { AGENT_TICKED } from 'agentonomous';
-import { combineAll, eventEmittedSince, tickAtLeast } from '../predicates.js';
-import { TOUR_END, selectorHandle } from '../types.js';
+import { combineAll, eventEmittedSinceStep, ticksSinceStepAtLeast } from '../predicates.js';
 import type { WalkthroughStep } from '../types.js';
-import { STEP_ID_AUTONOMY, tourCopy } from '../../../copy/tour.js';
+import { STEP_ID_AUTONOMY, STEP_ID_TRACE_OPEN, tourCopy } from '../../../copy/tour.js';
+import { registeredHandle } from '../../../stores/view/selectorHandles.js';
 
 /**
  * Logical UI handle for the HUD's needs panel. The HUD component
  * (`<HudPanel>`) registers this handle on mount so `<StepHighlight>`
- * can resolve a real DOM element to outline. Slice 1.3 generalises
- * the registration into a typed `useSelectorRegistry` mirror; for
- * now the handle is a plain branded string and the registry stub in
- * `stores/view/useSelectorRegistry.ts` does the lookup.
+ * can resolve a real DOM element to outline. The literal is checked
+ * against `RegisteredHandle` at compile time — a typo here surfaces
+ * as a `tsc` error rather than a silent label-only render.
  */
-const HUD_NEEDS_HANDLE = selectorHandle('hud.needs');
+const HUD_NEEDS_HANDLE = registeredHandle('hud.needs');
 
 /** Number of agent ticks required before chapter-1 advances. */
 const AUTONOMY_TICK_THRESHOLD = 3;
@@ -43,16 +45,18 @@ const autonomyStep: WalkthroughStep = {
   title: autonomyCopy.title,
   hint: autonomyCopy.hint,
   highlight: HUD_NEEDS_HANDLE,
-  // Both: the loop has run a few ticks AND `AGENT_TICKED` has been
-  // observed by the session. The combined check guards against a
-  // future tick driver that bumps `tickIndex` without publishing the
-  // event (which would silently break this chapter's "did the agent
-  // act?" promise).
+  // Both: a few ticks have elapsed since the cursor entered this step
+  // AND `AGENT_TICKED` has been observed since this step started. The
+  // combined check guards against a future tick driver that bumps
+  // `tickIndex` without publishing the event (which would silently
+  // break this chapter's "did the agent act?" promise) AND keeps
+  // `tour.restart()` honest — the user replays from a fresh chapter-1
+  // even after a long session has accumulated tick / event history.
   completionPredicate: combineAll(
-    tickAtLeast(AUTONOMY_TICK_THRESHOLD),
-    eventEmittedSince(AGENT_TICKED, 0),
+    ticksSinceStepAtLeast(AUTONOMY_TICK_THRESHOLD),
+    eventEmittedSinceStep(AGENT_TICKED),
   ),
-  nextOnComplete: TOUR_END,
+  nextOnComplete: STEP_ID_TRACE_OPEN,
 };
 
 /** All steps authored for chapter 1, in declaration order. */

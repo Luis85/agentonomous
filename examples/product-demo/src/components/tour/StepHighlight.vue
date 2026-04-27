@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useSelectorRegistry } from '../../stores/view/useSelectorRegistry.js';
+import type { RegisteredHandle } from '../../stores/view/selectorHandles.js';
 import type { SelectorHandle } from '../../demo-domain/walkthrough/types.js';
 
 const props = defineProps<{ handle: SelectorHandle }>();
@@ -10,7 +11,11 @@ const rect = ref<{ top: number; left: number; width: number; height: number } | 
 let raf = 0;
 
 function recompute(): void {
-  const el = registry.resolve(props.handle);
+  // Step `highlight` fields are constructed via `registeredHandle(...)`,
+  // so the runtime value is always a `RegisteredHandle`. The cast keeps
+  // the registry's typed surface honest without leaking the union into
+  // the domain `WalkthroughStep` contract.
+  const el = registry.resolve(props.handle as unknown as RegisteredHandle);
   if (el === null) {
     rect.value = null;
     return;
