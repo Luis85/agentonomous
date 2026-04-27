@@ -18,6 +18,8 @@ import {
   setLearningAgent,
   SOFTMAX_SKILL_IDS,
 } from '../../examples/product-demo/src/demo-domain/scenarios/petCare/cognition/learning.js';
+import { TEST_BACKEND } from '../setup/tfjsBackend.js';
+
 // `mountResetButton` lived in `examples/product-demo/src/ui.ts`, deleted by
 // Pillar 1 slice 1.2b. The test still needs a click handler that clears the
 // per-agent tfjs-network key (the only behaviour this file asserted), so it
@@ -35,7 +37,6 @@ function attachResetHandler(agentId: string): void {
     }
   });
 }
-import { TEST_BACKEND } from '../setup/tfjsBackend.js';
 
 type FakeAgent = {
   setReasoner: Mock<(r: unknown) => void>;
