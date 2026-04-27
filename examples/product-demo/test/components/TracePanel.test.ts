@@ -44,4 +44,37 @@ describe('<TracePanel>', () => {
     // `Candidates (N)` is the third h4 — N varies, so just match the prefix.
     expect(headings.some((h) => h.startsWith('Candidates'))).toBe(true);
   });
+
+  it('emits TracePanelOpened on mount when restored visible from localStorage (returning user)', async () => {
+    // Returning user reload: visibility persisted as `true` from a
+    // previous session. Without the on-mount emit, chapter-2's
+    // `trace-open` predicate would stall on this user until they
+    // toggle the panel off and back on.
+    globalThis.localStorage.setItem('demo.v2.trace.visible', 'true');
+    const session = useAgentSession();
+    session.init({ seed: 'trace-restore-emit-seed' });
+    const beforeMountEvents = session.recentEvents.filter(
+      (e) => e.type === 'TracePanelOpened',
+    ).length;
+    const wrapper = mount(TracePanel);
+    await nextTick();
+    const afterMountEvents = session.recentEvents.filter(
+      (e) => e.type === 'TracePanelOpened',
+    ).length;
+    expect(afterMountEvents).toBe(beforeMountEvents + 1);
+    wrapper.unmount();
+  });
+
+  it('does NOT emit TracePanelOpened on mount when starting hidden', async () => {
+    // Cold start (or user explicitly hid the panel last session).
+    // No event should fire until the user actually toggles open.
+    const session = useAgentSession();
+    session.init({ seed: 'trace-cold-mount-seed' });
+    const before = session.recentEvents.filter((e) => e.type === 'TracePanelOpened').length;
+    const wrapper = mount(TracePanel);
+    await nextTick();
+    const after = session.recentEvents.filter((e) => e.type === 'TracePanelOpened').length;
+    expect(after).toBe(before);
+    wrapper.unmount();
+  });
 });

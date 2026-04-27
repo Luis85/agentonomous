@@ -114,6 +114,13 @@ function levelText(needId: string): string {
 onMounted(() => {
   // No subscription needed — `session.lastTrace` / `lastTickNumber`
   // update reactively from useAgentSession's internal listener.
+  //
+  // Tour-aware UI signal: if the panel was restored visible from
+  // `demo.v2.trace.visible` (returning user), emit `TracePanelOpened`
+  // here so chapter-2's `trace-open` predicate doesn't get stuck
+  // waiting for a hidden→visible toggle that already happened in a
+  // previous session.
+  if (visible.value) session.recordUiEvent('TracePanelOpened');
 });
 </script>
 
