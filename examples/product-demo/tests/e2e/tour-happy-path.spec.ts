@@ -105,14 +105,17 @@ test.describe('Pillar-1 guided walkthrough — happy path', () => {
     await page.locator('[data-tour-handle="export.button"]').click();
     const download = await downloadPromise;
     const exportPath = await download.path();
-    expect(exportPath).not.toBeNull();
+    if (exportPath === null)
+      throw new Error(
+        'download.path() returned null — browser download did not produce a temp file',
+      );
     await expectTourStep(page, STEP_ID.replayImport);
 
     // Action 6 — import. `setInputFiles` simulates the user picking
     // the file from the dialog (the visible "📂 Import" button only
     // proxies a click to this hidden input, so driving the input
     // directly is the standard Playwright shortcut).
-    await page.locator('input[type="file"]').setInputFiles(exportPath as string);
+    await page.locator('input[type="file"]').setInputFiles(exportPath);
 
     // End of tour: `completedAt` is set, `<TourOverlay>` stops
     // rendering, and the URL stays at the last cursor's step. The

@@ -474,6 +474,7 @@ jobs:
     # (replay-determinism, scenario-swap) plug into the same job.
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [changes, build]
     if: needs.changes.outputs.code == 'true'
     steps:
