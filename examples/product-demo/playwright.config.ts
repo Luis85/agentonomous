@@ -1,18 +1,26 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Placeholder Playwright config for the pre-v1 demo evolution increment.
+ * Playwright config for the pre-v1 demo evolution increment.
  *
- * Wave-0 (rename preflight) wires `npm run e2e` so every downstream pillar
- * PR can rely on the entry point existing. Named scripts
- * (`tour-happy-path.spec.ts`, `replay-determinism.spec.ts`,
- * `scenario-swap.spec.ts`) are added by their owning pillar PRs — see
- * `docs/specs/2026-04-26-pre-v1-demo-evolution-design.md` (testing
- * strategy → end-to-end).
+ * Slice 1.4 introduces the first real e2e — `tour-happy-path.spec.ts`
+ * — and wires the `webServer` block so `npm run e2e` can run end-to-end
+ * locally and in CI without manual server orchestration. The
+ * production build is the gold path: Vite preview serves `dist/`,
+ * mirroring the artifact users will hit on GitHub Pages. Building
+ * the library + demo before invoking Playwright happens via the
+ * root `npm run e2e` script (`npm run demo:build && playwright test`).
  *
- * The `tests/e2e/` directory ships empty in this PR; Playwright treats
- * "no specs" as a successful run, so `npm run e2e` exits 0.
+ * `reuseExistingServer` keeps `npm run e2e` cheap during local
+ * iteration — Vite stays running between repeated runs. CI always
+ * starts a fresh server (`!process.env.CI`).
+ *
+ * Named scripts (`replay-determinism.spec.ts`, `scenario-swap.spec.ts`)
+ * land alongside their owning pillar PRs.
  */
+const PORT = Number(process.env.E2E_PORT ?? 5173);
+const BASE_URL = `http://127.0.0.1:${String(PORT)}`;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -20,8 +28,16 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
+  },
+  webServer: {
+    command: `npm run preview:e2e -- --port ${String(PORT)}`,
+    url: BASE_URL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
   projects: [
     {

@@ -8,7 +8,9 @@
     "dev": "vite --open",
     "build": "vite build",
     "preview": "vite preview",
-    "e2e": "playwright test"
+    "preview:e2e": "vite preview --strictPort --host 127.0.0.1",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
     "@pinia/testing": "^0.1.7",
