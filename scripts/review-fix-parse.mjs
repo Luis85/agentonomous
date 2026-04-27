@@ -102,7 +102,7 @@ const withFindings = issues
   .filter((iss) => typeof iss.body === 'string')
   .map((iss) => ({ issue: iss, findings: parseFindings(iss.body) }))
   .filter((entry) => entry.findings.length > 0)
-  .sort((a, b) => new Date(b.issue.createdAt) - new Date(a.issue.createdAt));
+  .sort((a, b) => new Date(b.issue.createdAt).getTime() - new Date(a.issue.createdAt).getTime());
 
 if (withFindings.length === 0) {
   stderr.write('No open review-bot issue contains findings — nothing to sweep\n');
