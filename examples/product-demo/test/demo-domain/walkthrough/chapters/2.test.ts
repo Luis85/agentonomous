@@ -32,25 +32,25 @@ describe('chapter-2 (trace visibility)', () => {
   const traceObserve = chapter2Steps.find((s) => s.id === STEP_ID_TRACE_OBSERVE)!;
 
   describe('trace-open step', () => {
-    it('is satisfied by a TracePanelOpened event emitted before the chapter started', () => {
-      // Returning-user case: the trace panel was visible from a previous
-      // session, so `TracePanel` emits `TracePanelOpened` on mount at
-      // tick 0. By the time chapter-2 starts (e.g., baseline tick 5),
-      // a step-scoped predicate would filter that event out. The
-      // session-scoped predicate accepts it and lets chapter-2 advance.
+    it('is satisfied when the panel is currently visible (returning user, restored open)', () => {
+      // Returning-user case: TracePanel emitted TracePanelOpened on
+      // mount when restored visible. No subsequent close → predicate
+      // sees the latest matching event is "open" → satisfied.
       const ctx = makeCtx({
         stepBaselineTick: 5,
         session: {
           tickIndex: 5,
-          recentEvents: [{ type: 'TracePanelOpened', tickIndex: 0 }],
+          recentEvents: [
+            { type: 'AgentTicked', tickIndex: 1 },
+            { type: 'TracePanelOpened', tickIndex: 0 },
+            { type: 'AgentTicked', tickIndex: 2 },
+          ],
         },
       });
       expect(traceOpen.completionPredicate(ctx)).toBe(true);
     });
 
-    it('is satisfied by a TracePanelOpened event emitted during the step itself', () => {
-      // Cold-start user toggles the panel mid-chapter — predicate
-      // fires on the live emission as well.
+    it('is satisfied when the user toggles the panel open mid-chapter', () => {
       const ctx = makeCtx({
         stepBaselineTick: 5,
         session: {
@@ -61,7 +61,23 @@ describe('chapter-2 (trace visibility)', () => {
       expect(traceOpen.completionPredicate(ctx)).toBe(true);
     });
 
-    it('is not satisfied when no TracePanelOpened event has been recorded', () => {
+    it('is NOT satisfied when the user opened then closed the panel before chapter-2', () => {
+      // The latest matching event is "closed" → flag is OFF, the user
+      // must reopen the panel on chapter-2 itself to advance.
+      const ctx = makeCtx({
+        stepBaselineTick: 5,
+        session: {
+          tickIndex: 5,
+          recentEvents: [
+            { type: 'TracePanelOpened', tickIndex: 1 },
+            { type: 'TracePanelClosed', tickIndex: 2 },
+          ],
+        },
+      });
+      expect(traceOpen.completionPredicate(ctx)).toBe(false);
+    });
+
+    it('is not satisfied when the panel has never been opened', () => {
       const ctx = makeCtx({
         stepBaselineTick: 5,
         session: {

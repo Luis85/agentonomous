@@ -5,15 +5,15 @@
  * Two-step shape so a stale paused frame from before the chapter
  * doesn't fast-forward the user past the dwell-tick observe step:
  *
- *   1. **trace-open** — satisfied when `TracePanelOpened` has been
- *      recorded at any point since session init. We use the
- *      session-scoped predicate (`eventEmittedSince(..., 0)`) rather
- *      than `eventEmittedSinceStep(...)` because `<TracePanel>`
- *      emits the event on mount when the panel is restored visible
- *      from `demo.v2.trace.visible` — that mount fires at tick 0,
- *      before chapter-2 starts, so a step-scoped predicate would
- *      filter it out and force the returning user to close + reopen
- *      the panel to advance.
+ *   1. **trace-open** — `flagOpen('TracePanelOpened', 'TracePanelClosed')`
+ *      checks the most recent matching event in the session buffer. The
+ *      panel emits `TracePanelOpened` on hidden→visible (and on mount
+ *      when restored visible), `TracePanelClosed` on visible→hidden,
+ *      so the predicate models "panel currently visible" through the
+ *      shared event stream. Returning users with the panel restored
+ *      visible advance without a forced extra toggle; users who
+ *      open-then-close the panel before the chapter still need to
+ *      re-open it on chapter-2 itself.
  *   2. **trace-observe** — give the user one more tick on the open
  *      panel so the trace they're looking at is the result of the
  *      reasoner running, not the cold-start zero state. This stays
@@ -23,8 +23,8 @@
 
 import {
   combineAll,
-  eventEmittedSince,
   eventEmittedSinceStep,
+  flagOpen,
   ticksSinceStepAtLeast,
 } from '../predicates.js';
 import type { WalkthroughStep } from '../types.js';
@@ -51,7 +51,7 @@ const traceOpenStep: WalkthroughStep = {
   title: traceOpenCopy.title,
   hint: traceOpenCopy.hint,
   highlight: TRACE_PANEL_HANDLE,
-  completionPredicate: eventEmittedSince('TracePanelOpened', 0),
+  completionPredicate: flagOpen('TracePanelOpened', 'TracePanelClosed'),
   nextOnComplete: STEP_ID_TRACE_OBSERVE,
 };
 

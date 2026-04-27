@@ -29,6 +29,7 @@ export {
   combineAny,
   eventEmittedSince,
   eventEmittedSinceStep,
+  flagOpen,
   not,
   onRoute,
   onRoutePrefix,

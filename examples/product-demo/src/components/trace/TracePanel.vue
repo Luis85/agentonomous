@@ -42,9 +42,12 @@ function toggle(): void {
   const next = !visible.value;
   visible.value = next;
   writeVisible(next);
-  // Tour-aware UI signal: chapter-2 step "trace-open" advances when the
-  // user reveals the panel for the first time on the current step.
-  if (next) session.recordUiEvent('TracePanelOpened');
+  // Tour-aware UI signal pair: chapter-2's `trace-open` predicate
+  // (`flagOpen('TracePanelOpened', 'TracePanelClosed')`) checks which
+  // event landed most recently to model "panel currently visible".
+  // Emit BOTH transitions so closing the panel revokes the flag and
+  // a stale historical open doesn't keep auto-advancing the chapter.
+  session.recordUiEvent(next ? 'TracePanelOpened' : 'TracePanelClosed');
 }
 
 const allCandidates = computed<readonly IntentionCandidate[]>(() => {
