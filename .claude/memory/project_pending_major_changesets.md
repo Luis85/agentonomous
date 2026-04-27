@@ -5,8 +5,10 @@ type: project
 ---
 
 Changesets under `.changeset/*.md` accumulate until the owner cuts the 1.0
-release. As of 2026-04-24, two major-bump changesets are queued (plus one
-minor-bump port addition that also lives in the same train):
+release. The pending changeset pile is the source of truth — skim
+`.changeset/*.md` before proposing a new changeset. The table below is an
+early snapshot (2026-04-24) preserved for context only and no longer
+maintained.
 
 | File                       | PR  | Bump  | What breaks                                                                                                                                        |
 | -------------------------- | --- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -14,9 +16,6 @@ minor-bump port addition that also lives in the same train):
 | `narrow-public-surface.md` | #67 | major | `AgentDependencies` removed from the public barrel; `AgentModule` / `ReactiveHandler` / `Needs` / `Modifiers` / `AgeModel` tagged `@experimental`. |
 | `llm-provider-port.md`     | #66 | minor | `LlmProviderPort` + `MockLlmProvider` added — public-surface addition.                                                                             |
 | `tfjs-learner.md`          | #70 | minor | `TfjsLearner` added to the `agentonomous/cognition/adapters/tfjs` subpath.                                                                         |
-
-Plus the older backlog from the tfjs-adapter PR and Phase A work under
-`.changeset/` (all pre-1.0).
 
 **How to apply:**
 

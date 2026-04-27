@@ -17,7 +17,7 @@ external narration.
 
 ## Pre-flight
 
-- Blocked by: rename preflight (`docs/plans/2026-04-26-pre-v1-demo-rename-preflight.md`). The `WalkthroughStep` contract lives under `examples/product-demo/src/demo-domain/walkthrough/` so the rename must merge first.
+- Rename preflight: resolved — archived at `docs/archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md` (PR #134, 2026-04-26).
 - Worktree pattern: `.worktrees/feat-tour-<slice>/`.
 - Tour copy tone is **OQ-P1** (open question) — settle in slice 1.2b review.
 - **Legacy recycle.** Slice 1.2a relocates pure modules from the legacy

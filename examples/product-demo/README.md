@@ -106,7 +106,7 @@ unsubscribe();
 
 Pair this with a `requestAnimationFrame` loop that calls
 `pet.tick(dt)` but does not render — the event drives UI. See
-`src/main.ts` for the reference implementation.
+`src/app/main.ts` for the reference implementation.
 
 ## Cognition switcher
 

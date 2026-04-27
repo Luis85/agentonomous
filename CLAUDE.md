@@ -37,8 +37,8 @@ MVP is a virtual-pet nurture demo (`examples/product-demo`).
   depends on an earlier unmerged one (rare).
 - **Worktrees per topic branch.** All feature / refactor / chore work
   happens in an isolated `git worktree` under `.worktrees/<branch-slug>`.
-  Worktree directory is `.worktrees/` (gitignored). This keeps
-  `D:\Projects\agent-library` itself on `develop` so multiple parallel
+  Worktree directory is `.worktrees/` (gitignored). This keeps the main
+  checkout itself on `develop` so multiple parallel
   agents (one per worktree) can each run `npm install` / `npm test` /
   `npm run dev` without stepping on each other's `node_modules` or vite
   caches. After PR merges: prune the worktree via
@@ -50,7 +50,7 @@ pull origin develop && git branch -d <topic>`. Delete the remote topic
   permissions allow). Prune stale tracking refs with `git fetch --prune
 origin` when switching contexts.
 - **Pre-PR gate.** `npm run verify` must be green before opening a PR.
-  Equivalent to `format:check && lint && typecheck && test && build`.
+  Equivalent to `format:check && lint && lint:demo && typecheck && test && build && docs`.
 - **No `--no-verify`.** If a pre-commit hook fails, fix the cause — don't
   bypass it. CI will reject `--no-verify`'d commits anyway.
 
