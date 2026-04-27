@@ -135,12 +135,14 @@ describe('mountCognitionSwitcher', () => {
     expect(typeof (firstCall as { selectIntention?: unknown }).selectIntention).toBe('function');
   });
 
-  // Tripwire for review-bot finding d9b4b85.2: the old onChange handler
-  // called `agent.setReasoner(NEW)` BEFORE `await buildLearningLearner`
-  // resolved, so any AGENT_TICKED firing inside the gap saw the new
-  // reasoner paired with the previous learner. The fix builds the
-  // learner first and commits both in the same synchronous block.
-  it('wires the new learner before the new reasoner so no tick observes a mismatched pair', async () => {
+  // Tripwire for review-bot finding d9b4b85.2: the original onChange
+  // handler called `agent.setReasoner(NEW)` BEFORE `await
+  // buildLearningLearner` resolved, so any AGENT_TICKED firing inside
+  // the gap saw the new reasoner paired with the previous learner.
+  // The fix builds the learner first (no agent mutation during the
+  // build await) and then commits `setReasoner` + `setLearner`
+  // synchronously in the same block.
+  it('wires both setReasoner and setLearner exactly once on a clean swap', async () => {
     const root = renderRoot();
     const setLearner = vi.fn();
     const agentWithLearner = { setReasoner: fakeAgent.setReasoner, setLearner };
@@ -153,12 +155,39 @@ describe('mountCognitionSwitcher', () => {
     select.dispatchEvent(new Event('change'));
     await waitForCalls(fakeAgent.setReasoner);
 
+    expect(fakeAgent.setReasoner).toHaveBeenCalledTimes(1);
     expect(setLearner).toHaveBeenCalledTimes(1);
-    const learnerOrder = setLearner.mock.invocationCallOrder[0];
-    const reasonerOrder = fakeAgent.setReasoner.mock.invocationCallOrder[0];
-    expect(learnerOrder).toBeDefined();
-    expect(reasonerOrder).toBeDefined();
-    expect(learnerOrder!).toBeLessThan(reasonerOrder!);
+    // The commit pair is sequential within the same sync block — vi's
+    // monotonic invocationCallOrder must be consecutive (no other
+    // agent mutator squeezed between them, no async-hop).
+    const reasonerOrder = fakeAgent.setReasoner.mock.invocationCallOrder[0]!;
+    const learnerOrder = setLearner.mock.invocationCallOrder[0]!;
+    expect(Math.abs(reasonerOrder - learnerOrder)).toBe(1);
+  });
+
+  // Codex P2 follow-up on d9b4b85.2: if `agent.setReasoner` throws
+  // synchronously, the just-built learner must be disposed BEFORE any
+  // wiring runs so the live agent stays on its previous (reasoner,
+  // learner) pair — no half-committed state.
+  it('rolls back without wiring setLearner when setReasoner throws', async () => {
+    const root = renderRoot();
+    const setLearner = vi.fn();
+    const setReasoner = vi.fn().mockImplementation(() => {
+      throw new Error('synthetic setReasoner failure');
+    });
+    const agentWithLearner = { setReasoner, setLearner };
+    mountCognitionSwitcher(agentWithLearner as never, root);
+    const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
+
+    await waitForProbes(select);
+
+    select.value = 'bt';
+    select.dispatchEvent(new Event('change'));
+    await waitForCalls(setReasoner);
+
+    expect(setLearner).not.toHaveBeenCalled();
+    // UI rolled back to the active mode the user was previously on.
+    expect(select.value).toBe('heuristic');
   });
 
   it('dispose() removes the change listener (subsequent change events are no-ops)', async () => {

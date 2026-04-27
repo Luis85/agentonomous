@@ -393,26 +393,25 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
   };
 
   /**
-   * Replace the agent's Stage-8 learner. For learning mode, builds a
-   * `TfjsLearner` that batch-trains the reasoner on observed outcomes;
-   * for every other mode, falls back to `NoopLearner` so accumulated
-   * outcomes from the prior mode don't bleed across switches.
+   * Construct the agent's next Stage-8 learner WITHOUT wiring it to the
+   * live agent. For learning mode, returns a `TfjsLearner` that
+   * batch-trains the supplied reasoner on observed outcomes; for every
+   * other mode, returns a fresh `NoopLearner` so accumulated outcomes
+   * from the prior mode don't bleed across switches.
    *
-   * Returns the new learner so the caller can stash it as the in-flight
-   * reference for HUD readout / disposal coordination.
+   * Wiring is the caller's responsibility — `onChange` calls
+   * `maybeSetLearner` only after `agent.setReasoner` has succeeded so a
+   * mid-swap reasoner-assignment failure cannot leave the agent with a
+   * new learner attached to the previous reasoner.
    */
-  const swapLearner = async (
+  const buildLearner = async (
     modeId: CognitionModeSpec['id'],
     reasoner: Reasoner,
   ): Promise<DisposableLearner> => {
     if (modeId === 'learning') {
-      const learner = (await buildLearningLearner(agent, reasoner)) as DisposableLearner;
-      maybeSetLearner(agent, learner);
-      return learner;
+      return (await buildLearningLearner(agent, reasoner)) as DisposableLearner;
     }
-    const noop = new NoopLearner() as DisposableLearner;
-    maybeSetLearner(agent, noop);
-    return noop;
+    return new NoopLearner() as DisposableLearner;
   };
 
   const disposeLearner = (l: DisposableLearner | null): void => {
@@ -437,26 +436,37 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         disposeIfOwned(reasoner);
         return;
       }
-      const previousReasoner = activeReasoner;
-      const previousLearner = activeLearner;
-      // Build the new learner BEFORE committing the reasoner swap so
-      // the agent never runs with a mismatched (reasoner, learner)
-      // pair. Original ordering called `agent.setReasoner(NEW)` first
-      // and then `await buildLearningLearner` before `maybeSetLearner`
-      // landed; any AGENT_TICKED firing inside that gap scored
-      // outcomes from the new reasoner against the old learner —
-      // training observations from the first N ticks after a switch
-      // into `learning` mode were silently discarded. With this
-      // ordering, `maybeSetLearner` (inside `swapLearner`) and
-      // `agent.setReasoner` land in the same synchronous block, so no
-      // tick can observe a mismatched pair.
-      const learner = await swapLearner(mode.id, reasoner);
+      // Build the new learner WITHOUT wiring it to the agent yet, so
+      // the `await` window between mode.construct() and the commit
+      // block leaves the live agent on its previous (reasoner,
+      // learner) pair. The original ordering called
+      // `agent.setReasoner(NEW)` and then `await buildLearningLearner`
+      // before `maybeSetLearner` ran; any AGENT_TICKED firing inside
+      // that gap scored outcomes from the new reasoner against the
+      // old learner — training observations from the first N ticks
+      // after a switch into `learning` mode were silently discarded.
+      const learner = await buildLearner(mode.id, reasoner);
       if (disposed || myEpoch !== changeEpoch) {
         disposeLearner(learner);
         disposeIfOwned(reasoner);
         return;
       }
-      agent.setReasoner(reasoner);
+      const previousReasoner = activeReasoner;
+      const previousLearner = activeLearner;
+      // Atomic commit: setReasoner is sync — if it throws, dispose
+      // both the just-built learner and the orphan reasoner before
+      // re-throwing so the live agent stays on its previous pair and
+      // the outer catch handles the UI rollback. setReasoner +
+      // maybeSetLearner must land in the same synchronous block; no
+      // tick can be observed between them.
+      try {
+        agent.setReasoner(reasoner);
+      } catch (err) {
+        disposeLearner(learner);
+        disposeIfOwned(reasoner);
+        throw err;
+      }
+      maybeSetLearner(agent, learner);
       activeReasoner = reasoner;
       activeModeId = mode.id;
       activeLearner = learner;
@@ -660,22 +670,32 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
         disposeIfOwned(reasoner);
         return;
       }
-      const previousReasoner = activeReasoner;
-      const previousLearner = activeLearner;
-      agent.setReasoner(reasoner);
-      activeReasoner = reasoner;
-      activeModeId = 'learning';
-      disposeIfOwned(previousReasoner);
       // Untrain wipes accumulated buffer too — a "reset to baseline"
       // shouldn't bake the previous run's evidence into the fresh
-      // reasoner via flush(). Drop the buffered outcomes via dispose,
-      // then rebuild a fresh learner around the new reasoner.
-      const learner = await swapLearner('learning', reasoner);
+      // reasoner via flush(). Build the fresh learner WITHOUT wiring
+      // it; the commit pair below applies setReasoner + setLearner
+      // atomically so a failure in the former rolls back without
+      // leaking the new learner onto the agent.
+      const learner = await buildLearner('learning', reasoner);
       if (disposed || myEpoch !== changeEpoch) {
         disposeLearner(learner);
+        disposeIfOwned(reasoner);
         return;
       }
+      const previousReasoner = activeReasoner;
+      const previousLearner = activeLearner;
+      try {
+        agent.setReasoner(reasoner);
+      } catch (err) {
+        disposeLearner(learner);
+        disposeIfOwned(reasoner);
+        throw err;
+      }
+      maybeSetLearner(agent, learner);
+      activeReasoner = reasoner;
+      activeModeId = 'learning';
       activeLearner = learner;
+      disposeIfOwned(previousReasoner);
       disposeLearner(previousLearner);
       startLearnerReadout();
       flashStatus(status, 'Reset to baseline ✓', TRAINED_FLASH_MS);
