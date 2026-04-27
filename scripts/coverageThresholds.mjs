@@ -21,15 +21,15 @@
  * Floor percentages for each v8 coverage metric. Vitest fails the build
  * if any actual percentage drops below the corresponding floor.
  *
- * **Baseline 2026-04-25 (commit f6e4464):** statements 76.22 / branches
- * 66.61 / functions 85.42 / lines 77.78. Floors set at
+ * **Baseline 2026-04-27 (commit ce1b291):** statements 87.12 / branches
+ * 77.25 / functions 91.05 / lines 89.53. Floors set at
  * `floor(measured − 2)`.
  */
 export const COVERAGE_THRESHOLDS = Object.freeze({
-  statements: 74,
-  branches: 64,
-  functions: 83,
-  lines: 75,
+  statements: 85,
+  branches: 75,
+  functions: 89,
+  lines: 87,
 });
 
 /**
