@@ -2,19 +2,31 @@
  * Chapter 2 — Trace visibility. The user opens the decision-trace panel
  * and watches a tick refresh through it.
  *
- * Two-step shape so the predicate doesn't auto-complete on a stale
- * panel-state from before the user reached the chapter:
+ * Two-step shape so a stale paused frame from before the chapter
+ * doesn't fast-forward the user past the dwell-tick observe step:
  *
- *   1. **trace-open** — wait for `<TracePanel>` to publish the
- *      synthetic `TracePanelOpened` UI event since this step started.
- *      The panel emits it via `useAgentSession.recordUiEvent` whenever
- *      the toggle goes from hidden → visible.
+ *   1. **trace-open** — satisfied when `TracePanelOpened` has been
+ *      recorded at any point since session init. We use the
+ *      session-scoped predicate (`eventEmittedSince(..., 0)`) rather
+ *      than `eventEmittedSinceStep(...)` because `<TracePanel>`
+ *      emits the event on mount when the panel is restored visible
+ *      from `demo.v2.trace.visible` — that mount fires at tick 0,
+ *      before chapter-2 starts, so a step-scoped predicate would
+ *      filter it out and force the returning user to close + reopen
+ *      the panel to advance.
  *   2. **trace-observe** — give the user one more tick on the open
  *      panel so the trace they're looking at is the result of the
- *      reasoner running, not the cold-start zero state.
+ *      reasoner running, not the cold-start zero state. This stays
+ *      step-scoped because the dwell semantics are about elapsed
+ *      time after the user reached this step, not session totals.
  */
 
-import { combineAll, eventEmittedSinceStep, ticksSinceStepAtLeast } from '../predicates.js';
+import {
+  combineAll,
+  eventEmittedSince,
+  eventEmittedSinceStep,
+  ticksSinceStepAtLeast,
+} from '../predicates.js';
 import type { WalkthroughStep } from '../types.js';
 import {
   STEP_ID_COGNITION_SWAP,
@@ -39,7 +51,7 @@ const traceOpenStep: WalkthroughStep = {
   title: traceOpenCopy.title,
   hint: traceOpenCopy.hint,
   highlight: TRACE_PANEL_HANDLE,
-  completionPredicate: eventEmittedSinceStep('TracePanelOpened'),
+  completionPredicate: eventEmittedSince('TracePanelOpened', 0),
   nextOnComplete: STEP_ID_TRACE_OBSERVE,
 };
 
