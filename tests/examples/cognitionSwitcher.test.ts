@@ -135,6 +135,32 @@ describe('mountCognitionSwitcher', () => {
     expect(typeof (firstCall as { selectIntention?: unknown }).selectIntention).toBe('function');
   });
 
+  // Tripwire for review-bot finding d9b4b85.2: the old onChange handler
+  // called `agent.setReasoner(NEW)` BEFORE `await buildLearningLearner`
+  // resolved, so any AGENT_TICKED firing inside the gap saw the new
+  // reasoner paired with the previous learner. The fix builds the
+  // learner first and commits both in the same synchronous block.
+  it('wires the new learner before the new reasoner so no tick observes a mismatched pair', async () => {
+    const root = renderRoot();
+    const setLearner = vi.fn();
+    const agentWithLearner = { setReasoner: fakeAgent.setReasoner, setLearner };
+    mountCognitionSwitcher(agentWithLearner as never, root);
+    const select = root.querySelector<HTMLSelectElement>('#cognition-mode-select')!;
+
+    await waitForProbes(select);
+
+    select.value = 'bt';
+    select.dispatchEvent(new Event('change'));
+    await waitForCalls(fakeAgent.setReasoner);
+
+    expect(setLearner).toHaveBeenCalledTimes(1);
+    const learnerOrder = setLearner.mock.invocationCallOrder[0];
+    const reasonerOrder = fakeAgent.setReasoner.mock.invocationCallOrder[0];
+    expect(learnerOrder).toBeDefined();
+    expect(reasonerOrder).toBeDefined();
+    expect(learnerOrder!).toBeLessThan(reasonerOrder!);
+  });
+
   it('dispose() removes the change listener (subsequent change events are no-ops)', async () => {
     const root = renderRoot();
     const handle = mountCognitionSwitcher(fakeAgent as never, root);

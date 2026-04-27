@@ -439,18 +439,28 @@ export function mountCognitionSwitcher(agent: Agent, rootEl: HTMLElement): Cogni
       }
       const previousReasoner = activeReasoner;
       const previousLearner = activeLearner;
-      agent.setReasoner(reasoner);
-      activeReasoner = reasoner;
-      activeModeId = mode.id;
-      disposeIfOwned(previousReasoner);
-      // Swap learners after the reasoner is in place — the new learner
-      // closes over the new reasoner via `buildLearningLearner`.
+      // Build the new learner BEFORE committing the reasoner swap so
+      // the agent never runs with a mismatched (reasoner, learner)
+      // pair. Original ordering called `agent.setReasoner(NEW)` first
+      // and then `await buildLearningLearner` before `maybeSetLearner`
+      // landed; any AGENT_TICKED firing inside that gap scored
+      // outcomes from the new reasoner against the old learner —
+      // training observations from the first N ticks after a switch
+      // into `learning` mode were silently discarded. With this
+      // ordering, `maybeSetLearner` (inside `swapLearner`) and
+      // `agent.setReasoner` land in the same synchronous block, so no
+      // tick can observe a mismatched pair.
       const learner = await swapLearner(mode.id, reasoner);
       if (disposed || myEpoch !== changeEpoch) {
         disposeLearner(learner);
+        disposeIfOwned(reasoner);
         return;
       }
+      agent.setReasoner(reasoner);
+      activeReasoner = reasoner;
+      activeModeId = mode.id;
       activeLearner = learner;
+      disposeIfOwned(previousReasoner);
       disposeLearner(previousLearner);
       status.dataset.mode = mode.id;
       status.textContent = 'active';
