@@ -19,7 +19,7 @@ import { defineConfig, devices } from '@playwright/test';
  * land alongside their owning pillar PRs.
  */
 const PORT = Number(process.env.E2E_PORT ?? 5173);
-const BASE_URL = `http://127.0.0.1:${String(PORT)}`;
+const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -32,7 +32,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: `npm run preview:e2e -- --port ${String(PORT)}`,
+    command: `npm run preview:e2e -- --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

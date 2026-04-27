@@ -375,7 +375,7 @@ Canonical status. Update the **Status** and **PR** cells in the same diff that s
 | Wave | Pillar | Plan | Status | PR |
 |---|---|---|---|---|
 | 0 | Demo rename preflight | [`rename-preflight`](../archive/plans/2026-04-26-pre-v1-demo-rename-preflight.md) (archived) | ✅ shipped | [#134](https://github.com/Luis85/agentonomous/pull/134) |
-| A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | ✅ shipped | [#140](https://github.com/Luis85/agentonomous/pull/140) (1.1) · [#146](https://github.com/Luis85/agentonomous/pull/146) (1.2a) · [#150](https://github.com/Luis85/agentonomous/pull/150) (1.2b) · [#153](https://github.com/Luis85/agentonomous/pull/153) (1.3) · TBD (1.4) |
+| A | Guided walkthrough | [`guided-walkthrough`](../plans/2026-04-26-pre-v1-demo-guided-walkthrough.md) | ✅ shipped | [#140](https://github.com/Luis85/agentonomous/pull/140) (1.1) · [#146](https://github.com/Luis85/agentonomous/pull/146) (1.2a) · [#150](https://github.com/Luis85/agentonomous/pull/150) (1.2b) · [#153](https://github.com/Luis85/agentonomous/pull/153) (1.3) · [#158](https://github.com/Luis85/agentonomous/pull/158) (1.4) |
 | A | Cognition diff panel | [`cognition-diff-panel`](../plans/2026-04-26-pre-v1-demo-cognition-diff-panel.md) | not started | — |
 | A | Determinism fingerprint | [`determinism-fingerprint`](../plans/2026-04-26-pre-v1-demo-determinism-fingerprint.md) | not started | — |
 | B | JSON preview / commit | [`json-preview-commit`](../plans/2026-04-26-pre-v1-demo-json-preview-commit.md) | not started | — |
