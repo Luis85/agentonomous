@@ -56,7 +56,12 @@ useRegisterSelector('hud.json.toggle');
 // Cognition picker (Pillar-1 slice 1.3): minimal placeholder until
 // Pillar-2 slice 2.5 ports the legacy cognitionSwitcher with its loss
 // sparkline + prediction strip. Probes the peer dep on first hover so
-// unavailable modes render disabled with an install hint.
+// unavailable modes render disabled with an install hint. `learning`
+// stays force-disabled here regardless of TF.js availability — the
+// store's `setCognitionMode` only wires the reasoner, not the paired
+// `TfjsLearner`, so enabling the option would silently disable online
+// training while the UI claims "Active: learning". The full switcher
+// (cognitionSwitcher.ts) is the supported path until slice 2.5.
 const cognitionAvailable = ref<Record<CognitionModeSpec['id'], boolean>>({
   heuristic: true,
   bt: false,
@@ -68,6 +73,10 @@ const cognitionError = ref<string | null>(null);
 async function probeCognitionModes(): Promise<void> {
   for (const mode of session.cognitionModes) {
     if (mode.id === 'heuristic') continue;
+    // See `cognitionAvailable` JSDoc — `learning` is intentionally
+    // pinned to false here. The store-side `setCognitionMode` also
+    // throws on `'learning'` as a defence-in-depth guard.
+    if (mode.id === 'learning') continue;
     try {
       cognitionAvailable.value = {
         ...cognitionAvailable.value,

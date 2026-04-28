@@ -7,6 +7,7 @@ import type {
   AgentTickedEvent,
   DecisionTrace,
   DomainEvent,
+  Reasoner,
   SpeciesDescriptor,
 } from 'agentonomous';
 import {
@@ -86,6 +87,23 @@ const RECENT_EVENT_LIMIT = 50;
  * Tour predicates only need identity equality across sibling snapshots,
  * not cryptographic uniqueness — `cyrb53` is plenty.
  */
+/**
+ * Best-effort reasoner disposal for stale-completion paths. Concrete
+ * reasoners may or may not implement `dispose()` (heuristic / bt / bdi
+ * don't; `TfjsReasoner` does, holding WebGL allocations). Duck-typed
+ * + try/catch so a noop reasoner is a no-op and a throwing dispose
+ * doesn't bubble out of the swap path.
+ */
+function disposeReasoner(reasoner: Reasoner): void {
+  const maybe = reasoner as { dispose?: () => void };
+  if (typeof maybe.dispose !== 'function') return;
+  try {
+    maybe.dispose();
+  } catch {
+    // Best-effort — disposal must not block the cognition swap.
+  }
+}
+
 function hashSeed(seedStr: string): number {
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
@@ -302,6 +320,20 @@ export const useAgentSession = defineStore('agentSession', () => {
     if (mode === undefined) {
       throw new Error(`useAgentSession.setCognitionMode: unknown mode "${String(modeId)}".`);
     }
+    // Learning mode requires a paired `TfjsLearner` so the online batch-
+    // training loop can score outcomes against the same network the
+    // reasoner runs inference on. The store path doesn't yet build a
+    // learner — wiring just the reasoner would leave the HUD claiming
+    // "Active: learning" while online training is silently disabled.
+    // The full reasoner+learner switcher lives in `cognitionSwitcher.ts`
+    // (Pillar-2 slice 2.5 ports it onto the store path). Refuse here so a
+    // caller bypassing the HUD's disabled-option guard fails loudly
+    // instead of running in the broken intermediate state.
+    if (modeId === 'learning') {
+      throw new Error(
+        'useAgentSession.setCognitionMode: learning mode is not yet wired through the store path — use the legacy cognitionSwitcher (Pillar-2 slice 2.5).',
+      );
+    }
     const targetAgent = agent.value;
     if (targetAgent === null) {
       throw new Error('useAgentSession.setCognitionMode: no live agent (call init() first).');
@@ -318,7 +350,17 @@ export const useAgentSession = defineStore('agentSession', () => {
       throw new Error(`useAgentSession.setCognitionMode: ${hint}`);
     }
     const reasoner = await mode.construct();
-    if (myToken !== cognitionToken || agent.value !== targetAgent) return;
+    if (myToken !== cognitionToken || agent.value !== targetAgent) {
+      // Stale completion: a parallel `init()` / `replayFromSnapshot()` /
+      // second `setCognitionMode()` landed while `mode.construct()` was
+      // in flight. The freshly-built reasoner will never be adopted —
+      // dispose it before dropping the reference so peer-dep adapters
+      // that hold native handles (e.g. `TfjsReasoner`'s WebGL
+      // allocations) don't leak. Mirrors `cognitionSwitcher.ts`'s
+      // `disposeIfOwned` on its analogous stale-epoch guard.
+      disposeReasoner(reasoner);
+      return;
+    }
     targetAgent.setReasoner(reasoner);
     cognitionModeId.value = modeId;
     recordUiEvent('CognitionModeChanged');
