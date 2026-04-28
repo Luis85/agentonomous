@@ -320,6 +320,19 @@ export const useAgentSession = defineStore('agentSession', () => {
     if (mode === undefined) {
       throw new Error(`useAgentSession.setCognitionMode: unknown mode "${String(modeId)}".`);
     }
+    const targetAgent = agent.value;
+    if (targetAgent === null) {
+      throw new Error('useAgentSession.setCognitionMode: no live agent (call init() first).');
+    }
+    // Bump the token BEFORE the learning guard so a prior in-flight
+    // swap is invalidated even when this call rejects synchronously.
+    // Without this, a caller bypassing the HUD's disabled-option guard
+    // who issued `setCognitionMode('learning')` while another mode
+    // change was still constructing would see the older swap land
+    // after the error — a surprising late mode switch from a call
+    // that already failed.
+    cognitionToken += 1;
+    const myToken = cognitionToken;
     // Learning mode requires a paired `TfjsLearner` so the online batch-
     // training loop can score outcomes against the same network the
     // reasoner runs inference on. The store path doesn't yet build a
@@ -334,12 +347,6 @@ export const useAgentSession = defineStore('agentSession', () => {
         'useAgentSession.setCognitionMode: learning mode is not yet wired through the store path — use the legacy cognitionSwitcher (Pillar-2 slice 2.5).',
       );
     }
-    const targetAgent = agent.value;
-    if (targetAgent === null) {
-      throw new Error('useAgentSession.setCognitionMode: no live agent (call init() first).');
-    }
-    cognitionToken += 1;
-    const myToken = cognitionToken;
     const available = await mode.probe();
     if (myToken !== cognitionToken || agent.value !== targetAgent) return;
     if (!available) {

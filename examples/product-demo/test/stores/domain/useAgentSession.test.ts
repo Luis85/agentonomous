@@ -478,6 +478,47 @@ describe('useAgentSession', () => {
     );
   });
 
+  it('setCognitionMode("learning") invalidates a prior in-flight swap so the older swap cannot land after the throw', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-learning-invalidates-seed' });
+    const liveAgent = session.agent!;
+    const setReasonerSpy = vi.spyOn(liveAgent, 'setReasoner');
+
+    // Defer heuristic's construct so we can race a synchronous
+    // `setCognitionMode('learning')` against the suspended swap. Without
+    // bumping `cognitionToken` BEFORE the learning guard's throw, the
+    // earlier swap would still resolve and call `setReasoner` after the
+    // synchronous rejection — a late, surprising mode switch from a call
+    // that already failed.
+    const heuristic = session.cognitionModes.find((m) => m.id === 'heuristic')!;
+    const originalConstruct = heuristic.construct.bind(heuristic);
+    let resolveConstruct!: (reasoner: Awaited<ReturnType<typeof originalConstruct>>) => void;
+    const constructSpy = vi.spyOn(heuristic, 'construct').mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof originalConstruct>>>((resolve) => {
+          resolveConstruct = resolve;
+        }),
+    );
+
+    const firstSwap = session.setCognitionMode('heuristic');
+    // Flush probe so the function suspends on construct.
+    await Promise.resolve();
+    await Promise.resolve();
+    // The learning guard rejects synchronously; the token bump that
+    // PRECEDES the throw is what invalidates the suspended first swap.
+    await expect(session.setCognitionMode('learning')).rejects.toThrow(
+      /learning mode is not yet wired/i,
+    );
+    // Resolve the first swap's construct AFTER the rejection so the
+    // stale-epoch guard fires on its return path.
+    resolveConstruct(await originalConstruct());
+    await firstSwap;
+
+    expect(setReasonerSpy).not.toHaveBeenCalled();
+    constructSpy.mockRestore();
+    setReasonerSpy.mockRestore();
+  });
+
   it('recordUiEvent bumps recentEventsVersion every push, even past the ring-buffer cap', async () => {
     const session = useAgentSession();
     session.init({ seed: 'recent-events-version-seed' });
