@@ -70,6 +70,31 @@ describe('<TourView>', () => {
     wrapper.unmount();
   });
 
+  it('logs a warning when syncRoute rejects (e.g. a navigation guard blocks the push)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const { wrapper, router } = await mountTourAt(`/tour/${STEP_ID_AUTONOMY}`);
+
+      // Replace `router.push` with a rejecting stub. The TourView watcher on
+      // `tour.lastStep` triggers `syncRoute(router)`, which then awaits the
+      // failing push. Without the `.catch` the rejection becomes a silent
+      // unhandled promise; with it the warning lands on `console.warn`.
+      const pushSpy = vi
+        .spyOn(router, 'push')
+        .mockRejectedValueOnce(new Error('synthetic guard rejection'));
+
+      const tour = useTourProgress();
+      tour.lastStep = STEP_ID_COGNITION_SWAP;
+      await flushPromises();
+
+      expect(pushSpy).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith('[TourView] syncRoute failed:', expect.any(Error));
+      wrapper.unmount();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('on mount with an upstream URL step, leaves the cursor on the persisted progress', async () => {
     // Seed persisted progress at chapter-3.
     globalThis.localStorage.setItem(

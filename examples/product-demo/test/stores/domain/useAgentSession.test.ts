@@ -392,6 +392,133 @@ describe('useAgentSession', () => {
     expect(session.cognitionModeId).toBe('heuristic');
   });
 
+  it('setCognitionMode disposes the freshly-constructed reasoner when init() invalidates the swap mid-construct', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-dispose-seed-1' });
+    const firstAgent = session.agent;
+    expect(firstAgent).not.toBeNull();
+
+    // Defer `construct` so init() can land between the probe-stale check
+    // (already passed) and the construct-stale check we want to exercise.
+    // Without the deferral, probe + construct both flush in one microtask
+    // and the synchronous init() reaches the function only after
+    // setCognitionMode has already returned past the probe-stale guard.
+    const heuristic = session.cognitionModes.find((m) => m.id === 'heuristic')!;
+    const originalConstruct = heuristic.construct.bind(heuristic);
+    let resolveConstruct!: (reasoner: Awaited<ReturnType<typeof originalConstruct>>) => void;
+    const constructSpy = vi.spyOn(heuristic, 'construct').mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof originalConstruct>>>((resolve) => {
+          resolveConstruct = resolve;
+        }),
+    );
+
+    const swap = session.setCognitionMode('heuristic');
+    // Flush probe's microtask so setCognitionMode advances to the
+    // suspended `await mode.construct()`. Two flushes give probe's
+    // continuation room to schedule construct, then suspend on it.
+    await Promise.resolve();
+    await Promise.resolve();
+    // Now race a fresh init() against the suspended construct. Bumps
+    // cognitionToken AND swaps `agent.value`, so both stale-epoch
+    // predicates fire when construct resolves.
+    session.init({ seed: 'cognition-dispose-seed-2' });
+
+    // Build a real reasoner and attach a dispose spy. The swap will
+    // discard this reasoner via the stale-epoch guard — without the
+    // fix, a `TfjsReasoner` would leak its WebGL allocations.
+    const inner = await originalConstruct();
+    let disposed = false;
+    const reasonerWithDispose = Object.assign(inner, {
+      dispose: () => {
+        disposed = true;
+      },
+    });
+    resolveConstruct(reasonerWithDispose);
+    await swap;
+
+    expect(disposed).toBe(true);
+    constructSpy.mockRestore();
+  });
+
+  it('setCognitionMode tolerates reasoners without a dispose method on the stale-epoch path', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-no-dispose-seed-1' });
+
+    // Default heuristic reasoner (`UrgencyReasoner`) has no `dispose`
+    // method; the duck-type check in `disposeReasoner` must skip
+    // without throwing. Race construct + init() the same way the
+    // dispose test does, but with the unmodified mode.
+    const heuristic = session.cognitionModes.find((m) => m.id === 'heuristic')!;
+    const originalConstruct = heuristic.construct.bind(heuristic);
+    let resolveConstruct!: (reasoner: Awaited<ReturnType<typeof originalConstruct>>) => void;
+    const constructSpy = vi.spyOn(heuristic, 'construct').mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof originalConstruct>>>((resolve) => {
+          resolveConstruct = resolve;
+        }),
+    );
+
+    const swap = session.setCognitionMode('heuristic');
+    await Promise.resolve();
+    await Promise.resolve();
+    session.init({ seed: 'cognition-no-dispose-seed-2' });
+
+    const inner = await originalConstruct();
+    resolveConstruct(inner);
+    await expect(swap).resolves.toBeUndefined();
+    constructSpy.mockRestore();
+  });
+
+  it('setCognitionMode("learning") throws because the store does not yet wire a paired learner', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-learning-guard-seed' });
+    await expect(session.setCognitionMode('learning')).rejects.toThrow(
+      /learning mode is not yet wired/i,
+    );
+  });
+
+  it('setCognitionMode("learning") invalidates a prior in-flight swap so the older swap cannot land after the throw', async () => {
+    const session = useAgentSession();
+    session.init({ seed: 'cognition-learning-invalidates-seed' });
+    const liveAgent = session.agent!;
+    const setReasonerSpy = vi.spyOn(liveAgent, 'setReasoner');
+
+    // Defer heuristic's construct so we can race a synchronous
+    // `setCognitionMode('learning')` against the suspended swap. Without
+    // bumping `cognitionToken` BEFORE the learning guard's throw, the
+    // earlier swap would still resolve and call `setReasoner` after the
+    // synchronous rejection — a late, surprising mode switch from a call
+    // that already failed.
+    const heuristic = session.cognitionModes.find((m) => m.id === 'heuristic')!;
+    const originalConstruct = heuristic.construct.bind(heuristic);
+    let resolveConstruct!: (reasoner: Awaited<ReturnType<typeof originalConstruct>>) => void;
+    const constructSpy = vi.spyOn(heuristic, 'construct').mockImplementationOnce(
+      () =>
+        new Promise<Awaited<ReturnType<typeof originalConstruct>>>((resolve) => {
+          resolveConstruct = resolve;
+        }),
+    );
+
+    const firstSwap = session.setCognitionMode('heuristic');
+    // Flush probe so the function suspends on construct.
+    await Promise.resolve();
+    await Promise.resolve();
+    // The learning guard rejects synchronously; the token bump that
+    // PRECEDES the throw is what invalidates the suspended first swap.
+    await expect(session.setCognitionMode('learning')).rejects.toThrow(
+      /learning mode is not yet wired/i,
+    );
+    // Resolve the first swap's construct AFTER the rejection so the
+    // stale-epoch guard fires on its return path.
+    resolveConstruct(await originalConstruct());
+    await firstSwap;
+
+    expect(setReasonerSpy).not.toHaveBeenCalled();
+    constructSpy.mockRestore();
+    setReasonerSpy.mockRestore();
+  });
+
   it('recordUiEvent bumps recentEventsVersion every push, even past the ring-buffer cap', async () => {
     const session = useAgentSession();
     session.init({ seed: 'recent-events-version-seed' });

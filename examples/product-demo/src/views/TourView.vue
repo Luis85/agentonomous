@@ -24,12 +24,23 @@ const tour = useTourProgress();
 const router = useRouter();
 const route = useRoute();
 
+/**
+ * Surface `router.push` rejections from `syncRoute` instead of swallowing
+ * them with a bare `void`. A future navigation guard that blocks
+ * `/tour/...` mid-session would otherwise silently fail — the URL
+ * never updates, the chapter predicate never fires, and the tour
+ * appears stuck with no console output during development.
+ */
+function logSyncRouteFailure(err: unknown): void {
+  globalThis.console?.warn('[TourView] syncRoute failed:', err);
+}
+
 function reconcileFromRoute(): void {
   const stepRaw = route.params['step'];
   if (typeof stepRaw === 'string' && stepRaw.length > 0) {
     tour.resumeFromRoute(stepRaw);
   }
-  void tour.syncRoute(router);
+  tour.syncRoute(router).catch(logSyncRouteFailure);
 }
 
 onMounted(reconcileFromRoute);
@@ -39,7 +50,7 @@ watch(() => route.params['step'], reconcileFromRoute);
 watch(
   () => tour.lastStep,
   () => {
-    void tour.syncRoute(router);
+    tour.syncRoute(router).catch(logSyncRouteFailure);
   },
 );
 </script>
