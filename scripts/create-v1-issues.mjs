@@ -24,6 +24,9 @@ if (!repository?.includes('/')) {
 
 const [owner, repo] = repository.split('/');
 const milestoneTitle = process.env.ISSUE_MILESTONE ?? 'v1.0';
+const labelOverride = process.env.ISSUE_LABELS
+  ? process.env.ISSUE_LABELS.split(',').map((v) => v.trim()).filter(Boolean)
+  : null;
 
 const issues = [
   [
@@ -134,10 +137,7 @@ async function resolveMilestone() {
 (async () => {
   const milestone = await resolveMilestone();
   for (const [title, labelsCsv, body] of issues) {
-    const labels = labelsCsv
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const labels = labelOverride ?? labelsCsv.split(',').map((v) => v.trim()).filter(Boolean);
     const payload = { title, body, labels };
     if (milestone !== undefined) payload.milestone = milestone;
     const created = await gh(`/repos/${owner}/${repo}/issues`, {
