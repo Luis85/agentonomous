@@ -24,6 +24,11 @@ if (!repository?.includes('/')) {
 
 const [owner, repo] = repository.split('/');
 const milestoneTitle = process.env.ISSUE_MILESTONE ?? 'v1.0';
+const labelOverride = process.env.ISSUE_LABELS
+  ? process.env.ISSUE_LABELS.split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+  : null;
 
 const issues = [
   [
@@ -126,18 +131,27 @@ async function gh(path, init = {}) {
 }
 
 async function resolveMilestone() {
-  const open = await gh(`/repos/${owner}/${repo}/milestones?state=open&per_page=100`);
-  const found = open.find((m) => m.title === milestoneTitle);
-  return found?.number;
+  let page = 1;
+  while (true) {
+    const batch = await gh(
+      `/repos/${owner}/${repo}/milestones?state=open&per_page=100&page=${page}`,
+    );
+    const found = batch.find((m) => m.title === milestoneTitle);
+    if (found) return found.number;
+    if (batch.length < 100) return undefined;
+    page++;
+  }
 }
 
 (async () => {
   const milestone = await resolveMilestone();
   for (const [title, labelsCsv, body] of issues) {
-    const labels = labelsCsv
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const labels =
+      labelOverride ??
+      labelsCsv
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
     const payload = { title, body, labels };
     if (milestone !== undefined) payload.milestone = milestone;
     const created = await gh(`/repos/${owner}/${repo}/issues`, {
