@@ -131,9 +131,16 @@ async function gh(path, init = {}) {
 }
 
 async function resolveMilestone() {
-  const open = await gh(`/repos/${owner}/${repo}/milestones?state=open&per_page=100`);
-  const found = open.find((m) => m.title === milestoneTitle);
-  return found?.number;
+  let page = 1;
+  while (true) {
+    const batch = await gh(
+      `/repos/${owner}/${repo}/milestones?state=open&per_page=100&page=${page}`,
+    );
+    const found = batch.find((m) => m.title === milestoneTitle);
+    if (found) return found.number;
+    if (batch.length < 100) return undefined;
+    page++;
+  }
 }
 
 (async () => {
