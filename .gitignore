@@ -16,6 +16,7 @@ examples/**/test-results
 .worktrees
 .review-fix-cache
 .plan-recon-cache/
+.docs-review-cache/
 .claude/settings.local.json
 .claude/.last-run
 
